@@ -10,21 +10,21 @@ export const handler = async (event) => {
     const limit = Math.min(Number(q.get("limit") || 100), 1000);
     const pageOffset = Number(q.get("offset") || 0);
 
-    /* - oringinal SQL, returns all SteadyState
+    
     let vql = `
       SELECT id, name__v, status__v, major_version_number__v, minor_version_number__v, type__v
       FROM documents
       WHERE status__v = STEADYSTATE()
     `;
-    */
     
-let vql = `
+    
+/*let vql = `
   SELECT id, name__v, status__v, major_version_number__v, minor_version_number__v, type__v
   FROM documents
   WHERE status__v = STEADYSTATE()
     AND type__v = 'Quality System Master Document'
   ORDER BY name__v
-`;
+`;*/
 
     
     
