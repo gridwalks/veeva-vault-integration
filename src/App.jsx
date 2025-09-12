@@ -9,8 +9,13 @@ export default function App() {
   const [data, setData] = useState({ items: [], total: 0, pageOffset: 0, pageSize: 50 });
 
   async function load(offset = 0) {
-    const res = await listApproved({ name: q, limit: 50, offset });
-    setData(res);
+    try {
+      const res = await listApproved({ name: q, limit: 50, offset });
+      setData(res);
+    } catch (err) {
+      console.error(err);
+      setData({ items: [], total: 0, pageOffset: 0, pageSize: 50, error: err.message });
+    }
   }
 
   useEffect(() => { load(0); }, []);
@@ -31,11 +36,13 @@ export default function App() {
           <button style={{padding:'8px 12px'}}>Search</button>
         </form>
 
+        {data.error && <p style={{color:'#b00020'}}>Error: {data.error}</p>}
+
         <DocumentList items={data.items} />
 
         <div className="pager" style={{display:'flex', gap:12, alignItems:'center', marginTop:12}}>
           <button disabled={data.pageOffset <= 0} onClick={() => load(Math.max(0, data.pageOffset - data.pageSize))}>Prev</button>
-          <span>{data.pageOffset + 1}–{data.pageOffset + data.items.length} of {data.total}</span>
+          <span>{data.pageOffset + 1}–{data.pageOffset + (data.items?.length || 0)} of {data.total}</span>
           <button disabled={data.pageOffset + data.pageSize >= data.total} onClick={() => load(data.pageOffset + data.pageSize)}>Next</button>
         </div>
       </main>
