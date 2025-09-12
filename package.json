@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "netlify dev",
-    "build": "echo 'Netlify builds functions automatically'",
+    "build": "vite build",
     "start": "netlify dev"
   },
   "dependencies": {

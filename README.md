@@ -43,8 +43,9 @@ Netlify CLI will read `.env` for local dev. In production, set these in **Netlif
 1. Create a new repo in GitHub.
 2. Upload this project (or import zip below).
 3. In Netlify, **New site from Git**, select your repo.
-4. In **Environment variables**, add the variables shown above.
-5. Deploy. (Functions are under `netlify/functions/*` and are auto-built by Netlify.)
+4. In **Build settings**, set the build command to `npm run build` and the publish directory to `dist`.
+5. In **Environment variables**, add the variables shown above.
+6. Deploy. (Functions are under `netlify/functions/*` and are auto-built by Netlify.)
 
 ## Notes
 
