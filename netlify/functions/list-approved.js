@@ -14,8 +14,7 @@ export const handler = async (event) => {
     let vql = `
       SELECT id, name__v, status__v, major_version_number__v, minor_version_number__v, type__v
       FROM documents
-      --WHERE status__v = STEADYSTATE()
-        AND type__v = 'Quality System Master Document'
+        where type__v = 'Quality System Master Document'
     `;
 
     
