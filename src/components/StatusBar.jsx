@@ -1,3 +1,4 @@
+// src/components/StatusBar.jsx
 import { useEffect, useState } from "react";
 
 export default function StatusBar() {
@@ -15,12 +16,20 @@ export default function StatusBar() {
 
   useEffect(() => { load(); }, []);
 
-  const { ok, loading, error } = status;
+  const { ok, loading, error, data } = status;
   const color = loading ? "#999" : ok ? "#0a7d00" : "#b00020";
+
+  const rawUser = data?.user || {};
+  const fallback =
+    rawUser.name || rawUser.username || rawUser.full_name__v ||
+    rawUser.user_name__v || rawUser.email || rawUser.id;
+
+  const name = data?.displayName || fallback;
+
   const text = loading
     ? "Checking Vault connection..."
     : ok
-      ? `Connected as ${status.data?.user?.name || status.data?.user?.username}`
+      ? (name ? `Connected as ${name}` : "Connected")
       : `Vault not reachable${error ? `: ${error}` : ""}`;
 
   return (
