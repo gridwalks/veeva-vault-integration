@@ -20,6 +20,8 @@ VAULT_DOMAIN=y-prime-quality.veevavault.com
 VAULT_API_VERSION=v25.2
 VAULT_USERNAME=<your_vault_username>
 VAULT_PASSWORD=<your_vault_password>
+VITE_AUTH0_DOMAIN=<your_auth0_domain>
+VITE_AUTH0_CLIENT_ID=<your_auth0_client_id>
 ```
 
 Netlify CLI will read `.env` for local dev. In production, set these in **Netlify → Site settings → Environment variables**.
@@ -34,6 +36,7 @@ Netlify CLI will read `.env` for local dev. In production, set these in **Netlif
 
 ## UI
 
+- Requires Auth0 login to access document list.
 - **StatusBar** shows live readiness across the top.
 - Search/filter by name and paginate.
 - Download the underlying file via proxied endpoint.
