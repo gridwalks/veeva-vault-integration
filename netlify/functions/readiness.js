@@ -1,4 +1,14 @@
+// netlify/functions/readiness.js
 import { getSessionId } from "./vault-auth.js";
+
+function pickDisplayName(u = {}) {
+  // Try common fields from Vault users API and custom profiles
+  return (
+    u.name || u.username || u.full_name__v || u.user_name__v ||
+    u.fullName || u.first_name__v && u.last_name__v && `${u.first_name__v} ${u.last_name__v}` ||
+    u.email || u.email__v || u.id || "Authenticated user"
+  );
+}
 
 export const handler = async () => {
   try {
@@ -19,6 +29,7 @@ export const handler = async () => {
     const who = await whoRes.json();
     const whoOk = whoRes.ok && who?.responseStatus === "SUCCESS";
 
+    const user = whoOk ? (who?.user || who?.data || who) : null;
     const ok = limitsOk && whoOk;
 
     return {
@@ -30,10 +41,8 @@ export const handler = async () => {
           limits: { ok: limitsOk, raw: limits },
           whoami: { ok: whoOk, raw: who },
         },
-        user:
-          whoOk
-            ? (who?.user || who?.data || null)
-            : null,
+        user,
+        displayName: user ? pickDisplayName(user) : null,
         timestamp: new Date().toISOString(),
       }),
     };
