@@ -15,7 +15,6 @@ export const handler = async (event) => {
       SELECT id, name__v, status__v, major_version_number__v, minor_version_number__v, type__v
       FROM documents
         WHERE status__v = STEADYSTATE() AND
-        type__v = 'Quality System Master Document' AND
         subtype__v = "Standard Operating Procedure'
     `;
 
