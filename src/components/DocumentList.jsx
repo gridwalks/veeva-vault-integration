@@ -10,7 +10,7 @@ export default function DocumentList({ items = [] }) {
             <strong>{d.name}</strong>
             <div className="sub" style={{fontSize:12, color:'#555'}}>#{d.id} · {d.status} · v{d.major}.{d.minor}</div>
           </div>
-          <a href={downloadUrl({ id: d.id, major: d.major, minor: d.minor })}>Download</a>
+          <a href={downloadUrl({ id: d.id, number: d.document_number__v, major: d.major, minor: d.minor })}>Download</a>
         </li>
       ))}
     </ul>
