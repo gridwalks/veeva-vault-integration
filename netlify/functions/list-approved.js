@@ -53,6 +53,7 @@ export const handler = async (event) => {
         pageSize: data.responseDetails?.pagesize ?? limit,
         items: (data.data || []).map(d => ({
           id: d.id,
+          number: d.document_number__v,
           name: d.name__v,
           status: d.status__v,
           major: d.major_version_number__v,
