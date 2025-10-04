@@ -80,8 +80,15 @@ export const handler = async (event) => {
     const pool = getPool();
     const results = [];
 
-    for (const doc of documents) {
+    console.log(`Processing ${documents.length} documents...`);
+
+    for (let i = 0; i < documents.length; i++) {
+      const doc = documents[i];
+      const docStartTime = Date.now();
+      
       try {
+        console.log(`Processing document ${i + 1}/${documents.length}: ${doc.name__v} (${doc.id})`);
+        
         // Check if document already exists
         const existingDoc = await pool.query(
           'SELECT * FROM document_index WHERE veeva_document_id = $1',
@@ -108,6 +115,7 @@ export const handler = async (event) => {
             existing.status !== documentData.status;
 
           if (needsUpdate) {
+            console.log(`Updating existing document: ${doc.name__v}`);
             // Update existing record
             await pool.query(`
               UPDATE document_index 
@@ -127,7 +135,9 @@ export const handler = async (event) => {
               document: documentData,
               summary: existing.summary // Keep existing summary
             });
+            console.log(`Document updated: ${doc.name__v}`);
           } else {
+            console.log(`Document unchanged: ${doc.name__v}`);
             results.push({
               action: 'unchanged',
               document: documentData,
@@ -136,17 +146,23 @@ export const handler = async (event) => {
           }
         } else {
           // New document - fetch content and generate summary
+          console.log(`Processing new document: ${doc.name__v}`);
           let summary = null;
           try {
             // Download document content
+            console.log(`Downloading content for document: ${doc.id}`);
             const downloadRes = await fetch(`https://${domain}/api/${v}/objects/documents/${doc.id}/file`, {
               headers: { "Authorization": sessionId }
             });
 
             if (downloadRes.ok) {
               const documentContent = await downloadRes.text();
+              console.log(`Downloaded ${documentContent.length} characters for document: ${doc.id}`);
               
               // Generate summary using OpenAI
+              console.log(`Generating AI summary for document: ${doc.id}`);
+              const openaiStartTime = Date.now();
+              
               const completion = await openai.chat.completions.create({
                 model: "gpt-3.5-turbo",
                 messages: [
@@ -163,14 +179,30 @@ export const handler = async (event) => {
                 temperature: 0.3,
               });
 
+              const openaiDuration = Date.now() - openaiStartTime;
               summary = completion.choices[0]?.message?.content || null;
+              console.log(`AI summary generated in ${openaiDuration}ms for document: ${doc.id}`, {
+                summaryLength: summary?.length || 0,
+                tokensUsed: completion.usage?.total_tokens || 0
+              });
+            } else {
+              console.error(`Failed to download document content: ${doc.id}`, {
+                status: downloadRes.status,
+                statusText: downloadRes.statusText
+              });
             }
           } catch (error) {
-            console.error(`Error generating summary for document ${doc.id}:`, error);
+            console.error(`Error generating summary for document ${doc.id}:`, {
+              message: error.message,
+              stack: error.stack,
+              documentId: doc.id,
+              documentName: doc.name__v
+            });
             // Continue without summary
           }
 
           // Insert new record
+          console.log(`Inserting new document record: ${doc.id}`);
           await pool.query(`
             INSERT INTO document_index 
             (veeva_document_id, document_number, document_name, major_version, minor_version, document_type, status, summary)
@@ -191,9 +223,22 @@ export const handler = async (event) => {
             document: documentData,
             summary: summary
           });
+          console.log(`Document inserted: ${doc.name__v}`);
         }
+
+        const docDuration = Date.now() - docStartTime;
+        console.log(`Document processed in ${docDuration}ms: ${doc.name__v}`);
+        
       } catch (error) {
-        console.error(`Error processing document ${doc.id}:`, error);
+        const docDuration = Date.now() - docStartTime;
+        console.error(`Error processing document ${doc.id} after ${docDuration}ms:`, {
+          message: error.message,
+          stack: error.stack,
+          documentId: doc.id,
+          documentName: doc.name__v,
+          documentNumber: doc.document_number__v
+        });
+        
         results.push({
           action: 'error',
           document: {
@@ -206,17 +251,41 @@ export const handler = async (event) => {
       }
     }
 
+    const totalDuration = Date.now() - startTime;
+    const stats = {
+      created: results.filter(r => r.action === 'created').length,
+      updated: results.filter(r => r.action === 'updated').length,
+      unchanged: results.filter(r => r.action === 'unchanged').length,
+      errors: results.filter(r => r.action === 'error').length
+    };
+
+    console.log('Document indexing completed:', {
+      totalDuration: `${totalDuration}ms`,
+      totalDocuments: documents.length,
+      processed: results.length,
+      stats,
+      timestamp: new Date().toISOString()
+    });
+
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         total: documents.length,
         processed: results.length,
+        duration: totalDuration,
+        stats,
         results: results
       }),
     };
   } catch (e) {
-    console.error('Index documents error:', e);
+    const totalDuration = Date.now() - startTime;
+    console.error('Index documents error:', {
+      message: e.message,
+      stack: e.stack,
+      duration: `${totalDuration}ms`,
+      timestamp: new Date().toISOString()
+    });
     return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
   }
 };
