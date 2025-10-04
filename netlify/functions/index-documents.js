@@ -142,13 +142,36 @@ export const handler = async (event) => {
       const docStartTime = Date.now();
       
       try {
-        console.log(`Processing document ${i + 1}/${documents.length}: ${doc.name__v} (${doc.id})`);
+        console.log(`=== PROCESSING DOCUMENT ${i + 1}/${documents.length} ===`);
+        console.log(`Document: ${doc.name__v} (${doc.id})`);
+        console.log(`Document details:`, {
+          id: doc.id,
+          number: doc.document_number__v,
+          name: doc.name__v,
+          status: doc.status__v,
+          major: doc.major_version_number__v,
+          minor: doc.minor_version_number__v,
+          type: doc.type__v
+        });
         
         // Check if document already exists
+        console.log(`Checking if document ${doc.id} already exists in database...`);
         const existingDoc = await pool.query(
           'SELECT * FROM document_index WHERE veeva_document_id = $1',
           [doc.id]
         );
+        
+        console.log(`Database lookup result:`, {
+          found: existingDoc.rows.length > 0,
+          rowCount: existingDoc.rows.length,
+          existingRecord: existingDoc.rows[0] ? {
+            id: existingDoc.rows[0].id,
+            document_name: existingDoc.rows[0].document_name,
+            major_version: existingDoc.rows[0].major_version,
+            minor_version: existingDoc.rows[0].minor_version,
+            status: existingDoc.rows[0].status
+          } : null
+        });
 
         const documentData = {
           veeva_document_id: doc.id,
@@ -160,8 +183,11 @@ export const handler = async (event) => {
           status: doc.status__v,
         };
 
+        console.log(`Prepared document data:`, documentData);
+
         // If document exists, check if we need to update
         if (existingDoc.rows.length > 0) {
+          console.log(`Document exists, checking if update needed...`);
           const existing = existingDoc.rows[0];
           const needsUpdate = 
             existing.document_name !== documentData.document_name ||
@@ -169,10 +195,20 @@ export const handler = async (event) => {
             existing.minor_version !== documentData.minor_version ||
             existing.status !== documentData.status;
 
+          console.log(`Update check:`, {
+            needsUpdate,
+            nameChanged: existing.document_name !== documentData.document_name,
+            majorChanged: existing.major_version !== documentData.major_version,
+            minorChanged: existing.minor_version !== documentData.minor_version,
+            statusChanged: existing.status !== documentData.status
+          });
+
           if (needsUpdate) {
             console.log(`Updating existing document: ${doc.name__v}`);
+            console.log(`Executing UPDATE query for document ${doc.id}...`);
+            
             // Update existing record
-            await pool.query(`
+            const updateResult = await pool.query(`
               UPDATE document_index 
               SET document_name = $1, major_version = $2, minor_version = $3, 
                   status = $4, updated_at = CURRENT_TIMESTAMP
@@ -184,6 +220,11 @@ export const handler = async (event) => {
               documentData.status,
               doc.id
             ]);
+            
+            console.log(`UPDATE query result:`, {
+              rowCount: updateResult.rowCount,
+              command: updateResult.command
+            });
             
             results.push({
               action: 'updated',
@@ -200,14 +241,25 @@ export const handler = async (event) => {
             });
           }
         } else {
+          console.log(`Document does not exist, creating new record...`);
           // New document - fetch content and generate summary
           console.log(`Processing new document: ${doc.name__v}`);
           let summary = null;
           try {
             // Download document content
             console.log(`Downloading content for document: ${doc.id}`);
-            const downloadRes = await fetch(`https://${domain}/api/${v}/objects/documents/${doc.id}/file`, {
+            const downloadUrl = `https://${domain}/api/${v}/objects/documents/${doc.id}/file`;
+            console.log(`Download URL: ${downloadUrl}`);
+            
+            const downloadRes = await fetch(downloadUrl, {
               headers: { "Authorization": sessionId }
+            });
+
+            console.log(`Download response:`, {
+              status: downloadRes.status,
+              statusText: downloadRes.statusText,
+              ok: downloadRes.ok,
+              contentType: downloadRes.headers.get('content-type')
             });
 
             if (downloadRes.ok) {
@@ -258,7 +310,18 @@ export const handler = async (event) => {
 
           // Insert new record
           console.log(`Inserting new document record: ${doc.id}`);
-          await pool.query(`
+          console.log(`INSERT query parameters:`, [
+            documentData.veeva_document_id,
+            documentData.document_number,
+            documentData.document_name,
+            documentData.major_version,
+            documentData.minor_version,
+            documentData.document_type,
+            documentData.status,
+            summary
+          ]);
+          
+          const insertResult = await pool.query(`
             INSERT INTO document_index 
             (veeva_document_id, document_number, document_name, major_version, minor_version, document_type, status, summary)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -273,6 +336,12 @@ export const handler = async (event) => {
             summary
           ]);
 
+          console.log(`INSERT query result:`, {
+            rowCount: insertResult.rowCount,
+            command: insertResult.command,
+            oid: insertResult.oid
+          });
+
           results.push({
             action: 'created',
             document: documentData,
@@ -282,16 +351,19 @@ export const handler = async (event) => {
         }
 
         const docDuration = Date.now() - docStartTime;
+        console.log(`=== DOCUMENT ${i + 1} COMPLETED ===`);
         console.log(`Document processed in ${docDuration}ms: ${doc.name__v}`);
         
       } catch (error) {
         const docDuration = Date.now() - docStartTime;
+        console.error(`=== DOCUMENT ${i + 1} ERROR ===`);
         console.error(`Error processing document ${doc.id} after ${docDuration}ms:`, {
           message: error.message,
           stack: error.stack,
           documentId: doc.id,
           documentName: doc.name__v,
-          documentNumber: doc.document_number__v
+          documentNumber: doc.document_number__v,
+          errorType: error.constructor.name
         });
         
         results.push({
