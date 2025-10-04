@@ -117,7 +117,7 @@ export const handler = async (event) => {
       errors: data.errors
     });
 
-    if (!res.ok || data.responseStatus !== "SUCCESS") {
+    if (!res.ok || (data.responseStatus !== "SUCCESS" && data.responseStatus !== "WARNING")) {
       console.error('Veeva query failed:', {
         status: res.status,
         statusText: res.statusText,
