@@ -4,27 +4,89 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [contentType, setContentType] = useState(null);
+  const [convertedPdfUrl, setConvertedPdfUrl] = useState(null);
 
   useEffect(() => {
     if (isOpen && documentUrl) {
       setLoading(true);
       setError(null);
+      setConvertedPdfUrl(null);
       
-      // Fetch document to determine content type
-      fetch(documentUrl)
-        .then(response => {
-          setContentType(response.headers.get('content-type'));
-          return response.blob();
-        })
-        .catch(err => {
-          setError('Failed to load document');
-          console.error('Document loading error:', err);
-        })
-        .finally(() => {
-          setLoading(false);
-        });
+      // Convert document to PDF
+      convertDocumentToPdf(documentUrl);
     }
   }, [isOpen, documentUrl]);
+
+  // Cleanup function to revoke blob URLs
+  useEffect(() => {
+    return () => {
+      if (convertedPdfUrl) {
+        URL.revokeObjectURL(convertedPdfUrl);
+      }
+    };
+  }, [convertedPdfUrl]);
+
+  const convertDocumentToPdf = async (url) => {
+    try {
+      console.log('Starting document conversion to PDF...', { url });
+      
+      // Create a FormData object to send the document
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch document: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      const fileType = response.headers.get('content-type') || 'application/octet-stream';
+      
+      console.log('Document fetched for conversion:', {
+        size: blob.size,
+        type: fileType
+      });
+
+      // Create FormData for the conversion request
+      const formData = new FormData();
+      formData.append('file', blob, documentName || 'document');
+      formData.append('output', 'pdf');
+
+      // Use a document conversion service (you can replace this with your preferred service)
+      const convertResponse = await fetch('/api/convert-to-pdf', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!convertResponse.ok) {
+        throw new Error(`Conversion failed: ${convertResponse.status}`);
+      }
+
+      const convertedBlob = await convertResponse.blob();
+      const pdfUrl = URL.createObjectURL(convertedBlob);
+      
+      console.log('Document converted to PDF successfully:', {
+        originalSize: blob.size,
+        convertedSize: convertedBlob.size,
+        pdfUrl: pdfUrl
+      });
+
+      setConvertedPdfUrl(pdfUrl);
+      setContentType('application/pdf');
+      
+    } catch (err) {
+      console.error('Document conversion error:', err);
+      setError(`Failed to convert document to PDF: ${err.message}`);
+      
+      // Fallback: try to fetch original document
+      try {
+        const response = await fetch(url);
+        setContentType(response.headers.get('content-type'));
+      } catch (fetchErr) {
+        console.error('Fallback fetch error:', fetchErr);
+        setError('Failed to load document');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -47,7 +109,8 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
             borderRadius: '50%',
             animation: 'spin 1s linear infinite'
           }}></div>
-          <p>Loading document...</p>
+          <p>Converting document to PDF...</p>
+          <p style={{ fontSize: '14px', color: '#666' }}>This may take a few moments</p>
         </div>
       );
     }
@@ -64,55 +127,76 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
           color: '#dc3545'
         }}>
           <p>{error}</p>
-          <button 
-            onClick={() => window.open(documentUrl, '_blank')}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Download Instead
-          </button>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button 
+              onClick={() => window.open(documentUrl, '_blank')}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Download Original
+            </button>
+            <button 
+              onClick={() => {
+                setLoading(true);
+                setError(null);
+                convertDocumentToPdf(documentUrl);
+              }}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#28a745',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Retry Conversion
+            </button>
+          </div>
         </div>
       );
     }
 
-    // Handle different content types
-    if (contentType?.includes('pdf')) {
+    // Display converted PDF or original if conversion failed
+    const displayUrl = convertedPdfUrl || documentUrl;
+    const isPdf = contentType?.includes('pdf') || convertedPdfUrl;
+
+    if (isPdf) {
       return (
-        <iframe
-          src={documentUrl}
-          style={{
-            width: '100%',
-            height: '600px',
-            border: 'none',
-            borderRadius: '4px'
-          }}
-          title={documentName}
-        />
+        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+          {convertedPdfUrl && (
+            <div style={{ 
+              backgroundColor: '#d4edda', 
+              color: '#155724', 
+              padding: '8px 12px', 
+              borderRadius: '4px', 
+              marginBottom: '16px',
+              fontSize: '14px'
+            }}>
+              ✓ Document converted to PDF for viewing
+            </div>
+          )}
+          <iframe
+            src={displayUrl}
+            style={{
+              width: '100%',
+              height: '600px',
+              border: '1px solid #ddd',
+              borderRadius: '4px'
+            }}
+            title={documentName}
+          />
+        </div>
       );
     }
 
-    if (contentType?.includes('text/')) {
-      return (
-        <iframe
-          src={documentUrl}
-          style={{
-            width: '100%',
-            height: '600px',
-            border: '1px solid #ddd',
-            borderRadius: '4px'
-          }}
-          title={documentName}
-        />
-      );
-    }
-
-    // For other file types, show download option
+    // Fallback for non-PDF documents
     return (
       <div style={{ 
         display: 'flex', 
@@ -123,24 +207,44 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
         gap: '16px',
         textAlign: 'center'
       }}>
-        <p>This document type cannot be previewed in the browser.</p>
+        <p>Document conversion failed. Showing original format.</p>
         <p style={{ fontSize: '14px', color: '#666' }}>
           Content Type: {contentType || 'Unknown'}
         </p>
-        <button 
-          onClick={() => window.open(documentUrl, '_blank')}
-          style={{
-            padding: '12px 24px',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '16px'
-          }}
-        >
-          Download Document
-        </button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button 
+            onClick={() => window.open(displayUrl, '_blank')}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#007bff',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '16px'
+            }}
+          >
+            View Original
+          </button>
+          <button 
+            onClick={() => {
+              setLoading(true);
+              setError(null);
+              convertDocumentToPdf(documentUrl);
+            }}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '16px'
+            }}
+          >
+            Retry PDF Conversion
+          </button>
+        </div>
       </div>
     );
   };
