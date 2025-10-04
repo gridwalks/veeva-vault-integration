@@ -280,35 +280,111 @@ export const handler = async (event) => {
             });
 
             if (downloadRes.ok) {
-              const documentContent = await downloadRes.text();
-              console.log(`Downloaded ${documentContent.length} characters for document: ${doc.id}`);
+              const documentBuffer = await downloadRes.arrayBuffer();
+              const documentName = doc.name__v || `document_${doc.id}`;
               
-              // Generate summary using OpenAI
-              console.log(`Generating AI summary for document: ${doc.id}`);
-              const openaiStartTime = Date.now();
+              console.log(`Downloaded ${documentBuffer.byteLength} bytes for document: ${doc.id}`);
               
-              const completion = await openai.chat.completions.create({
-                model: "gpt-3.5-turbo",
-                messages: [
-                  {
-                    role: "system",
-                    content: "You are a helpful assistant that creates concise summaries of pharmaceutical documents. Focus on key procedures, requirements, and important details."
-                  },
-                  {
-                    role: "user",
-                    content: `Please provide a concise summary of this document: ${documentContent.substring(0, 4000)}`
-                  }
-                ],
-                max_tokens: 500,
-                temperature: 0.3,
-              });
+              // Extract text from document using the text extraction service
+              console.log(`Extracting text from document: ${doc.id}`);
+              const extractionStartTime = Date.now();
+              
+              try {
+                // Create FormData for text extraction
+                const formData = new FormData();
+                formData.append('file', new Blob([documentBuffer]), documentName);
 
-              const openaiDuration = Date.now() - openaiStartTime;
-              summary = completion.choices[0]?.message?.content || null;
-              console.log(`AI summary generated in ${openaiDuration}ms for document: ${doc.id}`, {
-                summaryLength: summary?.length || 0,
-                tokensUsed: completion.usage?.total_tokens || 0
-              });
+                const extractionRes = await fetch('/api/extract-text', {
+                  method: 'POST',
+                  body: formData
+                });
+
+                if (!extractionRes.ok) {
+                  throw new Error(`Text extraction failed: ${extractionRes.status}`);
+                }
+
+                const extractionResult = await extractionRes.json();
+                const extractionDuration = Date.now() - extractionStartTime;
+                
+                console.log(`Text extraction completed in ${extractionDuration}ms for document: ${doc.id}`, {
+                  extractedLength: extractionResult.textLength,
+                  extractionMethod: extractionResult.extractionMethod,
+                  fileType: extractionResult.fileType
+                });
+
+                const documentText = extractionResult.extractedText;
+                
+                if (!documentText || documentText.trim().length === 0) {
+                  throw new Error('No text content extracted from document');
+                }
+
+                // Generate summary using OpenAI
+                console.log(`Generating AI summary for document: ${doc.id}`);
+                const openaiStartTime = Date.now();
+                
+                const completion = await openai.chat.completions.create({
+                  model: "gpt-3.5-turbo",
+                  messages: [
+                    {
+                      role: "system",
+                      content: "You are a helpful assistant that creates concise summaries of pharmaceutical documents. Focus on key procedures, requirements, and important details."
+                    },
+                    {
+                      role: "user",
+                      content: `Please provide a concise summary of this document: ${documentText.substring(0, 4000)}`
+                    }
+                  ],
+                  max_tokens: 500,
+                  temperature: 0.3,
+                });
+
+                const openaiDuration = Date.now() - openaiStartTime;
+                summary = completion.choices[0]?.message?.content || null;
+                console.log(`AI summary generated in ${openaiDuration}ms for document: ${doc.id}`, {
+                  summaryLength: summary?.length || 0,
+                  tokensUsed: completion.usage?.total_tokens || 0,
+                  totalProcessingTime: extractionDuration + openaiDuration
+                });
+                
+              } catch (extractionError) {
+                console.error(`Text extraction failed for document ${doc.id}:`, {
+                  message: extractionError.message,
+                  documentId: doc.id,
+                  documentName: doc.name__v
+                });
+                
+                // Fallback: try to use the document as plain text
+                try {
+                  const fallbackText = new TextDecoder().decode(documentBuffer);
+                  if (fallbackText && fallbackText.trim().length > 0) {
+                    console.log(`Using fallback text extraction for document: ${doc.id}`);
+                    
+                    const completion = await openai.chat.completions.create({
+                      model: "gpt-3.5-turbo",
+                      messages: [
+                        {
+                          role: "system",
+                          content: "You are a helpful assistant that creates concise summaries of pharmaceutical documents. Focus on key procedures, requirements, and important details."
+                        },
+                        {
+                          role: "user",
+                          content: `Please provide a concise summary of this document: ${fallbackText.substring(0, 4000)}`
+                        }
+                      ],
+                      max_tokens: 500,
+                      temperature: 0.3,
+                    });
+
+                    summary = completion.choices[0]?.message?.content || null;
+                    console.log(`Fallback summary generated for document: ${doc.id}`);
+                  } else {
+                    throw new Error('No readable text found in document');
+                  }
+                } catch (fallbackError) {
+                  console.error(`Fallback text extraction also failed for document ${doc.id}:`, fallbackError);
+                  throw extractionError; // Re-throw original error
+                }
+              }
             } else {
               console.error(`Failed to download document content: ${doc.id}`, {
                 status: downloadRes.status,
