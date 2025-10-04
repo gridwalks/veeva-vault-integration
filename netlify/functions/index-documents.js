@@ -7,6 +7,12 @@ const openai = new OpenAI({
 });
 
 export const handler = async (event) => {
+  const startTime = Date.now();
+  console.log('Starting document indexing process...', {
+    timestamp: new Date().toISOString(),
+    queryParams: Object.fromEntries(new URL(event.rawUrl).searchParams)
+  });
+
   try {
     // Initialize database
     await initDatabase();
@@ -18,6 +24,13 @@ export const handler = async (event) => {
     const nameLike = q.get("name")?.trim();
     const limit = Math.min(Number(q.get("limit") || 100), 1000);
 
+    console.log('Querying Veeva for documents...', {
+      nameLike,
+      limit,
+      domain,
+      apiVersion: v
+    });
+
     // Query Veeva for approved documents
     let vql = `
       SELECT id, document_number__v, name__v, status__v, major_version_number__v, minor_version_number__v, type__v
@@ -28,6 +41,8 @@ export const handler = async (event) => {
 
     if (nameLike) vql += ` AND name__v CONTAINS '${nameLike.replace(/'/g, "''")}' `;
     vql += " ORDER BY name__v ";
+
+    console.log('VQL Query:', vql);
 
     const sessionId = await getSessionId();
     const body = new URLSearchParams({ q: vql });
@@ -46,8 +61,20 @@ export const handler = async (event) => {
 
     const data = await res.json();
     if (!res.ok || data.responseStatus !== "SUCCESS") {
+      console.error('Veeva query failed:', {
+        status: res.status,
+        statusText: res.statusText,
+        responseStatus: data.responseStatus,
+        responseDetails: data.responseDetails,
+        errors: data.errors
+      });
       return { statusCode: res.status || 500, body: JSON.stringify(data) };
     }
+
+    console.log('Veeva query successful:', {
+      totalDocuments: data.data?.length || 0,
+      responseDetails: data.responseDetails
+    });
 
     const documents = data.data || [];
     const pool = getPool();

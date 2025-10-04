@@ -18,6 +18,9 @@ export async function initDatabase() {
   const client = getPool();
   
   try {
+    console.log('Initializing database schema...');
+    const startTime = Date.now();
+    
     await client.query(`
       CREATE TABLE IF NOT EXISTS document_index (
         id SERIAL PRIMARY KEY,
@@ -45,9 +48,15 @@ export async function initDatabase() {
       ON document_index(document_number)
     `);
 
-    console.log('Database schema initialized successfully');
+    const duration = Date.now() - startTime;
+    console.log(`Database schema initialized successfully in ${duration}ms`);
   } catch (error) {
-    console.error('Error initializing database:', error);
+    console.error('Error initializing database:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      detail: error.detail
+    });
     throw error;
   }
 }
