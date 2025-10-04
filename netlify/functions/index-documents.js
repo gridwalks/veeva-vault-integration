@@ -16,6 +16,23 @@ export const handler = async (event) => {
     eventPath: event.path
   });
 
+  // Quick test response
+  if (event.queryStringParameters?.test === 'true') {
+    console.log('Returning test response');
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        total: 0,
+        processed: 0,
+        duration: 100,
+        stats: { created: 0, updated: 0, unchanged: 0, errors: 0 },
+        results: [],
+        test: true
+      }),
+    };
+  }
+
   try {
     // Initialize database
     console.log('Step 1: Initializing database...');
@@ -409,16 +426,20 @@ export const handler = async (event) => {
       console.log('4. Check Veeva permissions for the user account');
     }
 
+    const response = {
+      total: documents.length,
+      processed: results.length,
+      duration: totalDuration,
+      stats,
+      results: results
+    };
+
+    console.log('Final response being sent:', response);
+
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        total: documents.length,
-        processed: results.length,
-        duration: totalDuration,
-        stats,
-        results: results
-      }),
+      body: JSON.stringify(response),
     };
   } catch (e) {
     const totalDuration = Date.now() - startTime;
