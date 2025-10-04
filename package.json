@@ -11,7 +11,9 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@auth0/auth0-react": "^2.2.4"
+    "@auth0/auth0-react": "^2.2.4",
+    "pg": "^8.11.3",
+    "openai": "^4.28.0"
   },
   "devDependencies": {
     "netlify-cli": "^17.0.0",
