@@ -1,10 +1,88 @@
 import { getSessionId } from "./vault-auth.js";
 import { getPool, initDatabase } from "./db.js";
 import OpenAI from 'openai';
+import mammoth from 'mammoth';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// Local text extraction function
+async function extractTextFromBuffer(fileBuffer, fileName) {
+  const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+  let extractedText = '';
+  let extractionMethod = '';
+
+  console.log(`Extracting text from file: ${fileName} (${fileExtension})`);
+
+  if (fileExtension === 'docx') {
+    // Extract text from DOCX files using mammoth
+    try {
+      const result = await mammoth.extractRawText({ buffer: fileBuffer });
+      extractedText = result.value;
+      extractionMethod = 'mammoth_docx';
+      
+      console.log('DOCX extraction successful:', {
+        textLength: extractedText.length,
+        messages: result.messages
+      });
+    } catch (error) {
+      console.error('DOCX extraction failed:', error);
+      throw new Error(`Failed to extract text from DOCX file: ${error.message}`);
+    }
+  } else if (fileExtension === 'pdf') {
+    // Extract text from PDF files using pdf-parse
+    try {
+      // Dynamic import for pdf-parse to handle potential import issues
+      const pdfParse = await import('pdf-parse');
+      const pdfData = await pdfParse.default(fileBuffer);
+      
+      extractedText = pdfData.text;
+      extractionMethod = 'pdf_parse';
+      
+      console.log('PDF extraction successful:', {
+        pages: pdfData.numpages,
+        info: pdfData.info,
+        metadata: pdfData.metadata,
+        textLength: pdfData.text.length
+      });
+      
+      // Check if PDF appears to be scanned (no text or very little text)
+      if (!extractedText || extractedText.trim().length < 10) {
+        console.warn('PDF appears to be scanned or image-based - minimal text extracted');
+        extractedText = 'This PDF appears to be a scanned document or image-based PDF. Text extraction is limited. Consider using OCR services for better results.';
+      }
+    } catch (error) {
+      console.error('PDF extraction failed:', error);
+      throw new Error(`Failed to extract text from PDF file: ${error.message}`);
+    }
+  } else {
+    // Try to extract as plain text
+    extractedText = fileBuffer.toString('utf-8');
+    extractionMethod = 'fallback_text';
+  }
+
+  // Clean up the extracted text
+  extractedText = extractedText
+    .replace(/\r\n/g, '\n') // Normalize line endings
+    .replace(/\n{3,}/g, '\n\n') // Reduce multiple line breaks
+    .replace(/[ \t]+/g, ' ') // Normalize whitespace
+    .replace(/[^\x20-\x7E\n\r\t]/g, ' ') // Remove non-printable characters except newlines and tabs
+    .trim();
+
+  console.log('Text extraction successful:', {
+    extractedLength: extractedText.length,
+    fileType: fileExtension,
+    extractionMethod: extractionMethod
+  });
+
+  return {
+    extractedText,
+    extractionMethod,
+    fileType: fileExtension,
+    textLength: extractedText.length
+  };
+}
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -262,25 +340,12 @@ export const handler = async (event) => {
                   
                   console.log(`Downloaded ${documentBuffer.byteLength} bytes for document: ${doc.id}`);
                   
-                  // Extract text from document using the text extraction service
+                  // Extract text from document using local extraction
                   console.log(`Extracting text from document: ${doc.id}`);
                   const extractionStartTime = Date.now();
                   
                   try {
-                    // Create FormData for text extraction
-                    const formData = new FormData();
-                    formData.append('file', new Blob([documentBuffer]), documentName);
-
-                    const extractionRes = await fetch('/api/extract-text', {
-                      method: 'POST',
-                      body: formData
-                    });
-
-                    if (!extractionRes.ok) {
-                      throw new Error(`Text extraction failed: ${extractionRes.status}`);
-                    }
-
-                    const extractionResult = await extractionRes.json();
+                    const extractionResult = await extractTextFromBuffer(documentBuffer, documentName);
                     const extractionDuration = Date.now() - extractionStartTime;
                     
                     console.log(`Text extraction completed in ${extractionDuration}ms for document: ${doc.id}`, {
@@ -450,25 +515,12 @@ ${documentText.substring(0, 4000)}`
               
               console.log(`Downloaded ${documentBuffer.byteLength} bytes for document: ${doc.id}`);
               
-              // Extract text from document using the text extraction service
+              // Extract text from document using local extraction
               console.log(`Extracting text from document: ${doc.id}`);
               const extractionStartTime = Date.now();
               
               try {
-                // Create FormData for text extraction
-                const formData = new FormData();
-                formData.append('file', new Blob([documentBuffer]), documentName);
-
-                const extractionRes = await fetch('/api/extract-text', {
-                  method: 'POST',
-                  body: formData
-                });
-
-                if (!extractionRes.ok) {
-                  throw new Error(`Text extraction failed: ${extractionRes.status}`);
-                }
-
-                const extractionResult = await extractionRes.json();
+                const extractionResult = await extractTextFromBuffer(documentBuffer, documentName);
                 const extractionDuration = Date.now() - extractionStartTime;
                 
                 console.log(`Text extraction completed in ${extractionDuration}ms for document: ${doc.id}`, {
