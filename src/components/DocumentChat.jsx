@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import DocumentViewer from './DocumentViewer.jsx';
 
 export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }) {
   const [conversationHistory, setConversationHistory] = useState([]);
@@ -7,6 +8,9 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [usedDocuments, setUsedDocuments] = useState([]);
+  const [showDocumentOffer, setShowDocumentOffer] = useState(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -65,6 +69,11 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }
       setConversationHistory(data.conversationHistory);
       setUsedDocuments(data.documents);
 
+      // Show document offer if documents were used in the response
+      if (data.documents && data.documents.length > 0) {
+        setShowDocumentOffer(data.documents);
+      }
+
       console.log('Chat response received:', {
         responseLength: data.response.length,
         documentsUsed: data.documents.length,
@@ -99,6 +108,25 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }
     setConversationHistory([]);
     setUsedDocuments([]);
     setError(null);
+    setShowDocumentOffer(null);
+  };
+
+  const handleOpenDocument = (document) => {
+    setSelectedDocument({
+      url: `/api/download-file?docId=${document.id}&major=${document.version.split('.')[0]}&minor=${document.version.split('.')[1]}`,
+      name: document.name
+    });
+    setViewerOpen(true);
+    setShowDocumentOffer(null);
+  };
+
+  const handleCloseViewer = () => {
+    setViewerOpen(false);
+    setSelectedDocument(null);
+  };
+
+  const handleDismissDocumentOffer = () => {
+    setShowDocumentOffer(null);
   };
 
   const renderMessage = (message, index) => {
@@ -411,6 +439,127 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }
           </div>
         </div>
       </div>
+
+      {/* Document Offer Modal */}
+      {showDocumentOffer && showDocumentOffer.length > 0 && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          zIndex: 1001,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '24px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+            textAlign: 'center'
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', color: '#333' }}>
+              📄 Open Document?
+            </h3>
+            <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#666' }}>
+              I found {showDocumentOffer.length} document{showDocumentOffer.length !== 1 ? 's' : ''} that might be relevant to your question. Would you like to open {showDocumentOffer.length === 1 ? 'it' : 'one of them'}?
+            </p>
+            
+            <div style={{ marginBottom: '20px' }}>
+              {showDocumentOffer.map((doc, index) => (
+                <div key={index} style={{
+                  padding: '12px',
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: '8px',
+                  marginBottom: '8px',
+                  border: '1px solid #e9ecef'
+                }}>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#333', marginBottom: '4px' }}>
+                    {doc.name}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#666' }}>
+                    {doc.number} • v{doc.version} • {doc.type}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              {showDocumentOffer.length === 1 ? (
+                <button
+                  onClick={() => handleOpenDocument(showDocumentOffer[0])}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  Open Document
+                </button>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                  {showDocumentOffer.slice(0, 3).map((doc, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleOpenDocument(doc)}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#007bff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        textAlign: 'left'
+                      }}
+                    >
+                      Open: {doc.name.length > 40 ? doc.name.substring(0, 40) + '...' : doc.name}
+                    </button>
+                  ))}
+                  {showDocumentOffer.length > 3 && (
+                    <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
+                      ... and {showDocumentOffer.length - 3} more documents
+                    </div>
+                  )}
+                </div>
+              )}
+              <button
+                onClick={handleDismissDocumentOffer}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                Not Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Viewer */}
+      <DocumentViewer
+        isOpen={viewerOpen}
+        onClose={handleCloseViewer}
+        documentUrl={selectedDocument?.url}
+        documentName={selectedDocument?.name}
+      />
 
       {/* CSS for spinner animation */}
       <style>
