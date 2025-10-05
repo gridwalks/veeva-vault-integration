@@ -149,6 +149,7 @@ When answering questions:
 6. If asked about processes, procedures, or compliance topics, focus on what the documents actually say
 7. When both AI and manual summaries are available, consider both perspectives and note any differences
 8. Prioritize manual summaries when they provide additional context or corrections to AI summaries
+9. When discussing regulatory standards or practices, use "Good Clinical Practices (GCP)" instead of "Good Manufacturing Practices (GMP)"
 
 Document Context:
 ${documentContext}`;
