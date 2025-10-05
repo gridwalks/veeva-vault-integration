@@ -53,6 +53,9 @@ Netlify CLI will read `.env` for local dev. In production, set these in **Netlif
 ### Document Chat
 - `POST /api/chat-with-documents` — Chat with indexed documents using OpenAI API.
 
+### Manual Summaries
+- `POST /api/update-manual-summary` — Add or update manual summaries for documents.
+
 ## UI
 
 - Requires Auth0 login to access document list.
@@ -64,6 +67,8 @@ Netlify CLI will read `.env` for local dev. In production, set these in **Netlif
 - View AI-generated document summaries in the indexed documents tab.
 - **Chat with Documents** button to ask questions about indexed documents using AI.
 - Select specific documents to chat with or chat with all indexed documents.
+- **Manual Summary Editor** to add user-defined summaries to documents.
+- Combined AI and manual summaries provide comprehensive document understanding.
 
 ## Document Indexing Features
 
@@ -77,9 +82,18 @@ Netlify CLI will read `.env` for local dev. In production, set these in **Netlif
 
 - **AI-Powered Q&A**: Ask questions about your indexed documents and get intelligent answers.
 - **Document Selection**: Choose specific documents to chat with or let the AI find relevant documents automatically.
-- **Context-Aware Responses**: AI uses document summaries and metadata to provide accurate, relevant answers.
+- **Context-Aware Responses**: AI uses both AI and manual document summaries plus metadata to provide accurate, relevant answers.
 - **Conversation History**: Maintains chat context throughout your session.
 - **Smart Document Discovery**: Automatically finds relevant documents based on your questions.
+- **Hybrid Summaries**: Combines AI-generated and user-added manual summaries for comprehensive document understanding.
+
+## Manual Summary Features
+
+- **User-Added Context**: Add your own notes and summaries to complement AI-generated summaries.
+- **Inline Editing**: Edit manual summaries directly in the document list interface.
+- **Markdown Support**: Format your manual summaries with markdown for better readability.
+- **Chat Integration**: Manual summaries are automatically included in chat responses.
+- **Search Enhancement**: Manual summaries improve document discoverability in chat searches.
 
 ## Database Setup
 
@@ -108,3 +122,5 @@ Netlify CLI will read `.env` for local dev. In production, set these in **Netlif
 - Document chat uses GPT-4 for intelligent question answering with document context.
 - Chat functionality requires indexed documents to work effectively.
 - OpenAI API key is required for both document summarization and chat features.
+- Manual summaries enhance chat responses by providing user-added context and corrections.
+- Database schema automatically adds manual_summary column to existing installations.

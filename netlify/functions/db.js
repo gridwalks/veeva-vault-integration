@@ -32,6 +32,7 @@ export async function initDatabase() {
         document_type VARCHAR(255),
         status VARCHAR(100),
         summary TEXT,
+        manual_summary TEXT,
         indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )

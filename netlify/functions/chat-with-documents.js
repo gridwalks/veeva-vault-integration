@@ -42,7 +42,7 @@ export const handler = async (event) => {
       const placeholders = documentIds.map((_, index) => `$${index + 1}`).join(',');
       const query = `
         SELECT veeva_document_id, document_number, document_name, 
-               major_version, minor_version, document_type, status, summary
+               major_version, minor_version, document_type, status, summary, manual_summary
         FROM document_index 
         WHERE veeva_document_id IN (${placeholders})
         ORDER BY document_name
@@ -57,28 +57,29 @@ export const handler = async (event) => {
       const searchTerms = message.toLowerCase().split(' ').filter(term => term.length > 3);
       
       if (searchTerms.length > 0) {
-        // Create a search query that looks for terms in document names, summaries, and types
+        // Create a search query that looks for terms in document names, summaries, manual summaries, and types
         const searchConditions = searchTerms.map((term, index) => 
-          `(document_name ILIKE $${index + 1} OR summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1})`
+          `(document_name ILIKE $${index + 1} OR summary ILIKE $${index + 1} OR manual_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1})`
         ).join(' OR ');
         
         const searchParams = searchTerms.map(term => `%${term}%`);
         const query = `
           SELECT veeva_document_id, document_number, document_name, 
-                 major_version, minor_version, document_type, status, summary
+                 major_version, minor_version, document_type, status, summary, manual_summary
           FROM document_index 
           WHERE ${searchConditions}
           ORDER BY 
             CASE 
               WHEN document_name ILIKE ANY($${searchParams.length + 1}) THEN 1
-              WHEN summary ILIKE ANY($${searchParams.length + 2}) THEN 2
-              ELSE 3
+              WHEN manual_summary ILIKE ANY($${searchParams.length + 2}) THEN 2
+              WHEN summary ILIKE ANY($${searchParams.length + 3}) THEN 3
+              ELSE 4
             END,
             document_name
           LIMIT 10
         `;
         
-        const result = await pool.query(query, [...searchParams, searchParams, searchParams]);
+        const result = await pool.query(query, [...searchParams, searchParams, searchParams, searchParams]);
         relevantDocuments = result.rows;
         
         console.log(`Found ${relevantDocuments.length} relevant documents based on search terms:`, searchTerms);
@@ -86,7 +87,7 @@ export const handler = async (event) => {
         // If no search terms, get the most recent documents
         const query = `
           SELECT veeva_document_id, document_number, document_name, 
-                 major_version, minor_version, document_type, status, summary
+                 major_version, minor_version, document_type, status, summary, manual_summary
           FROM document_index 
           ORDER BY updated_at DESC
           LIMIT 5
@@ -113,16 +114,31 @@ export const handler = async (event) => {
 
     // Build context from relevant documents
     const documentContext = relevantDocuments.map(doc => {
-      return `**${doc.document_name}** (${doc.document_number} v${doc.major_version}.${doc.minor_version})
+      let context = `**${doc.document_name}** (${doc.document_number} v${doc.major_version}.${doc.minor_version})
 Type: ${doc.document_type || 'Unknown'}
-Status: ${doc.status || 'Unknown'}
-Summary: ${doc.summary || 'No summary available'}
+Status: ${doc.status || 'Unknown'}`;
 
----`;
+      // Add AI summary if available
+      if (doc.summary) {
+        context += `\nAI Summary: ${doc.summary}`;
+      }
+
+      // Add manual summary if available
+      if (doc.manual_summary) {
+        context += `\nManual Summary: ${doc.manual_summary}`;
+      }
+
+      // If no summaries available
+      if (!doc.summary && !doc.manual_summary) {
+        context += `\nSummary: No summary available`;
+      }
+
+      context += '\n\n---';
+      return context;
     }).join('\n\n');
 
     // Prepare the system prompt
-    const systemPrompt = `You are an AI assistant that helps users understand and work with pharmaceutical documents from Veeva Vault. You have access to document summaries and metadata from an indexed document collection.
+    const systemPrompt = `You are an AI assistant that helps users understand and work with pharmaceutical documents from Veeva Vault. You have access to both AI-generated summaries and user-added manual summaries from an indexed document collection.
 
 When answering questions:
 1. Use the provided document context to give accurate, helpful answers
@@ -131,6 +147,8 @@ When answering questions:
 4. Provide actionable insights based on the document content
 5. Maintain a professional, helpful tone appropriate for the pharmaceutical industry
 6. If asked about processes, procedures, or compliance topics, focus on what the documents actually say
+7. When both AI and manual summaries are available, consider both perspectives and note any differences
+8. Prioritize manual summaries when they provide additional context or corrections to AI summaries
 
 Document Context:
 ${documentContext}`;

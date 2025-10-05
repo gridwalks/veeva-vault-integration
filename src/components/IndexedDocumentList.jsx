@@ -1,4 +1,4 @@
-import { downloadUrl } from "../api";
+import { downloadUrl, updateManualSummary } from "../api";
 import { useState } from "react";
 import DocumentViewer from "./DocumentViewer.jsx";
 import ReactMarkdown from "react-markdown";
@@ -7,6 +7,10 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [selectedDocs, setSelectedDocs] = useState(new Set());
+  const [editingSummary, setEditingSummary] = useState(null);
+  const [summaryText, setSummaryText] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
 
   const handleViewDocument = (doc) => {
     setSelectedDocument({
@@ -52,6 +56,48 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
         onDocumentsSelected(items);
       }
     }
+  };
+
+  const handleEditSummary = (doc) => {
+    setEditingSummary(doc.id);
+    setSummaryText(doc.manual_summary || '');
+    setSaveError(null);
+  };
+
+  const handleSaveSummary = async (docId) => {
+    setIsSaving(true);
+    setSaveError(null);
+    
+    try {
+      await updateManualSummary({
+        documentId: docId,
+        manualSummary: summaryText
+      });
+      
+      // Update the local items to reflect the change
+      const updatedItems = items.map(item => 
+        item.id === docId 
+          ? { ...item, manual_summary: summaryText }
+          : item
+      );
+      
+      // You might want to notify the parent component to refresh
+      console.log('Manual summary saved successfully');
+      
+      setEditingSummary(null);
+      setSummaryText('');
+    } catch (error) {
+      console.error('Failed to save manual summary:', error);
+      setSaveError(error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingSummary(null);
+    setSummaryText('');
+    setSaveError(null);
   };
 
   if (!items?.length) {
@@ -159,15 +205,17 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
               </div>
             </div>
           
+          {/* AI Summary */}
           {doc.summary && (
             <div style={{
               backgroundColor: 'white',
               padding: '12px',
               borderRadius: '4px',
-              border: '1px solid #e0e0e0'
+              border: '1px solid #e0e0e0',
+              marginBottom: '12px'
             }}>
               <h4 style={{margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#333'}}>
-                Document Summary:
+                AI Summary:
               </h4>
               <div style={{
                 fontSize: '14px',
@@ -196,6 +244,124 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
               </div>
             </div>
           )}
+
+          {/* Manual Summary */}
+          <div style={{
+            backgroundColor: '#f8f9fa',
+            padding: '12px',
+            borderRadius: '4px',
+            border: '1px solid #dee2e6'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h4 style={{margin: '0', fontSize: '14px', fontWeight: '600', color: '#333'}}>
+                Manual Summary:
+              </h4>
+              {editingSummary !== doc.id && (
+                <button
+                  onClick={() => handleEditSummary(doc)}
+                  style={{
+                    padding: '4px 8px',
+                    backgroundColor: '#6c757d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  {doc.manual_summary ? 'Edit' : 'Add Summary'}
+                </button>
+              )}
+            </div>
+            
+            {editingSummary === doc.id ? (
+              <div>
+                <textarea
+                  value={summaryText}
+                  onChange={(e) => setSummaryText(e.target.value)}
+                  placeholder="Enter your manual summary of this document..."
+                  style={{
+                    width: '100%',
+                    minHeight: '80px',
+                    padding: '8px',
+                    border: '1px solid #ced4da',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    fontFamily: 'inherit',
+                    resize: 'vertical'
+                  }}
+                />
+                {saveError && (
+                  <div style={{ color: '#dc3545', fontSize: '12px', marginTop: '4px' }}>
+                    Error: {saveError}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                  <button
+                    onClick={() => handleSaveSummary(doc.id)}
+                    disabled={isSaving}
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: isSaving ? '#ccc' : '#28a745',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '3px',
+                      cursor: isSaving ? 'not-allowed' : 'pointer',
+                      fontSize: '12px'
+                    }}
+                  >
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    disabled={isSaving}
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: '#6c757d',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '3px',
+                      cursor: isSaving ? 'not-allowed' : 'pointer',
+                      fontSize: '12px'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                fontSize: '14px',
+                lineHeight: '1.5',
+                color: '#555',
+                textAlign: 'left',
+                minHeight: '40px',
+                padding: '8px',
+                backgroundColor: 'white',
+                borderRadius: '3px',
+                border: '1px solid #e9ecef'
+              }}>
+                {doc.manual_summary ? (
+                  <ReactMarkdown
+                    components={{
+                      p: ({children}) => <p style={{margin: '4px 0'}}>{children}</p>,
+                      strong: ({children}) => <strong style={{fontWeight: 'bold'}}>{children}</strong>,
+                      em: ({children}) => <em style={{fontStyle: 'italic'}}>{children}</em>,
+                      ul: ({children}) => <ul style={{margin: '4px 0', paddingLeft: '20px'}}>{children}</ul>,
+                      ol: ({children}) => <ol style={{margin: '4px 0', paddingLeft: '20px'}}>{children}</ol>,
+                      li: ({children}) => <li style={{margin: '2px 0'}}>{children}</li>
+                    }}
+                  >
+                    {doc.manual_summary}
+                  </ReactMarkdown>
+                ) : (
+                  <span style={{ color: '#999', fontStyle: 'italic' }}>
+                    No manual summary added yet. Click "Add Summary" to add your own notes about this document.
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
           
           <div style={{fontSize: '12px', color: '#999', marginTop: '12px'}}>
             Indexed: {new Date(doc.indexed_at).toLocaleString()} | 

@@ -177,3 +177,47 @@ export async function chatWithDocuments({ message, documentIds = [], conversatio
     throw error;
   }
 }
+
+export async function updateManualSummary({ documentId, manualSummary }) {
+  const startTime = Date.now();
+  console.log('Updating manual summary...', { documentId, summaryLength: manualSummary?.length });
+  
+  try {
+    const res = await fetch('/api/update-manual-summary', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        documentId,
+        manualSummary
+      })
+    });
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to update manual summary:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText
+      });
+      throw new Error(`Failed to update manual summary: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Manual summary updated in ${duration}ms:`, {
+      documentId: data.document?.id,
+      summaryLength: data.document?.manual_summary?.length
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error updating manual summary after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}

@@ -27,7 +27,7 @@ export const handler = async (event) => {
     let query = `
       SELECT id, veeva_document_id, document_number, document_name, 
              major_version, minor_version, document_type, status, 
-             summary, indexed_at, updated_at
+             summary, manual_summary, indexed_at, updated_at
       FROM document_index
     `;
     
@@ -95,6 +95,7 @@ export const handler = async (event) => {
           document_type: row.document_type,
           status: row.status,
           summary: row.summary,
+          manual_summary: row.manual_summary,
           indexed_at: row.indexed_at,
           updated_at: row.updated_at,
         }))
