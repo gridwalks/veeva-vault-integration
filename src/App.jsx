@@ -4,6 +4,7 @@ import { listApproved, indexDocuments, getIndexedDocuments } from "./api";
 import DocumentList from "./components/DocumentList.jsx";
 import IndexedDocumentList from "./components/IndexedDocumentList.jsx";
 import StatusBar from "./components/StatusBar.jsx";
+import DocumentChat from "./components/DocumentChat.jsx";
 // import StatusPanel from "./components/StatusPanel.jsx";
 import yprimeLogo from "../assets/YP_New_Logo.png";
 
@@ -15,6 +16,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("documents");
   const [isIndexing, setIsIndexing] = useState(false);
   const [indexResult, setIndexResult] = useState(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [selectedDocuments, setSelectedDocuments] = useState([]);
 
   async function load(offset = 0) {
     console.log('Loading approved documents...', { query: q, offset });
@@ -212,6 +215,27 @@ export default function App() {
           >
             Indexed Documents
           </button>
+          {indexedData.items.length > 0 && (
+            <button
+              onClick={() => {
+                console.log('Opening document chat');
+                setIsChatOpen(true);
+              }}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#28a745',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              💬 Chat with Documents
+            </button>
+          )}
         </div>
 
         <form onSubmit={(e) => { 
@@ -323,7 +347,10 @@ export default function App() {
           </>
         ) : (
           <>
-            <IndexedDocumentList items={indexedData.items} />
+            <IndexedDocumentList 
+              items={indexedData.items} 
+              onDocumentsSelected={setSelectedDocuments}
+            />
             <div className="pager" style={{display:'flex', gap:12, alignItems:'center', marginTop:12}}>
               <button 
                 disabled={indexedData.pageOffset <= 0} 
@@ -350,6 +377,13 @@ export default function App() {
           </>
         )}
       </main>
+
+      {/* Document Chat Modal */}
+      <DocumentChat
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        selectedDocuments={selectedDocuments}
+      />
     </>
   );
 }

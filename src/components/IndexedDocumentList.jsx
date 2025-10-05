@@ -3,9 +3,10 @@ import { useState } from "react";
 import DocumentViewer from "./DocumentViewer.jsx";
 import ReactMarkdown from "react-markdown";
 
-export default function IndexedDocumentList({ items = [] }) {
+export default function IndexedDocumentList({ items = [], onDocumentsSelected }) {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [selectedDocs, setSelectedDocs] = useState(new Set());
 
   const handleViewDocument = (doc) => {
     setSelectedDocument({
@@ -20,25 +21,104 @@ export default function IndexedDocumentList({ items = [] }) {
     setSelectedDocument(null);
   };
 
+  const handleSelectDocument = (docId) => {
+    const newSelected = new Set(selectedDocs);
+    if (newSelected.has(docId)) {
+      newSelected.delete(docId);
+    } else {
+      newSelected.add(docId);
+    }
+    setSelectedDocs(newSelected);
+    
+    // Notify parent component of selected documents
+    if (onDocumentsSelected) {
+      const selectedDocuments = items.filter(doc => newSelected.has(doc.id));
+      onDocumentsSelected(selectedDocuments);
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedDocs.size === items.length) {
+      // Deselect all
+      setSelectedDocs(new Set());
+      if (onDocumentsSelected) {
+        onDocumentsSelected([]);
+      }
+    } else {
+      // Select all
+      const allIds = new Set(items.map(doc => doc.id));
+      setSelectedDocs(allIds);
+      if (onDocumentsSelected) {
+        onDocumentsSelected(items);
+      }
+    }
+  };
+
   if (!items?.length) {
     return <p style={{color: '#666', fontStyle: 'italic'}}>No indexed documents found.</p>;
   }
 
   return (
     <>
+      {/* Selection Controls */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '16px',
+        padding: '12px',
+        backgroundColor: '#f8f9fa',
+        borderRadius: '8px',
+        border: '1px solid #e9ecef'
+      }}>
+        <div style={{ fontSize: '14px', color: '#666' }}>
+          {selectedDocs.size} of {items.length} documents selected
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={handleSelectAll}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: selectedDocs.size === items.length ? '#6c757d' : '#007bff',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+          >
+            {selectedDocs.size === items.length ? 'Deselect All' : 'Select All'}
+          </button>
+        </div>
+      </div>
+
       <div style={{display: 'grid', gap: '16px', marginTop: '16px'}}>
         {items.map((doc) => (
           <div key={doc.id} style={{
-            border: '1px solid #ddd',
+            border: '2px solid',
+            borderColor: selectedDocs.has(doc.id) ? '#007bff' : '#ddd',
             borderRadius: '8px',
             padding: '16px',
-            backgroundColor: '#f9f9f9'
+            backgroundColor: selectedDocs.has(doc.id) ? '#f0f8ff' : '#f9f9f9',
+            transition: 'all 0.2s ease'
           }}>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px'}}>
               <div style={{flex: 1}}>
-                <h3 style={{margin: '0 0 8px 0', fontSize: '16px', fontWeight: '600'}}>
-                  {doc.document_name}
-                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedDocs.has(doc.id)}
+                    onChange={() => handleSelectDocument(doc.id)}
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      cursor: 'pointer'
+                    }}
+                  />
+                  <h3 style={{margin: '0', fontSize: '16px', fontWeight: '600'}}>
+                    {doc.document_name}
+                  </h3>
+                </div>
                 <div style={{display: 'flex', gap: '16px', fontSize: '14px', color: '#666', marginBottom: '8px'}}>
                   <span><strong>Number:</strong> {doc.document_number}</span>
                   <span><strong>Version:</strong> {doc.major_version}.{doc.minor_version}</span>

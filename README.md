@@ -50,6 +50,9 @@ Netlify CLI will read `.env` for local dev. In production, set these in **Netlif
 - `POST /api/index-documents?limit=100&name=foo` — Index Veeva documents with AI summaries.
 - `GET /api/get-indexed-documents?limit=50&offset=0&name=foo` — Retrieve indexed documents from database.
 
+### Document Chat
+- `POST /api/chat-with-documents` — Chat with indexed documents using OpenAI API.
+
 ## UI
 
 - Requires Auth0 login to access document list.
@@ -59,6 +62,8 @@ Netlify CLI will read `.env` for local dev. In production, set these in **Netlif
 - Download the underlying file via proxied endpoint.
 - **Index Documents** button to process Veeva documents with AI summarization.
 - View AI-generated document summaries in the indexed documents tab.
+- **Chat with Documents** button to ask questions about indexed documents using AI.
+- Select specific documents to chat with or chat with all indexed documents.
 
 ## Document Indexing Features
 
@@ -67,6 +72,14 @@ Netlify CLI will read `.env` for local dev. In production, set these in **Netlif
 - **Upsert Logic**: Existing documents are updated if their metadata changes, preserving existing summaries.
 - **Version Tracking**: Captures document name, number, major/minor versions, and status.
 - **Search & Filter**: Search indexed documents by name with pagination support.
+
+## Document Chat Features
+
+- **AI-Powered Q&A**: Ask questions about your indexed documents and get intelligent answers.
+- **Document Selection**: Choose specific documents to chat with or let the AI find relevant documents automatically.
+- **Context-Aware Responses**: AI uses document summaries and metadata to provide accurate, relevant answers.
+- **Conversation History**: Maintains chat context throughout your session.
+- **Smart Document Discovery**: Automatically finds relevant documents based on your questions.
 
 ## Database Setup
 
@@ -92,3 +105,6 @@ Netlify CLI will read `.env` for local dev. In production, set these in **Netlif
 - Document indexing processes up to 4000 characters of content for OpenAI summarization.
 - Database connections are pooled for optimal performance.
 - Indexing results show created, updated, and unchanged document counts.
+- Document chat uses GPT-4 for intelligent question answering with document context.
+- Chat functionality requires indexed documents to work effectively.
+- OpenAI API key is required for both document summarization and chat features.

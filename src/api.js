@@ -131,3 +131,49 @@ export function downloadUrl({ id, major, minor }) {
   if (major && minor) { p.set("major", major); p.set("minor", minor); }
   return `/api/download-file?${p}`;
 }
+
+export async function chatWithDocuments({ message, documentIds = [], conversationHistory = [] }) {
+  const startTime = Date.now();
+  console.log('Sending chat message...', { message: message.substring(0, 100) + '...', documentIds });
+  
+  try {
+    const res = await fetch('/api/chat-with-documents', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message,
+        documentIds,
+        conversationHistory
+      })
+    });
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to send chat message:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText
+      });
+      throw new Error(`Failed to send chat message: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Chat response received in ${duration}ms:`, {
+      responseLength: data.response?.length || 0,
+      documentsUsed: data.documents?.length || 0,
+      metadata: data.metadata
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error sending chat message after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
