@@ -298,6 +298,14 @@ export const handler = async (event) => {
 
                     // Generate new summary using improved OpenAI prompt
                     console.log(`Generating new AI summary for document: ${doc.id}`);
+                    console.log(`Sending document to OpenAI API:`, {
+                      documentId: doc.id,
+                      documentName: doc.name__v,
+                      documentType: doc.type__v,
+                      documentNumber: doc.document_number__v,
+                      textLength: documentText.length,
+                      textPreview: documentText.substring(0, 200) + '...'
+                    });
                     const openaiStartTime = Date.now();
                     
                     const completion = await openai.chat.completions.create({
@@ -334,10 +342,14 @@ ${documentText.substring(0, 4000)}`
 
                     const openaiDuration = Date.now() - openaiStartTime;
                     updatedSummary = completion.choices[0]?.message?.content || null;
-                    console.log(`New AI summary generated in ${openaiDuration}ms for document: ${doc.id}`, {
+                    console.log(`OpenAI API response received for document: ${doc.id}`, {
+                      responseTime: `${openaiDuration}ms`,
                       summaryLength: updatedSummary?.length || 0,
                       tokensUsed: completion.usage?.total_tokens || 0,
-                      totalProcessingTime: extractionDuration + openaiDuration
+                      promptTokens: completion.usage?.prompt_tokens || 0,
+                      completionTokens: completion.usage?.completion_tokens || 0,
+                      totalProcessingTime: extractionDuration + openaiDuration,
+                      summaryPreview: updatedSummary ? updatedSummary.substring(0, 150) + '...' : 'No summary'
                     });
                     
                   } catch (extractionError) {
@@ -386,17 +398,23 @@ ${documentText.substring(0, 4000)}`
               doc.id
             ]);
             
+            const updateTimestamp = new Date().toISOString();
             console.log(`UPDATE query result:`, {
               rowCount: updateResult.rowCount,
-              command: updateResult.command
+              command: updateResult.command,
+              timestamp: updateTimestamp,
+              documentId: doc.id,
+              documentName: doc.name__v,
+              action: forceRegenerate ? 'force_regenerate' : 'metadata_update'
             });
             
-            results.push({
-              action: 'updated',
-              document: documentData,
-              summary: updatedSummary
-            });
-            console.log(`Document updated: ${doc.name__v}`);
+          results.push({
+            action: 'updated',
+            document: documentData,
+            summary: updatedSummary,
+            timestamp: updateTimestamp
+          });
+          console.log(`Document updated: ${doc.name__v} at ${updateTimestamp}`);
           } else {
             console.log(`Document unchanged: ${doc.name__v}`);
             results.push({
@@ -468,6 +486,15 @@ ${documentText.substring(0, 4000)}`
 
                 // Generate summary using OpenAI
                 console.log(`Generating AI summary for document: ${doc.id}`);
+                console.log(`Sending new document to OpenAI API:`, {
+                  documentId: doc.id,
+                  documentName: doc.name__v,
+                  documentType: doc.type__v,
+                  documentNumber: doc.document_number__v,
+                  textLength: documentText.length,
+                  textPreview: documentText.substring(0, 200) + '...',
+                  isNewDocument: true
+                });
                 const openaiStartTime = Date.now();
                 
                 const completion = await openai.chat.completions.create({
@@ -504,10 +531,14 @@ ${documentText.substring(0, 4000)}`
 
                 const openaiDuration = Date.now() - openaiStartTime;
                 summary = completion.choices[0]?.message?.content || null;
-                console.log(`AI summary generated in ${openaiDuration}ms for document: ${doc.id}`, {
+                console.log(`OpenAI API response received for new document: ${doc.id}`, {
+                  responseTime: `${openaiDuration}ms`,
                   summaryLength: summary?.length || 0,
                   tokensUsed: completion.usage?.total_tokens || 0,
-                  totalProcessingTime: extractionDuration + openaiDuration
+                  promptTokens: completion.usage?.prompt_tokens || 0,
+                  completionTokens: completion.usage?.completion_tokens || 0,
+                  totalProcessingTime: extractionDuration + openaiDuration,
+                  summaryPreview: summary ? summary.substring(0, 150) + '...' : 'No summary'
                 });
                 
               } catch (extractionError) {
@@ -522,6 +553,15 @@ ${documentText.substring(0, 4000)}`
                   const fallbackText = new TextDecoder().decode(documentBuffer);
                   if (fallbackText && fallbackText.trim().length > 0) {
                     console.log(`Using fallback text extraction for document: ${doc.id}`);
+                    console.log(`Sending fallback document to OpenAI API:`, {
+                      documentId: doc.id,
+                      documentName: doc.name__v,
+                      documentType: doc.type__v,
+                      documentNumber: doc.document_number__v,
+                      textLength: fallbackText.length,
+                      textPreview: fallbackText.substring(0, 200) + '...',
+                      extractionMethod: 'fallback_plain_text'
+                    });
                     
                     const completion = await openai.chat.completions.create({
                       model: "gpt-3.5-turbo",
@@ -556,7 +596,13 @@ ${fallbackText.substring(0, 4000)}`
                     });
 
                     summary = completion.choices[0]?.message?.content || null;
-                    console.log(`Fallback summary generated for document: ${doc.id}`);
+                    console.log(`OpenAI API response received for fallback document: ${doc.id}`, {
+                      summaryLength: summary?.length || 0,
+                      tokensUsed: completion.usage?.total_tokens || 0,
+                      promptTokens: completion.usage?.prompt_tokens || 0,
+                      completionTokens: completion.usage?.completion_tokens || 0,
+                      summaryPreview: summary ? summary.substring(0, 150) + '...' : 'No summary'
+                    });
                   } else {
                     throw new Error('No readable text found in document');
                   }
@@ -596,8 +642,8 @@ ${fallbackText.substring(0, 4000)}`
           
           const insertResult = await pool.query(`
             INSERT INTO document_index 
-            (veeva_document_id, document_number, document_name, major_version, minor_version, document_type, status, summary)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            (veeva_document_id, document_number, document_name, major_version, minor_version, document_type, status, summary, indexed_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
           `, [
             documentData.veeva_document_id,
             documentData.document_number,
@@ -609,18 +655,23 @@ ${fallbackText.substring(0, 4000)}`
             summary
           ]);
 
+          const insertTimestamp = new Date().toISOString();
           console.log(`INSERT query result:`, {
             rowCount: insertResult.rowCount,
             command: insertResult.command,
-            oid: insertResult.oid
+            oid: insertResult.oid,
+            timestamp: insertTimestamp,
+            documentId: doc.id,
+            documentName: doc.name__v
           });
 
           results.push({
             action: 'created',
             document: documentData,
-            summary: summary
+            summary: summary,
+            timestamp: insertTimestamp
           });
-          console.log(`Document inserted: ${doc.name__v}`);
+          console.log(`Document inserted: ${doc.name__v} at ${insertTimestamp}`);
         }
 
         const docDuration = Date.now() - docStartTime;
@@ -682,12 +733,15 @@ ${fallbackText.substring(0, 4000)}`
       console.log('4. Check Veeva permissions for the user account');
     }
 
+    const responseTimestamp = new Date().toISOString();
     const response = {
       total: documents.length,
       processed: results.length,
       duration: totalDuration,
       stats,
-      results: results
+      results: results,
+      timestamp: responseTimestamp,
+      completedAt: responseTimestamp
     };
 
     console.log('Final response being sent:', response);
