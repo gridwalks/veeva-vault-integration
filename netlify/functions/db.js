@@ -49,6 +49,17 @@ export async function initDatabase() {
       ON document_index(document_number)
     `);
 
+    // Add manual_summary column if it doesn't exist (for existing installations)
+    try {
+      await client.query(`
+        ALTER TABLE document_index 
+        ADD COLUMN IF NOT EXISTS manual_summary TEXT
+      `);
+      console.log('Manual summary column added or already exists');
+    } catch (alterError) {
+      console.log('Manual summary column may already exist:', alterError.message);
+    }
+
     const duration = Date.now() - startTime;
     console.log(`Database schema initialized successfully in ${duration}ms`);
   } catch (error) {
