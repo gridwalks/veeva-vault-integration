@@ -63,14 +63,70 @@ export default function App() {
     setIndexResult(null);
     
     try {
-      const res = await indexDocuments({ name: q, limit: 100, force: forceRegenerate });
-      console.log('Document indexing completed successfully:', {
-        total: res.total,
-        processed: res.processed,
-        stats: res.stats,
-        duration: res.duration
-      });
-      setIndexResult(res);
+      let batchOffset = 0;
+      const batchSize = 5; // Process 5 documents at a time to avoid timeout
+      let allResults = [];
+      let batchCount = 0;
+      
+      while (true) {
+        batchCount++;
+        console.log(`Processing batch ${batchCount}...`, { batchOffset, batchSize });
+        
+        const res = await indexDocuments({ 
+          name: q, 
+          limit: 100, 
+          force: forceRegenerate,
+          batchSize,
+          batchOffset 
+        });
+        
+        console.log(`Batch ${batchCount} completed:`, {
+          total: res.total,
+          processed: res.processed,
+          stats: res.stats,
+          duration: res.duration,
+          batchInfo: res.batchInfo
+        });
+        
+        // Accumulate results
+        if (res.results) {
+          allResults = allResults.concat(res.results);
+        }
+        
+        // Check if there are more batches to process
+        if (!res.batchInfo?.hasMoreBatches) {
+          console.log('All batches completed');
+          break;
+        }
+        
+        // Update offset for next batch
+        batchOffset = res.batchInfo.nextBatchOffset;
+        
+        // Add a small delay between batches to avoid overwhelming the system
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+      // Create final result object
+      const finalResult = {
+        total: allResults.length > 0 ? allResults[0].total || allResults.length : 0,
+        processed: allResults.length,
+        duration: Date.now() - Date.now(), // Will be updated by individual batches
+        stats: {
+          created: allResults.filter(r => r.action === 'created').length,
+          updated: allResults.filter(r => r.action === 'updated').length,
+          unchanged: allResults.filter(r => r.action === 'unchanged').length,
+          errors: allResults.filter(r => r.action === 'error').length
+        },
+        results: allResults,
+        batchInfo: {
+          totalBatches: batchCount,
+          batchSize,
+          completed: true
+        }
+      };
+      
+      console.log('Document indexing completed successfully:', finalResult);
+      setIndexResult(finalResult);
       
       // Refresh indexed documents after indexing
       console.log('Refreshing indexed documents after indexing...');

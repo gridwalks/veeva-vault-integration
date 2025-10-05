@@ -39,13 +39,15 @@ export async function listApproved({ name = "", limit = 50, offset = 0 } = {}) {
   }
 }
 
-export async function indexDocuments({ name = "", limit = 100, force = false } = {}) {
+export async function indexDocuments({ name = "", limit = 100, force = false, batchSize = 5, batchOffset = 0 } = {}) {
   const startTime = Date.now();
-  console.log('Starting document indexing...', { name, limit, force });
+  console.log('Starting document indexing...', { name, limit, force, batchSize, batchOffset });
   
   try {
     const p = new URLSearchParams({ name, limit });
     if (force) p.set('force', 'true');
+    if (batchSize) p.set('batchSize', batchSize);
+    if (batchOffset) p.set('batchOffset', batchOffset);
     const res = await fetch(`/api/index-documents?${p}`);
     
     if (!res.ok) {
@@ -66,7 +68,8 @@ export async function indexDocuments({ name = "", limit = 100, force = false } =
       total: data.total,
       processed: data.processed,
       duration: data.duration,
-      stats: data.stats
+      stats: data.stats,
+      batchInfo: data.batchInfo
     });
     
     return data;

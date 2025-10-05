@@ -134,12 +134,16 @@ export const handler = async (event) => {
     const nameLike = q.get("name")?.trim();
     const limit = Math.min(Number(q.get("limit") || 100), 1000);
     const forceRegenerate = q.get("force") === 'true';
+    const batchSize = Math.min(Number(q.get("batchSize") || 5), 10); // Process max 10 docs per batch to avoid timeout
+    const batchOffset = Number(q.get("batchOffset") || 0);
 
     console.log('Step 3: Querying Veeva for documents...', {
       nameLike,
       limit,
       forceRegenerate,
       forceParam: q.get("force"),
+      batchSize,
+      batchOffset,
       domain,
       apiVersion: v
     });
@@ -224,7 +228,20 @@ export const handler = async (event) => {
     
     const results = [];
 
-    console.log(`Step 10: Processing ${documents.length} documents...`);
+    // Apply batch processing to avoid timeout
+    const startIndex = batchOffset;
+    const endIndex = Math.min(startIndex + batchSize, documents.length);
+    const documentsToProcess = documents.slice(startIndex, endIndex);
+
+    console.log(`Step 10: Processing documents in batch...`, {
+      totalDocuments: documents.length,
+      batchSize,
+      batchOffset,
+      startIndex,
+      endIndex,
+      documentsToProcess: documentsToProcess.length,
+      remainingDocuments: documents.length - endIndex
+    });
     
     if (documents.length === 0) {
       console.log('WARNING: No documents returned from Veeva query!');
@@ -235,12 +252,13 @@ export const handler = async (event) => {
       console.log('4. Veeva domain/version configuration issue');
     }
 
-    for (let i = 0; i < documents.length; i++) {
-      const doc = documents[i];
+    for (let i = 0; i < documentsToProcess.length; i++) {
+      const doc = documentsToProcess[i];
+      const globalIndex = startIndex + i;
       const docStartTime = Date.now();
       
       try {
-        console.log(`=== PROCESSING DOCUMENT ${i + 1}/${documents.length} ===`);
+        console.log(`=== PROCESSING DOCUMENT ${globalIndex + 1}/${documents.length} (Batch ${Math.floor(startIndex/batchSize) + 1}) ===`);
         console.log(`Document: ${doc.name__v} (${doc.id})`);
         console.log(`Document details:`, {
           id: doc.id,
@@ -726,12 +744,12 @@ ${fallbackText.substring(0, 4000)}`
         }
 
         const docDuration = Date.now() - docStartTime;
-        console.log(`=== DOCUMENT ${i + 1} COMPLETED ===`);
+        console.log(`=== DOCUMENT ${globalIndex + 1} COMPLETED ===`);
         console.log(`Document processed in ${docDuration}ms: ${doc.name__v}`);
         
       } catch (error) {
         const docDuration = Date.now() - docStartTime;
-        console.error(`=== DOCUMENT ${i + 1} ERROR ===`);
+        console.error(`=== DOCUMENT ${globalIndex + 1} ERROR ===`);
         console.error(`Error processing document ${doc.id} after ${docDuration}ms:`, {
           message: error.message,
           stack: error.stack,
@@ -766,6 +784,14 @@ ${fallbackText.substring(0, 4000)}`
       totalDuration: `${totalDuration}ms`,
       totalDocuments: documents.length,
       processed: results.length,
+      batchInfo: {
+        batchSize,
+        batchOffset,
+        startIndex,
+        endIndex,
+        documentsInBatch: documentsToProcess.length,
+        hasMoreBatches: endIndex < documents.length
+      },
       stats,
       timestamp: new Date().toISOString()
     });
@@ -791,6 +817,15 @@ ${fallbackText.substring(0, 4000)}`
       duration: totalDuration,
       stats,
       results: results,
+      batchInfo: {
+        batchSize,
+        batchOffset,
+        startIndex,
+        endIndex,
+        documentsInBatch: documentsToProcess.length,
+        hasMoreBatches: endIndex < documents.length,
+        nextBatchOffset: endIndex < documents.length ? endIndex : null
+      },
       timestamp: responseTimestamp,
       completedAt: responseTimestamp
     };
