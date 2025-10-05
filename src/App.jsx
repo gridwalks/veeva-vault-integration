@@ -57,13 +57,13 @@ export default function App() {
     }
   }
 
-  async function handleIndexDocuments() {
-    console.log('Starting document indexing process...', { query: q });
+  async function handleIndexDocuments(forceRegenerate = false) {
+    console.log('Starting document indexing process...', { query: q, forceRegenerate });
     setIsIndexing(true);
     setIndexResult(null);
     
     try {
-      const res = await indexDocuments({ name: q, limit: 100 });
+      const res = await indexDocuments({ name: q, limit: 100, force: forceRegenerate });
       console.log('Document indexing completed successfully:', {
         total: res.total,
         processed: res.processed,
@@ -172,21 +172,38 @@ export default function App() {
           />
           <button style={{padding:'8px 12px'}}>Search</button>
           {activeTab === "documents" && (
-            <button
-              type="button"
-              onClick={handleIndexDocuments}
-              disabled={isIndexing}
-              style={{
-                padding:'8px 12px',
-                backgroundColor: isIndexing ? '#ccc' : '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: isIndexing ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {isIndexing ? 'Indexing...' : 'Index Documents'}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => handleIndexDocuments(false)}
+                disabled={isIndexing}
+                style={{
+                  padding:'8px 12px',
+                  backgroundColor: isIndexing ? '#ccc' : '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: isIndexing ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isIndexing ? 'Indexing...' : 'Index Documents'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleIndexDocuments(true)}
+                disabled={isIndexing}
+                style={{
+                  padding:'8px 12px',
+                  backgroundColor: isIndexing ? '#ccc' : '#ff6b35',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: isIndexing ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isIndexing ? 'Regenerating...' : 'Regenerate Summaries'}
+              </button>
+            </>
           )}
         </form>
 

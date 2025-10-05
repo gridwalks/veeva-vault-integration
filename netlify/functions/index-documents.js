@@ -55,10 +55,12 @@ export const handler = async (event) => {
 
     const nameLike = q.get("name")?.trim();
     const limit = Math.min(Number(q.get("limit") || 100), 1000);
+    const forceRegenerate = q.get("force") === 'true';
 
     console.log('Step 3: Querying Veeva for documents...', {
       nameLike,
       limit,
+      forceRegenerate,
       domain,
       apiVersion: v
     });
@@ -206,7 +208,7 @@ export const handler = async (event) => {
         if (existingDoc.rows.length > 0) {
           console.log(`Document exists, checking if update needed...`);
           const existing = existingDoc.rows[0];
-          const needsUpdate = 
+          const needsUpdate = forceRegenerate ||
             existing.document_name !== documentData.document_name ||
             existing.major_version !== documentData.major_version ||
             existing.minor_version !== documentData.minor_version ||
@@ -221,20 +223,156 @@ export const handler = async (event) => {
           });
 
           if (needsUpdate) {
-            console.log(`Updating existing document: ${doc.name__v}`);
+            console.log(`Updating existing document: ${doc.name__v}${forceRegenerate ? ' (force regenerate enabled)' : ''}`);
+            
+            let updatedSummary = existing.summary;
+            
+            // If force regenerate is enabled, generate new summary
+            if (forceRegenerate) {
+              console.log(`Force regenerating summary for document: ${doc.id}`);
+              try {
+                // Download document content
+                console.log(`Downloading content for document: ${doc.id}`);
+                const downloadUrl = `https://${domain}/api/${v}/objects/documents/${doc.id}/file`;
+                console.log(`Download URL: ${downloadUrl}`);
+                
+                const downloadRes = await fetch(downloadUrl, {
+                  headers: { "Authorization": sessionId }
+                });
+
+                console.log(`Download response:`, {
+                  status: downloadRes.status,
+                  statusText: downloadRes.statusText,
+                  ok: downloadRes.ok,
+                  contentType: downloadRes.headers.get('content-type')
+                });
+
+                if (downloadRes.ok) {
+                  const documentBuffer = await downloadRes.arrayBuffer();
+                  const documentName = doc.name__v || `document_${doc.id}`;
+                  
+                  console.log(`Downloaded ${documentBuffer.byteLength} bytes for document: ${doc.id}`);
+                  
+                  // Extract text from document using the text extraction service
+                  console.log(`Extracting text from document: ${doc.id}`);
+                  const extractionStartTime = Date.now();
+                  
+                  try {
+                    // Create FormData for text extraction
+                    const formData = new FormData();
+                    formData.append('file', new Blob([documentBuffer]), documentName);
+
+                    const extractionRes = await fetch('/api/extract-text', {
+                      method: 'POST',
+                      body: formData
+                    });
+
+                    if (!extractionRes.ok) {
+                      throw new Error(`Text extraction failed: ${extractionRes.status}`);
+                    }
+
+                    const extractionResult = await extractionRes.json();
+                    const extractionDuration = Date.now() - extractionStartTime;
+                    
+                    console.log(`Text extraction completed in ${extractionDuration}ms for document: ${doc.id}`, {
+                      extractedLength: extractionResult.textLength,
+                      extractionMethod: extractionResult.extractionMethod,
+                      fileType: extractionResult.fileType
+                    });
+
+                    const documentText = extractionResult.extractedText;
+                    
+                    if (!documentText || documentText.trim().length === 0) {
+                      throw new Error('No text content extracted from document');
+                    }
+
+                    // Generate new summary using improved OpenAI prompt
+                    console.log(`Generating new AI summary for document: ${doc.id}`);
+                    const openaiStartTime = Date.now();
+                    
+                    const completion = await openai.chat.completions.create({
+                      model: "gpt-3.5-turbo",
+                      messages: [
+                        {
+                          role: "system",
+                          content: `You are a pharmaceutical document analyst. Create detailed, actionable summaries that help users quickly understand:
+
+1. **Purpose & Scope**: What is this document for and who should use it?
+2. **Key Topics**: What main subjects does it cover (procedures, policies, systems, etc.)?
+3. **Target Audience**: Who is this document intended for (roles, departments, users)?
+4. **High-Level Process**: What are the main steps or workflow described?
+5. **Important Requirements**: Any critical compliance, quality, or regulatory requirements?
+6. **Key Responsibilities**: Who does what in the described processes?
+7. **Timeline/Deadlines**: Any important timeframes or schedules?
+
+Format as clear, structured bullet points. Be specific and reference actual content from the document. Avoid generic statements like "contains various information" - instead describe what specific information is included.`
+                        },
+                        {
+                          role: "user",
+                          content: `Document Title: "${doc.name__v}"
+Document Type: "${doc.type__v}"
+Document Number: "${doc.document_number__v}"
+
+Please analyze this document and provide a detailed summary covering the areas above:
+
+${documentText.substring(0, 4000)}`
+                        }
+                      ],
+                      max_tokens: 800,
+                      temperature: 0.2,
+                    });
+
+                    const openaiDuration = Date.now() - openaiStartTime;
+                    updatedSummary = completion.choices[0]?.message?.content || null;
+                    console.log(`New AI summary generated in ${openaiDuration}ms for document: ${doc.id}`, {
+                      summaryLength: updatedSummary?.length || 0,
+                      tokensUsed: completion.usage?.total_tokens || 0,
+                      totalProcessingTime: extractionDuration + openaiDuration
+                    });
+                    
+                  } catch (extractionError) {
+                    console.error(`Text extraction failed for document ${doc.id} during force regenerate:`, {
+                      message: extractionError.message,
+                      documentId: doc.id,
+                      documentName: doc.name__v
+                    });
+                    // Keep existing summary if extraction fails
+                    console.log(`Keeping existing summary due to extraction failure`);
+                  }
+                } else {
+                  console.error(`Failed to download document content during force regenerate: ${doc.id}`, {
+                    status: downloadRes.status,
+                    statusText: downloadRes.statusText
+                  });
+                  // Keep existing summary if download fails
+                  console.log(`Keeping existing summary due to download failure`);
+                }
+              } catch (error) {
+                console.error(`Error during force regenerate for document ${doc.id}:`, {
+                  message: error.message,
+                  stack: error.stack,
+                  documentId: doc.id,
+                  documentName: doc.name__v
+                });
+                // Keep existing summary if generation fails
+                console.log(`Keeping existing summary due to error`);
+              }
+            }
+            
             console.log(`Executing UPDATE query for document ${doc.id}...`);
             
-            // Update existing record
+            // Update existing record with new summary if force regenerate was used
             const updateResult = await pool.query(`
               UPDATE document_index 
               SET document_name = $1, major_version = $2, minor_version = $3, 
-                  status = $4, updated_at = CURRENT_TIMESTAMP
-              WHERE veeva_document_id = $5
+                  status = $4, summary = $5, updated_at = CURRENT_TIMESTAMP
+              WHERE veeva_document_id = $6
             `, [
               documentData.document_name,
               documentData.major_version,
               documentData.minor_version,
               documentData.status,
+              updatedSummary,
               doc.id
             ]);
             
@@ -246,7 +384,7 @@ export const handler = async (event) => {
             results.push({
               action: 'updated',
               document: documentData,
-              summary: existing.summary // Keep existing summary
+              summary: updatedSummary
             });
             console.log(`Document updated: ${doc.name__v}`);
           } else {

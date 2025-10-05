@@ -39,12 +39,13 @@ export async function listApproved({ name = "", limit = 50, offset = 0 } = {}) {
   }
 }
 
-export async function indexDocuments({ name = "", limit = 100 } = {}) {
+export async function indexDocuments({ name = "", limit = 100, force = false } = {}) {
   const startTime = Date.now();
-  console.log('Starting document indexing...', { name, limit });
+  console.log('Starting document indexing...', { name, limit, force });
   
   try {
     const p = new URLSearchParams({ name, limit });
+    if (force) p.set('force', 'true');
     const res = await fetch(`/api/index-documents?${p}`);
     
     if (!res.ok) {
@@ -54,7 +55,7 @@ export async function indexDocuments({ name = "", limit = 100 } = {}) {
         statusText: res.statusText,
         errorText,
         url: res.url,
-        params: { name, limit }
+        params: { name, limit, force }
       });
       throw new Error(`Failed to index documents: ${res.status} ${res.statusText}`);
     }
@@ -74,7 +75,7 @@ export async function indexDocuments({ name = "", limit = 100 } = {}) {
     console.error(`Error indexing documents after ${duration}ms:`, {
       message: error.message,
       stack: error.stack,
-      params: { name, limit }
+      params: { name, limit, force }
     });
     throw error;
   }
