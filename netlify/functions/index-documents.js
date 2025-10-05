@@ -61,6 +61,7 @@ export const handler = async (event) => {
       nameLike,
       limit,
       forceRegenerate,
+      forceParam: q.get("force"),
       domain,
       apiVersion: v
     });
@@ -216,6 +217,7 @@ export const handler = async (event) => {
 
           console.log(`Update check:`, {
             needsUpdate,
+            forceRegenerate,
             nameChanged: existing.document_name !== documentData.document_name,
             majorChanged: existing.major_version !== documentData.major_version,
             minorChanged: existing.minor_version !== documentData.minor_version,
