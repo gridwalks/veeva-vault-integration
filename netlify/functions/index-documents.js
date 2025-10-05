@@ -209,8 +209,7 @@ export const handler = async (event) => {
         if (existingDoc.rows.length > 0) {
           console.log(`Document exists, checking if update needed...`);
           const existing = existingDoc.rows[0];
-          // TEMPORARY: Always update when force regenerate is requested
-          const needsUpdate = forceRegenerate || true ||
+          const needsUpdate = forceRegenerate ||
             existing.document_name !== documentData.document_name ||
             existing.major_version !== documentData.major_version ||
             existing.minor_version !== documentData.minor_version ||
