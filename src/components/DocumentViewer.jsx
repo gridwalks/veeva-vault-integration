@@ -44,9 +44,28 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
         type: fileType
       });
 
+      // Determine the file name with proper extension
+      let fileName = documentName || 'document';
+      
+      // If the document name doesn't have an extension, try to infer it from content-type
+      if (!fileName.includes('.')) {
+        const extensionMap = {
+          'application/pdf': '.pdf',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+          'application/msword': '.doc',
+          'text/plain': '.txt',
+          'application/rtf': '.rtf'
+        };
+        
+        const extension = extensionMap[fileType] || '';
+        fileName = fileName + extension;
+      }
+
+      console.log('Using filename for conversion:', fileName);
+
       // Create FormData for the conversion request
       const formData = new FormData();
-      formData.append('file', blob, documentName || 'document');
+      formData.append('file', blob, fileName);
       formData.append('output', 'pdf');
 
       // Use a document conversion service (you can replace this with your preferred service)
@@ -56,7 +75,21 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
       });
 
       if (!convertResponse.ok) {
-        throw new Error(`Conversion failed: ${convertResponse.status}`);
+        let errorMessage = `Conversion failed: ${convertResponse.status}`;
+        
+        try {
+          const errorData = await convertResponse.json();
+          if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (e) {
+          // If we can't parse the error response, use the default message
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const convertedBlob = await convertResponse.blob();

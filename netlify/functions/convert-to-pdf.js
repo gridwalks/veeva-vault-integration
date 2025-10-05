@@ -60,7 +60,22 @@ export const handler = async (event) => {
     
     const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
     
-    if (fileExtension === 'txt' || fileExtension === 'rtf') {
+    // Handle different file types
+    if (fileExtension === 'pdf') {
+      // If it's already a PDF, return it directly
+      console.log('Document is already a PDF, returning as-is');
+      
+      return {
+        statusCode: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `inline; filename="${fileName}"`,
+          'Content-Length': fileBuffer.length.toString()
+        },
+        body: fileBuffer.toString('base64'),
+        isBase64Encoded: true
+      };
+    } else if (fileExtension === 'txt' || fileExtension === 'rtf') {
       // Simple text-to-PDF conversion
       const textContent = fileBuffer.toString('utf-8');
       const pdfContent = await convertTextToPdf(textContent, fileName);
@@ -75,20 +90,73 @@ export const handler = async (event) => {
         body: pdfContent.toString('base64'),
         isBase64Encoded: true
       };
+    } else if (fileExtension === 'docx') {
+      // Extract text from DOCX and convert to PDF
+      try {
+        const mammoth = await import('mammoth');
+        const result = await mammoth.extractRawText({ buffer: fileBuffer });
+        const textContent = result.value;
+        
+        if (result.messages.length > 0) {
+          console.log('Mammoth extraction warnings:', result.messages);
+        }
+        
+        const pdfContent = await convertTextToPdf(textContent, fileName);
+        
+        return {
+          statusCode: 200,
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `inline; filename="${fileName.replace(/\.[^/.]+$/, '')}.pdf"`,
+            'Content-Length': pdfContent.length.toString()
+          },
+          body: pdfContent.toString('base64'),
+          isBase64Encoded: true
+        };
+      } catch (error) {
+        console.error('DOCX conversion failed:', error);
+        throw new Error(`Failed to convert DOCX to PDF: ${error.message}`);
+      }
     } else {
-      // For other file types, return the original file with a message
-      console.log('File type not supported for conversion:', fileExtension);
+      // For other file types, try to extract text and convert to PDF
+      console.log('Attempting text extraction for file type:', fileExtension);
       
-      return {
-        statusCode: 400,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          error: 'File type not supported for conversion',
-          supportedTypes: ['txt', 'rtf'],
-          receivedType: fileExtension,
-          suggestion: 'Please use a supported file type or contact support'
-        }),
-      };
+      try {
+        // Try to extract text from the file
+        const extractedText = await extractTextFromFile(fileBuffer, fileName, fileExtension);
+        
+        if (extractedText && extractedText.trim().length > 0) {
+          const pdfContent = await convertTextToPdf(extractedText, fileName);
+          
+          return {
+            statusCode: 200,
+            headers: {
+              'Content-Type': 'application/pdf',
+              'Content-Disposition': `inline; filename="${fileName.replace(/\.[^/.]+$/, '')}.pdf"`,
+              'Content-Length': pdfContent.length.toString()
+            },
+            body: pdfContent.toString('base64'),
+            isBase64Encoded: true
+          };
+        } else {
+          throw new Error('No text content could be extracted from the document');
+        }
+      } catch (error) {
+        console.error('Text extraction failed:', error);
+        
+        // Return a 400 error with helpful information
+        return {
+          statusCode: 400,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            error: 'Document conversion failed',
+            message: `Unable to convert ${fileExtension.toUpperCase()} file to PDF: ${error.message}`,
+            supportedTypes: ['pdf', 'txt', 'rtf', 'docx'],
+            receivedType: fileExtension,
+            suggestion: 'The document may be corrupted, password-protected, or in an unsupported format'
+          }),
+        };
+      }
     }
 
   } catch (error) {
@@ -110,6 +178,34 @@ export const handler = async (event) => {
     };
   }
 };
+
+// Helper function to extract text from various file types
+async function extractTextFromFile(fileBuffer, fileName, fileExtension) {
+  console.log('Extracting text from file:', { fileName, fileExtension });
+  
+  try {
+    if (fileExtension === 'pdf') {
+      // Extract text from PDF files using pdf-parse
+      const pdfParse = await import('pdf-parse');
+      const pdfData = await pdfParse.default(fileBuffer);
+      return pdfData.text;
+    } else if (fileExtension === 'docx') {
+      // Extract text from DOCX using mammoth
+      const mammoth = await import('mammoth');
+      const result = await mammoth.extractRawText({ buffer: fileBuffer });
+      return result.value;
+    } else if (fileExtension === 'txt' || fileExtension === 'rtf') {
+      // Simple text extraction
+      return fileBuffer.toString('utf-8');
+    } else {
+      // Try as plain text as fallback
+      return fileBuffer.toString('utf-8');
+    }
+  } catch (error) {
+    console.error('Text extraction error:', error);
+    throw new Error(`Failed to extract text from ${fileExtension} file: ${error.message}`);
+  }
+}
 
 // Simple text-to-PDF conversion function
 async function convertTextToPdf(textContent, fileName) {
