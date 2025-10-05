@@ -1,6 +1,7 @@
 import { downloadUrl } from "../api";
 import { useState } from "react";
 import DocumentViewer from "./DocumentViewer.jsx";
+import ReactMarkdown from "react-markdown";
 
 export default function IndexedDocumentList({ items = [] }) {
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -86,16 +87,32 @@ export default function IndexedDocumentList({ items = [] }) {
               border: '1px solid #e0e0e0'
             }}>
               <h4 style={{margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#333'}}>
-                AI Summary:
+                Document Summary:
               </h4>
-              <p style={{
-                margin: '0',
+              <div style={{
                 fontSize: '14px',
                 lineHeight: '1.5',
                 color: '#555'
               }}>
-                {doc.summary}
-              </p>
+                <ReactMarkdown
+                  components={{
+                    h1: ({children}) => <h1 style={{fontSize: '16px', fontWeight: 'bold', margin: '8px 0 4px 0', color: '#333'}}>{children}</h1>,
+                    h2: ({children}) => <h2 style={{fontSize: '15px', fontWeight: 'bold', margin: '6px 0 4px 0', color: '#333'}}>{children}</h2>,
+                    h3: ({children}) => <h3 style={{fontSize: '14px', fontWeight: 'bold', margin: '4px 0 2px 0', color: '#333'}}>{children}</h3>,
+                    strong: ({children}) => <strong style={{fontWeight: 'bold', color: '#333'}}>{children}</strong>,
+                    em: ({children}) => <em style={{fontStyle: 'italic'}}>{children}</em>,
+                    code: ({children}) => <code style={{backgroundColor: '#f4f4f4', padding: '2px 4px', borderRadius: '3px', fontFamily: 'monospace', fontSize: '13px'}}>{children}</code>,
+                    pre: ({children}) => <pre style={{backgroundColor: '#f4f4f4', padding: '8px', borderRadius: '4px', overflow: 'auto', fontSize: '13px', fontFamily: 'monospace'}}>{children}</pre>,
+                    p: ({children}) => <p style={{margin: '4px 0'}}>{children}</p>,
+                    ul: ({children}) => <ul style={{margin: '4px 0', paddingLeft: '20px'}}>{children}</ul>,
+                    ol: ({children}) => <ol style={{margin: '4px 0', paddingLeft: '20px'}}>{children}</ol>,
+                    li: ({children}) => <li style={{margin: '2px 0'}}>{children}</li>,
+                    a: ({href, children}) => <a href={href} style={{color: '#007bff', textDecoration: 'underline'}} target="_blank" rel="noopener noreferrer">{children}</a>
+                  }}
+                >
+                  {doc.summary}
+                </ReactMarkdown>
+              </div>
             </div>
           )}
           
