@@ -8,7 +8,6 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [usedDocuments, setUsedDocuments] = useState([]);
-  const [showDocumentOffer, setShowDocumentOffer] = useState(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const messagesEndRef = useRef(null);
@@ -69,11 +68,6 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }
       setConversationHistory(data.conversationHistory);
       setUsedDocuments(data.documents);
 
-      // Show document offer if documents were used in the response
-      if (data.documents && data.documents.length > 0) {
-        setShowDocumentOffer(data.documents);
-      }
-
       console.log('Chat response received:', {
         responseLength: data.response.length,
         documentsUsed: data.documents.length,
@@ -108,7 +102,6 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }
     setConversationHistory([]);
     setUsedDocuments([]);
     setError(null);
-    setShowDocumentOffer(null);
   };
 
   const handleOpenDocument = (document) => {
@@ -117,7 +110,6 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }
       name: document.name
     });
     setViewerOpen(true);
-    setShowDocumentOffer(null);
   };
 
   const handleCloseViewer = () => {
@@ -125,13 +117,10 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }
     setSelectedDocument(null);
   };
 
-  const handleDismissDocumentOffer = () => {
-    setShowDocumentOffer(null);
-  };
-
   const renderMessage = (message, index) => {
     const isUser = message.role === 'user';
     const isAssistant = message.role === 'assistant';
+    const isLastAssistantMessage = isAssistant && index === conversationHistory.length - 1;
 
     return (
       <div
@@ -139,7 +128,8 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }
         style={{
           display: 'flex',
           justifyContent: isUser ? 'flex-end' : 'flex-start',
-          marginBottom: '16px'
+          marginBottom: '16px',
+          flexDirection: 'column'
         }}
       >
         <div
@@ -160,6 +150,85 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }
             message.content
           )}
         </div>
+
+        {/* Document opening options for the last assistant message */}
+        {isLastAssistantMessage && usedDocuments && usedDocuments.length > 0 && (
+          <div style={{
+            maxWidth: '80%',
+            marginTop: '8px',
+            padding: '12px',
+            backgroundColor: '#e3f2fd',
+            borderRadius: '8px',
+            border: '1px solid #bbdefb'
+          }}>
+            <div style={{
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#1976d2',
+              marginBottom: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              📄 Documents referenced in this response:
+            </div>
+            
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px'
+            }}>
+              {usedDocuments.map((doc, docIndex) => (
+                <div key={docIndex} style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '8px',
+                  backgroundColor: 'white',
+                  borderRadius: '6px',
+                  border: '1px solid #e0e0e0'
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: '#333',
+                      marginBottom: '2px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {doc.name}
+                    </div>
+                    <div style={{
+                      fontSize: '11px',
+                      color: '#666'
+                    }}>
+                      {doc.number} • v{doc.version} • {doc.type}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleOpenDocument(doc)}
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: '#1976d2',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '11px',
+                      fontWeight: '500',
+                      whiteSpace: 'nowrap',
+                      marginLeft: '8px'
+                    }}
+                  >
+                    Open
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -440,118 +509,6 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }
         </div>
       </div>
 
-      {/* Document Offer Modal */}
-      {showDocumentOffer && showDocumentOffer.length > 0 && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 1001,
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '24px',
-            maxWidth: '500px',
-            width: '90%',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-            textAlign: 'center'
-          }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', color: '#333' }}>
-              📄 Open Document?
-            </h3>
-            <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#666' }}>
-              I found {showDocumentOffer.length} document{showDocumentOffer.length !== 1 ? 's' : ''} that might be relevant to your question. Would you like to open {showDocumentOffer.length === 1 ? 'it' : 'one of them'}?
-            </p>
-            
-            <div style={{ marginBottom: '20px' }}>
-              {showDocumentOffer.map((doc, index) => (
-                <div key={index} style={{
-                  padding: '12px',
-                  backgroundColor: '#f8f9fa',
-                  borderRadius: '8px',
-                  marginBottom: '8px',
-                  border: '1px solid #e9ecef'
-                }}>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#333', marginBottom: '4px' }}>
-                    {doc.name}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#666' }}>
-                    {doc.number} • v{doc.version} • {doc.type}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              {showDocumentOffer.length === 1 ? (
-                <button
-                  onClick={() => handleOpenDocument(showDocumentOffer[0])}
-                  style={{
-                    padding: '10px 20px',
-                    backgroundColor: '#007bff',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}
-                >
-                  Open Document
-                </button>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-                  {showDocumentOffer.slice(0, 3).map((doc, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleOpenDocument(doc)}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#007bff',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '13px',
-                        textAlign: 'left'
-                      }}
-                    >
-                      Open: {doc.name.length > 40 ? doc.name.substring(0, 40) + '...' : doc.name}
-                    </button>
-                  ))}
-                  {showDocumentOffer.length > 3 && (
-                    <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
-                      ... and {showDocumentOffer.length - 3} more documents
-                    </div>
-                  )}
-                </div>
-              )}
-              <button
-                onClick={handleDismissDocumentOffer}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                Not Now
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Document Viewer */}
       <DocumentViewer
