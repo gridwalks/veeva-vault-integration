@@ -209,7 +209,8 @@ export const handler = async (event) => {
         if (existingDoc.rows.length > 0) {
           console.log(`Document exists, checking if update needed...`);
           const existing = existingDoc.rows[0];
-          const needsUpdate = forceRegenerate ||
+          // TEMPORARY: Always update when force regenerate is requested
+          const needsUpdate = forceRegenerate || true ||
             existing.document_name !== documentData.document_name ||
             existing.major_version !== documentData.major_version ||
             existing.minor_version !== documentData.minor_version ||
@@ -228,6 +229,11 @@ export const handler = async (event) => {
 
           if (needsUpdate) {
             console.log(`Updating existing document: ${doc.name__v}${forceRegenerate ? ' (force regenerate enabled)' : ''}`);
+            
+            // TEMPORARY: Force regenerate all documents regardless of condition
+            if (forceRegenerate) {
+              console.log(`FORCE REGENERATE CONFIRMED for document: ${doc.id}`);
+            }
             
             let updatedSummary = existing.summary;
             
