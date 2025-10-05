@@ -72,8 +72,31 @@ export const handler = async (event) => {
       // DOC files are binary and harder to parse
       throw new Error('DOC files are not supported. Please convert to DOCX or TXT format.');
     } else if (fileExtension === 'pdf') {
-      // PDF files need special handling - for now, return error
-      throw new Error('PDF files are not supported for text extraction. Please use a text-based format.');
+      // Extract text from PDF files using pdf-parse
+      try {
+        // Dynamic import for pdf-parse to handle potential import issues
+        const pdfParse = await import('pdf-parse');
+        const pdfData = await pdfParse.default(fileBuffer);
+        
+        extractedText = pdfData.text;
+        extractionMethod = 'pdf_parse';
+        
+        console.log('PDF extraction successful:', {
+          pages: pdfData.numpages,
+          info: pdfData.info,
+          metadata: pdfData.metadata,
+          textLength: pdfData.text.length
+        });
+        
+        // Check if PDF appears to be scanned (no text or very little text)
+        if (!extractedText || extractedText.trim().length < 10) {
+          console.warn('PDF appears to be scanned or image-based - minimal text extracted');
+          extractedText = 'This PDF appears to be a scanned document or image-based PDF. Text extraction is limited. Consider using OCR services for better results.';
+        }
+      } catch (error) {
+        console.error('PDF extraction failed:', error);
+        throw new Error(`Failed to extract text from PDF file: ${error.message}`);
+      }
     } else {
       // Try to extract as plain text
       extractedText = fileBuffer.toString('utf-8');
@@ -85,6 +108,7 @@ export const handler = async (event) => {
       .replace(/\r\n/g, '\n') // Normalize line endings
       .replace(/\n{3,}/g, '\n\n') // Reduce multiple line breaks
       .replace(/[ \t]+/g, ' ') // Normalize whitespace
+      .replace(/[^\x20-\x7E\n\r\t]/g, ' ') // Remove non-printable characters except newlines and tabs
       .trim();
 
     console.log('Text extraction successful:', {
