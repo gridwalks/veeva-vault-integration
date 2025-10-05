@@ -218,10 +218,12 @@ export const handler = async (event) => {
           console.log(`Update check:`, {
             needsUpdate,
             forceRegenerate,
+            forceParam: q.get("force"),
             nameChanged: existing.document_name !== documentData.document_name,
             majorChanged: existing.major_version !== documentData.major_version,
             minorChanged: existing.minor_version !== documentData.minor_version,
-            statusChanged: existing.status !== documentData.status
+            statusChanged: existing.status !== documentData.status,
+            existingSummary: existing.summary ? existing.summary.substring(0, 100) + '...' : 'No summary'
           });
 
           if (needsUpdate) {
