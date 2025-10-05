@@ -40,7 +40,7 @@ export const handler = async (event) => {
     });
 
     const data = await res.json();
-    if (!res.ok || data.responseStatus !== "SUCCESS") {
+    if (!res.ok || (data.responseStatus !== "SUCCESS" && data.responseStatus !== "WARNING")) {
       return { statusCode: res.status || 500, body: JSON.stringify(data) };
     }
 
