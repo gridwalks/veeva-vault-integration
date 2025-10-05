@@ -92,7 +92,8 @@ export default function IndexedDocumentList({ items = [] }) {
               <div style={{
                 fontSize: '14px',
                 lineHeight: '1.5',
-                color: '#555'
+                color: '#555',
+                textAlign: 'left'
               }}>
                 <ReactMarkdown
                   components={{
