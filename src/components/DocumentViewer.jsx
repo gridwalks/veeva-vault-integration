@@ -98,8 +98,21 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
       console.log('Document converted to PDF successfully:', {
         originalSize: blob.size,
         convertedSize: convertedBlob.size,
-        pdfUrl: pdfUrl
+        pdfUrl: pdfUrl,
+        originalType: fileType,
+        fileName: fileName
       });
+      
+      // Validate the PDF blob
+      if (convertedBlob.size === 0) {
+        throw new Error('Generated PDF is empty');
+      }
+      
+      // Check if the blob looks like a PDF
+      const firstBytes = await convertedBlob.slice(0, 4).text();
+      if (!firstBytes.startsWith('%PDF')) {
+        console.warn('Generated file may not be a valid PDF - header check failed');
+      }
 
       setConvertedPdfUrl(pdfUrl);
       setContentType('application/pdf');
@@ -215,16 +228,84 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
               ✓ Document converted to PDF for viewing
             </div>
           )}
-          <iframe
-            src={displayUrl}
-            style={{
-              width: '100%',
-              height: '600px',
-              border: '1px solid #ddd',
-              borderRadius: '4px'
-            }}
-            title={documentName}
-          />
+          
+          {/* PDF Viewer Options */}
+          <div style={{ 
+            display: 'flex', 
+            gap: '12px', 
+            marginBottom: '16px', 
+            justifyContent: 'center',
+            flexWrap: 'wrap'
+          }}>
+            <button 
+              onClick={() => window.open(displayUrl, '_blank')}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              Open in New Tab
+            </button>
+            <button 
+              onClick={() => {
+                const link = document.createElement('a');
+                link.href = displayUrl;
+                link.download = documentName || 'document.pdf';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#28a745',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              Download PDF
+            </button>
+          </div>
+          
+          {/* PDF iframe with fallback */}
+          <div style={{ position: 'relative' }}>
+            <iframe
+              src={`${displayUrl}#toolbar=1&navpanes=1&scrollbar=1`}
+              style={{
+                width: '100%',
+                height: '600px',
+                border: '1px solid #ddd',
+                borderRadius: '4px'
+              }}
+              title={documentName}
+              onError={() => {
+                console.error('PDF iframe failed to load');
+              }}
+            />
+            
+            {/* Fallback message if iframe fails */}
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              padding: '20px',
+              borderRadius: '8px',
+              display: 'none', // Hidden by default, can be shown via JavaScript if needed
+              textAlign: 'center'
+            }} id="pdf-fallback">
+              <p>PDF viewer not supported in this browser.</p>
+              <p>Please use the "Open in New Tab" or "Download PDF" buttons above.</p>
+            </div>
+          </div>
         </div>
       );
     }

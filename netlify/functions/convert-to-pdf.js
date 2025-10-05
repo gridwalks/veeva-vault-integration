@@ -63,14 +63,26 @@ export const handler = async (event) => {
     // Handle different file types
     if (fileExtension === 'pdf') {
       // If it's already a PDF, return it directly
-      console.log('Document is already a PDF, returning as-is');
+      console.log('Document is already a PDF, returning as-is:', {
+        fileName,
+        fileSize: fileBuffer.length,
+        firstBytes: fileBuffer.slice(0, 10).toString('hex')
+      });
+      
+      // Validate that it's actually a PDF by checking the header
+      const pdfHeader = fileBuffer.slice(0, 4).toString();
+      if (pdfHeader !== '%PDF') {
+        console.warn('File has .pdf extension but doesn\'t start with %PDF header');
+        // Still return it, but log the warning
+      }
       
       return {
         statusCode: 200,
         headers: {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `inline; filename="${fileName}"`,
-          'Content-Length': fileBuffer.length.toString()
+          'Content-Length': fileBuffer.length.toString(),
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
         },
         body: fileBuffer.toString('base64'),
         isBase64Encoded: true
@@ -209,31 +221,86 @@ async function extractTextFromFile(fileBuffer, fileName, fileExtension) {
 
 // Simple text-to-PDF conversion function
 async function convertTextToPdf(textContent, fileName) {
-  // This is a basic implementation that creates a simple PDF
-  // In production, you would use a proper PDF library like PDFKit or jsPDF
+  console.log('Converting text to PDF:', { fileName, textLength: textContent.length });
   
-  const lines = textContent.split('\n');
-  const maxLinesPerPage = 50;
+  // Clean and prepare text content
+  const cleanText = textContent
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trim();
+  
+  const lines = cleanText.split('\n');
+  const maxLinesPerPage = 45; // Leave room for margins
   const linesPerPage = Math.min(lines.length, maxLinesPerPage);
   
-  // Create a simple PDF structure (this is a minimal implementation)
-  const pdfHeader = `%PDF-1.4
-1 0 obj
+  // Escape text for PDF (handle parentheses, backslashes, and other special chars)
+  const escapeText = (text) => {
+    return text
+      .replace(/\\/g, '\\\\')
+      .replace(/\(/g, '\\(')
+      .replace(/\)/g, '\\)')
+      .replace(/\r/g, '')
+      .replace(/\n/g, ' ')
+      .replace(/[\x00-\x1F\x7F-\x9F]/g, ''); // Remove control characters
+  };
+  
+  // Build content stream
+  let contentStream = `BT\n`;
+  contentStream += `/F1 12 Tf\n`;
+  contentStream += `72 720 Td\n`;
+  contentStream += `(${escapeText(fileName)}) Tj\n`;
+  contentStream += `0 -20 Td\n`;
+  
+  // Add text lines with proper positioning
+  const textLines = lines.slice(0, linesPerPage);
+  textLines.forEach((line, index) => {
+    const yPosition = 680 - (index * 15);
+    
+    // Skip empty lines
+    if (line.trim().length === 0) {
+      return;
+    }
+    
+    // Position text cursor
+    contentStream += `72 ${yPosition} Td `;
+    
+    // Add text (limit line length to prevent overflow)
+    const displayLine = line.length > 80 ? line.substring(0, 77) + '...' : line;
+    contentStream += `(${escapeText(displayLine)}) Tj\n`;
+  });
+  
+  contentStream += `ET\n`;
+  
+  // Calculate accurate lengths and offsets
+  const contentStreamBytes = Buffer.byteLength(contentStream, 'utf8');
+  
+  // Build PDF objects
+  const objects = [];
+  let currentOffset = 0;
+  
+  // Object 1: Catalog
+  const catalogObj = `1 0 obj
 <<
 /Type /Catalog
 /Pages 2 0 R
 >>
-endobj
-
-2 0 obj
+endobj`;
+  objects.push({ id: 1, content: catalogObj, offset: currentOffset });
+  currentOffset += Buffer.byteLength(catalogObj + '\n', 'utf8');
+  
+  // Object 2: Pages
+  const pagesObj = `2 0 obj
 <<
 /Type /Pages
 /Kids [3 0 R]
 /Count 1
 >>
-endobj
-
-3 0 obj
+endobj`;
+  objects.push({ id: 2, content: pagesObj, offset: currentOffset });
+  currentOffset += Buffer.byteLength(pagesObj + '\n', 'utf8');
+  
+  // Object 3: Page
+  const pageObj = `3 0 obj
 <<
 /Type /Page
 /Parent 2 0 R
@@ -245,61 +312,67 @@ endobj
 >>
 >>
 >>
-endobj
-
-4 0 obj
+endobj`;
+  objects.push({ id: 3, content: pageObj, offset: currentOffset });
+  currentOffset += Buffer.byteLength(pageObj + '\n', 'utf8');
+  
+  // Object 4: Content stream
+  const contentObj = `4 0 obj
 <<
-/Length ${textContent.length + 100}
+/Length ${contentStreamBytes}
 >>
 stream
-BT
-/F1 12 Tf
-72 720 Td
-(${fileName}) Tj
-0 -20 Td
-`;
-
-  const pdfFooter = `
-ET
-endstream
-endobj
-
-5 0 obj
+${contentStream}endstream
+endobj`;
+  objects.push({ id: 4, content: contentObj, offset: currentOffset });
+  currentOffset += Buffer.byteLength(contentObj + '\n', 'utf8');
+  
+  // Object 5: Font
+  const fontObj = `5 0 obj
 <<
 /Type /Font
 /Subtype /Type1
 /BaseFont /Helvetica
 >>
-endobj
-
-xref
-0 6
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000274 00000 n 
-0000000${(400 + textContent.length).toString().padStart(3, '0')} 00000 n 
-trailer
+endobj`;
+  objects.push({ id: 5, content: fontObj, offset: currentOffset });
+  currentOffset += Buffer.byteLength(fontObj + '\n', 'utf8');
+  
+  // Build xref table
+  const xrefEntries = [];
+  xrefEntries.push('0000000000 65535 f '); // Free object
+  objects.forEach(obj => {
+    const offset = obj.offset.toString().padStart(10, '0');
+    xrefEntries.push(`${offset} 00000 n `);
+  });
+  
+  const xrefTable = `xref
+0 ${objects.length + 1}
+${xrefEntries.join('\n')}`;
+  
+  // Build trailer
+  const trailer = `trailer
 <<
-/Size 6
+/Size ${objects.length + 1}
 /Root 1 0 R
 >>
 startxref
-${500 + textContent.length}
+${currentOffset}
 %%EOF`;
-
-  // Simple text rendering (this is very basic)
-  let pdfContent = pdfHeader;
   
-  // Add text content (simplified)
-  const textLines = lines.slice(0, linesPerPage);
-  textLines.forEach((line, index) => {
-    const yPosition = 680 - (index * 15);
-    pdfContent += `${yPosition} Td (${line.replace(/[()\\]/g, '\\$&')}) Tj 0 -15 Td\n`;
+  // Combine all parts
+  let pdfContent = '%PDF-1.4\n';
+  objects.forEach(obj => {
+    pdfContent += obj.content + '\n';
+  });
+  pdfContent += xrefTable + '\n';
+  pdfContent += trailer + '\n';
+  
+  console.log('PDF generation completed:', {
+    totalObjects: objects.length,
+    contentStreamBytes,
+    totalPdfSize: Buffer.byteLength(pdfContent, 'utf8')
   });
   
-  pdfContent += pdfFooter;
-  
-  return Buffer.from(pdfContent, 'utf-8');
+  return Buffer.from(pdfContent, 'utf8');
 }
