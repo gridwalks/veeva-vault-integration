@@ -327,15 +327,31 @@ export const handler = async (event) => {
                   messages: [
                     {
                       role: "system",
-                      content: "You are a helpful assistant that creates concise summaries of pharmaceutical documents. Focus on key procedures, requirements, and important details."
+                      content: `You are a pharmaceutical document analyst. Create detailed, actionable summaries that help users quickly understand:
+
+1. **Purpose & Scope**: What is this document for and who should use it?
+2. **Key Topics**: What main subjects does it cover (procedures, policies, systems, etc.)?
+3. **Target Audience**: Who is this document intended for (roles, departments, users)?
+4. **High-Level Process**: What are the main steps or workflow described?
+5. **Important Requirements**: Any critical compliance, quality, or regulatory requirements?
+6. **Key Responsibilities**: Who does what in the described processes?
+7. **Timeline/Deadlines**: Any important timeframes or schedules?
+
+Format as clear, structured bullet points. Be specific and reference actual content from the document. Avoid generic statements like "contains various information" - instead describe what specific information is included.`
                     },
                     {
                       role: "user",
-                      content: `Please provide a concise summary of this document: ${documentText.substring(0, 4000)}`
+                      content: `Document Title: "${doc.name__v}"
+Document Type: "${doc.type__v}"
+Document Number: "${doc.document_number__v}"
+
+Please analyze this document and provide a detailed summary covering the areas above:
+
+${documentText.substring(0, 4000)}`
                     }
                   ],
-                  max_tokens: 500,
-                  temperature: 0.3,
+                  max_tokens: 800,
+                  temperature: 0.2,
                 });
 
                 const openaiDuration = Date.now() - openaiStartTime;
@@ -364,15 +380,31 @@ export const handler = async (event) => {
                       messages: [
                         {
                           role: "system",
-                          content: "You are a helpful assistant that creates concise summaries of pharmaceutical documents. Focus on key procedures, requirements, and important details."
+                          content: `You are a pharmaceutical document analyst. Create detailed, actionable summaries that help users quickly understand:
+
+1. **Purpose & Scope**: What is this document for and who should use it?
+2. **Key Topics**: What main subjects does it cover (procedures, policies, systems, etc.)?
+3. **Target Audience**: Who is this document intended for (roles, departments, users)?
+4. **High-Level Process**: What are the main steps or workflow described?
+5. **Important Requirements**: Any critical compliance, quality, or regulatory requirements?
+6. **Key Responsibilities**: Who does what in the described processes?
+7. **Timeline/Deadlines**: Any important timeframes or schedules?
+
+Format as clear, structured bullet points. Be specific and reference actual content from the document. Avoid generic statements like "contains various information" - instead describe what specific information is included.`
                         },
                         {
                           role: "user",
-                          content: `Please provide a concise summary of this document: ${fallbackText.substring(0, 4000)}`
+                          content: `Document Title: "${doc.name__v}"
+Document Type: "${doc.type__v}"
+Document Number: "${doc.document_number__v}"
+
+Please analyze this document and provide a detailed summary covering the areas above:
+
+${fallbackText.substring(0, 4000)}`
                         }
                       ],
-                      max_tokens: 500,
-                      temperature: 0.3,
+                      max_tokens: 800,
+                      temperature: 0.2,
                     });
 
                     summary = completion.choices[0]?.message?.content || null;
