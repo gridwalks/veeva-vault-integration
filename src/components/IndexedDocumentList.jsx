@@ -100,8 +100,8 @@ export default function IndexedDocumentList({ items = [] }) {
           )}
           
           <div style={{fontSize: '12px', color: '#999', marginTop: '12px'}}>
-            Indexed: {new Date(doc.indexed_at).toLocaleDateString()} | 
-            Updated: {new Date(doc.updated_at).toLocaleDateString()}
+            Indexed: {new Date(doc.indexed_at).toLocaleString()} | 
+            Updated: {new Date(doc.updated_at).toLocaleString()}
           </div>
         </div>
       ))}
