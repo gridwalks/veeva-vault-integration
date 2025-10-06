@@ -3,7 +3,6 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { listApproved, indexDocuments, getIndexedDocuments } from "./api";
 import DocumentList from "./components/DocumentList.jsx";
 import IndexedDocumentList from "./components/IndexedDocumentList.jsx";
-import StatusBar from "./components/StatusBar.jsx";
 import DocumentChat from "./components/DocumentChat.jsx";
 import Header from "./components/Header.jsx";
 // import StatusPanel from "./components/StatusPanel.jsx";
@@ -159,7 +158,6 @@ export default function App() {
   if (!isAuthenticated) {
     return (
       <>
-        <StatusBar />
         <Header />
         <main style={{maxWidth: 860, margin: "20px auto", padding: "0 16px", textAlign: "center"}}>
           <h1>Approved Documents</h1>
@@ -172,7 +170,6 @@ export default function App() {
 
   return (
     <>
-      <StatusBar />
       <Header />
       <div style={{ textAlign: 'right', margin: '10px 16px' }}>
         {user && <span style={{ marginRight: 8 }}>Hello {user.name}</span>}

@@ -6,7 +6,7 @@ export default function Header() {
     <header style={{
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'flex-end',
       padding: '20px 16px',
       backgroundColor: '#ffffff',
       borderBottom: '1px solid #e0e0e0'
