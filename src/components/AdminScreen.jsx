@@ -350,6 +350,98 @@ export default function AdminScreen() {
           </div>
         </>
       )}
+
+      {/* Selected Documents for Chat */}
+      <div style={{
+        marginTop: '24px',
+        padding: '20px',
+        backgroundColor: '#f8fafc',
+        border: '1px solid #e5e7eb',
+        borderRadius: '8px'
+      }}>
+        <h3 style={{
+          margin: '0 0 16px 0',
+          fontSize: '18px',
+          fontWeight: '600',
+          color: '#374151',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        }}>
+          Selected Documents for Chat
+        </h3>
+        <p style={{
+          margin: '0 0 16px 0',
+          fontSize: '14px',
+          color: '#6b7280',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        }}>
+          Select documents below to use them in the chat interface.
+        </p>
+        
+        {selectedDocuments.length > 0 ? (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}>
+            {selectedDocuments.map((doc, index) => (
+              <div key={index} style={{
+                padding: '12px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #e5e7eb',
+                borderRadius: '6px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <div style={{
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#374151',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    {doc.document_name}
+                  </div>
+                  <div style={{
+                    fontSize: '12px',
+                    color: '#6b7280',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    {doc.document_type} • v{doc.version}
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedDocuments(prev => prev.filter((_, i) => i !== index));
+                  }}
+                  style={{
+                    padding: '4px 8px',
+                    backgroundColor: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{
+            padding: '24px',
+            textAlign: 'center',
+            color: '#6b7280',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          }}>
+            <div style={{ fontSize: '32px', marginBottom: '8px' }}>📄</div>
+            <p style={{ margin: 0, fontSize: '14px' }}>No documents selected for chat</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

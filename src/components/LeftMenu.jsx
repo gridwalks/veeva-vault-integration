@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function LeftMenu({ currentScreen, onScreenChange, onChatOpen, indexedCount, isIndexing, onIndexDocuments, onRegenerateSummaries, onLogout }) {
+export default function LeftMenu({ currentScreen, onScreenChange, onChatOpen, onLogout }) {
   const menuItems = [
     {
       id: 'main',
