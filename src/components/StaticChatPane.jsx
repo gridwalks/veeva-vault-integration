@@ -228,7 +228,7 @@ export default function StaticChatPane({ selectedDocuments = [] }) {
         backgroundColor: '#ffffff',
         border: '1px solid #e5e7eb',
         borderRadius: '8px',
-        height: '100vh',
+        height: '100%',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',

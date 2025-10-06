@@ -57,7 +57,7 @@ export default function App() {
         <div style={{
           display: 'flex',
           height: 'calc(100vh - 120px)',
-          margin: '0 90px 0 90px',
+          margin: '0 16px 0 312px',
           gap: '16px'
         }}>
           {/* Left Panel - Chat */}
@@ -136,7 +136,9 @@ export default function App() {
         </div>
       ) : (
         /* Admin Screen */
-        <AdminScreen />
+        <div style={{ margin: '0 16px 0 312px' }}>
+          <AdminScreen />
+        </div>
       )}
 
       {/* Left Menu */}
