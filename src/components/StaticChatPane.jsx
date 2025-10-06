@@ -75,9 +75,30 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       
       // Handle different response formats
       if (data.conversationHistory && Array.isArray(data.conversationHistory)) {
-        // API returns full conversation history - use it directly
+        // API returns full conversation history - clean up duplicates
         console.log('Using API conversation history:', data.conversationHistory.length, 'messages');
-        setConversationHistory(data.conversationHistory);
+        console.log('Raw conversation history:', data.conversationHistory.map((msg, i) => ({ index: i, role: msg.role, content: msg.content.substring(0, 50) + '...' })));
+        
+        // Remove duplicate consecutive messages
+        const cleanedHistory = [];
+        for (let i = 0; i < data.conversationHistory.length; i++) {
+          const message = data.conversationHistory[i];
+          const prevMessage = cleanedHistory[cleanedHistory.length - 1];
+          
+          // Skip if this message is identical to the previous one
+          if (prevMessage && 
+              prevMessage.role === message.role && 
+              prevMessage.content === message.content) {
+            console.log(`Removing duplicate message at index ${i}:`, message.content.substring(0, 50) + '...');
+            continue;
+          }
+          
+          cleanedHistory.push(message);
+        }
+        
+        console.log('Cleaned conversation history:', cleanedHistory.length, 'messages');
+        console.log('Cleaned conversation history details:', cleanedHistory.map((msg, i) => ({ index: i, role: msg.role, content: msg.content.substring(0, 50) + '...' })));
+        setConversationHistory(cleanedHistory);
       } else if (data.response) {
         // API returns just the response, append to existing history
         console.log('Appending API response to existing history');
