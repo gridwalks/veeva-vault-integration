@@ -31,18 +31,6 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout }
           }} 
         />
         
-        {/* Main text */}
-        <h1 style={{
-          margin: 0,
-          fontSize: '24px',
-          fontWeight: '600',
-          color: '#4338ca',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-          letterSpacing: '-0.025em'
-        }}>
-          AcceleraQA
-        </h1>
-        
         {/* Beta badge */}
         <span style={{
           fontSize: '12px',
