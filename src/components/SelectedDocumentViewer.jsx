@@ -7,69 +7,81 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
 
   const handleOpenDocument = React.useCallback(async (document) => {
     console.log('handleOpenDocument called with:', document);
+    
+    // Clean up previous blob URL to prevent memory leaks
+    if (documentContent && documentContent.startsWith('blob:')) {
+      URL.revokeObjectURL(documentContent);
+    }
+    
     setIsLoading(true);
     setActiveDocument(document);
     
     try {
-      // Fetch document content
+      // First, convert document to PDF
       const versionParts = document.version ? document.version.split('.') : ['1', '0'];
       const major = versionParts[0] || 1;
       const minor = versionParts[1] || 0;
-      const url = `/api/download-file?docId=${document.veeva_document_id}&major=${major}&minor=${minor}`;
-      console.log('Fetching document from URL:', url);
-      console.log('Document version parts:', { version: document.version, major, minor });
       
-      const response = await fetch(url);
-      console.log('Response status:', response.status, 'Content-Type:', response.headers.get('content-type'));
+      console.log('Converting document to PDF...', { docId: document.veeva_document_id, major, minor });
       
-      if (response.ok) {
-        const contentType = response.headers.get('content-type') || '';
-        const isPdf = document.document_type === 'PDF' || contentType.includes('pdf') || url.toLowerCase().includes('.pdf');
-        const isDocx = document.document_type?.toLowerCase().includes('document') || 
-                      contentType.includes('application/vnd.openxmlformats-officedocument') ||
-                      contentType.includes('application/octet-stream');
-        
-        if (isPdf) {
-          console.log('Document is PDF, showing message');
-          setDocumentContent('PDF documents cannot be displayed inline. Please use the download feature.');
-        } else if (isDocx) {
-          console.log('Document is DOCX/Word document, showing message');
-          setDocumentContent('Word documents (DOCX) cannot be displayed inline. Please use the download feature or convert to PDF first.');
-        } else {
-          // Try to get text content for other file types
-          try {
-            const text = await response.text();
-            console.log('Document text content length:', text.length);
-            
-            if (text.trim().length === 0) {
-              setDocumentContent('Document appears to be empty or binary content that cannot be displayed as text.');
-            } else {
-              // Check if content looks like binary/garbled
-              const hasBinaryChars = /[\x00-\x08\x0E-\x1F\x7F-\xFF]/.test(text.substring(0, 1000));
-              if (hasBinaryChars) {
-                setDocumentContent('This document appears to be a binary file that cannot be displayed as text. Please use the download feature.');
-              } else {
-                setDocumentContent(text);
-              }
-            }
-          } catch (textError) {
-            console.error('Error reading text content:', textError);
-            setDocumentContent('Document content could not be read as text. This may be a binary file.');
-          }
-        }
-      } else {
-        console.error('Failed to fetch document:', response.status, response.statusText);
-        setDocumentContent(`Error loading document content. Server returned: ${response.status} ${response.statusText}`);
+      const convertResponse = await fetch('/api/convert-to-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          docId: document.veeva_document_id,
+          major: major,
+          minor: minor
+        })
+      });
+      
+      if (!convertResponse.ok) {
+        throw new Error(`PDF conversion failed: ${convertResponse.status} ${convertResponse.statusText}`);
       }
+      
+      const convertData = await convertResponse.json();
+      console.log('PDF conversion result:', convertData);
+      
+      if (convertData.error) {
+        throw new Error(`PDF conversion error: ${convertData.error}`);
+      }
+      
+      // Now load the converted PDF
+      const pdfUrl = convertData.pdfUrl || convertData.url;
+      if (!pdfUrl) {
+        throw new Error('No PDF URL returned from conversion service');
+      }
+      
+      console.log('Loading converted PDF from URL:', pdfUrl);
+      
+      // For PDFs, we'll create a blob URL and display it in an iframe
+      const pdfResponse = await fetch(pdfUrl);
+      if (!pdfResponse.ok) {
+        throw new Error(`Failed to fetch PDF: ${pdfResponse.status} ${pdfResponse.statusText}`);
+      }
+      
+      const pdfBlob = await pdfResponse.blob();
+      const pdfObjectUrl = URL.createObjectURL(pdfBlob);
+      
+      console.log('PDF loaded successfully, size:', pdfBlob.size);
+      
+      // Set the PDF URL for display
+      setDocumentContent(pdfObjectUrl);
+      
     } catch (error) {
-      console.error('Error loading document:', error);
-      setDocumentContent(`Error loading document content: ${error.message}`);
+      console.error('Error converting/loading document:', error);
+      setDocumentContent(`Error loading document: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [documentContent]);
 
   const handleCloseDocument = () => {
+    // Clean up blob URL to prevent memory leaks
+    if (documentContent && documentContent.startsWith('blob:')) {
+      URL.revokeObjectURL(documentContent);
+    }
     setActiveDocument(null);
     setDocumentContent('');
   };
@@ -87,6 +99,15 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
   React.useEffect(() => {
     console.log('SelectedDocumentViewer mounted, ref should be available');
   }, []);
+
+  // Cleanup blob URL on unmount
+  React.useEffect(() => {
+    return () => {
+      if (documentContent && documentContent.startsWith('blob:')) {
+        URL.revokeObjectURL(documentContent);
+      }
+    };
+  }, [documentContent]);
 
   return (
     <>
@@ -262,17 +283,32 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                   </div>
                 ) : (
                   <div style={{
-                    color: '#374151',
-                    lineHeight: '1.6',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    whiteSpace: 'pre-wrap',
-                    wordWrap: 'break-word'
+                    height: '100%',
+                    width: '100%'
                   }}>
-                    {documentContent.startsWith('PDF documents cannot be displayed') || 
-                     documentContent.startsWith('Word documents (DOCX) cannot be displayed') ||
-                     documentContent.startsWith('This document appears to be a binary file') ||
-                     documentContent.startsWith('Document appears to be empty') ||
-                     documentContent.startsWith('Document content could not be read') ? (
+                    {documentContent.startsWith('blob:') || documentContent.startsWith('http') ? (
+                      /* PDF Viewer */
+                      <iframe
+                        src={documentContent}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          border: 'none',
+                          borderRadius: '4px'
+                        }}
+                        title={`PDF Viewer - ${activeDocument.document_name}`}
+                        onError={(e) => {
+                          console.error('PDF iframe error:', e);
+                          setDocumentContent('Error loading PDF viewer. Please try downloading the document.');
+                        }}
+                      />
+                    ) : documentContent.startsWith('PDF documents cannot be displayed') || 
+                       documentContent.startsWith('Word documents (DOCX) cannot be displayed') ||
+                       documentContent.startsWith('This document appears to be a binary file') ||
+                       documentContent.startsWith('Document appears to be empty') ||
+                       documentContent.startsWith('Document content could not be read') ||
+                       documentContent.startsWith('Error loading document') ? (
+                      /* Error State */
                       <div style={{
                         display: 'flex',
                         flexDirection: 'column',
@@ -312,7 +348,17 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                         </div>
                       </div>
                     ) : (
-                      documentContent
+                      /* Text Content */
+                      <div style={{
+                        color: '#374151',
+                        lineHeight: '1.6',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                        whiteSpace: 'pre-wrap',
+                        wordWrap: 'break-word',
+                        padding: '20px'
+                      }}>
+                        {documentContent}
+                      </div>
                     )}
                   </div>
                 )}
