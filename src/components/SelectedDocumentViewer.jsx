@@ -86,6 +86,8 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
           const contentType = response.headers.get('content-type') || '';
           const isPdf = contentType.includes('pdf') || contentType.includes('application/pdf');
           
+          console.log('Original document analysis:', { contentType, isPdf, size: response.headers.get('content-length') });
+          
           if (isPdf) {
             // It's already a PDF, load it directly
             const pdfBlob = await response.blob();
@@ -94,9 +96,11 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
             setDocumentContent(pdfObjectUrl);
           } else {
             // Not a PDF, show message with download option
+            console.log('Original document is not PDF, showing fallback message');
             setDocumentContent('This document cannot be displayed inline. PDF conversion is currently unavailable. Please use the download button to view the document.');
           }
         } else {
+          console.error('Failed to load original document:', response.status, response.statusText);
           throw new Error(`Failed to load original document: ${response.status} ${response.statusText}`);
         }
       }
