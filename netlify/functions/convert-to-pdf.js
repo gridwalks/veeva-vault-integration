@@ -13,30 +13,52 @@ export const handler = async (event) => {
     }
 
     const body = Buffer.from(event.body, 'base64');
-    const parts = body.toString().split(`--${boundary}`);
-    
+    const boundaryMarker = `--${boundary}`;
+    const bodyString = body.toString('latin1');
+    const rawParts = bodyString.split(boundaryMarker);
+
     let fileBuffer = null;
     let fileName = 'document';
     let outputFormat = 'pdf';
 
     // Parse form data manually
-    for (const part of parts) {
-      if (part.includes('Content-Disposition: form-data')) {
-        if (part.includes('name="file"')) {
-          const fileStart = part.indexOf('\r\n\r\n') + 4;
-          const fileEnd = part.lastIndexOf('\r\n');
-          fileBuffer = Buffer.from(part.slice(fileStart, fileEnd));
-          
-          // Extract filename
-          const filenameMatch = part.match(/filename="([^"]+)"/);
-          if (filenameMatch) {
-            fileName = filenameMatch[1];
-          }
-        } else if (part.includes('name="output"')) {
-          const valueStart = part.indexOf('\r\n\r\n') + 4;
-          const valueEnd = part.lastIndexOf('\r\n');
-          outputFormat = part.slice(valueStart, valueEnd).trim();
+    for (const rawPart of rawParts) {
+      const trimmedPart = rawPart.replace(/^\r\n/, '').replace(/\r\n$/, '');
+
+      if (!trimmedPart || trimmedPart === '--') {
+        continue;
+      }
+
+      if (!trimmedPart.includes('Content-Disposition: form-data')) {
+        continue;
+      }
+
+      const partBuffer = Buffer.from(trimmedPart, 'latin1');
+      const headerTerminator = partBuffer.indexOf(Buffer.from('\r\n\r\n', 'latin1'));
+
+      if (headerTerminator === -1) {
+        continue;
+      }
+
+      const headersBuffer = partBuffer.slice(0, headerTerminator);
+      let contentBuffer = partBuffer.slice(headerTerminator + 4);
+
+      // Remove trailing CRLF added before the boundary marker
+      if (contentBuffer.length >= 2 && contentBuffer[contentBuffer.length - 2] === 13 && contentBuffer[contentBuffer.length - 1] === 10) {
+        contentBuffer = contentBuffer.slice(0, -2);
+      }
+
+      const headers = headersBuffer.toString('utf-8');
+
+      if (headers.includes('name="file"')) {
+        fileBuffer = Buffer.from(contentBuffer);
+
+        const filenameMatch = headers.match(/filename="([^"]+)"/);
+        if (filenameMatch) {
+          fileName = filenameMatch[1];
         }
+      } else if (headers.includes('name="output"')) {
+        outputFormat = contentBuffer.toString('utf-8').trim();
       }
     }
 
