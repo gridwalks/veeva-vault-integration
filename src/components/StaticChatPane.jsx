@@ -334,7 +334,7 @@ export default function StaticChatPane({ selectedDocuments = [] }) {
           flex: 1,
           overflow: 'auto',
           padding: '20px',
-          backgroundColor: '#1e1e1e'
+          backgroundColor: '#ffffff'
         }}>
           {conversationHistory.length === 0 ? (
             <div style={{
@@ -344,10 +344,14 @@ export default function StaticChatPane({ selectedDocuments = [] }) {
               justifyContent: 'center',
               height: '100%',
               textAlign: 'center',
-              color: '#b0b0b0'
+              color: '#6b7280'
             }}>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>💬</div>
-              <h4 style={{ margin: '0 0 8px 0', color: '#ffffff' }}>
+              <h4 style={{ 
+                margin: '0 0 8px 0', 
+                color: '#374151',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}>
                 Chat with your documents
               </h4>
               <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5' }}>
@@ -385,18 +389,19 @@ export default function StaticChatPane({ selectedDocuments = [] }) {
                   <div style={{
                     padding: '12px 16px',
                     borderRadius: '18px',
-                    backgroundColor: '#2a2a2a',
-                    color: '#b0b0b0',
+                    backgroundColor: '#f3f4f6',
+                    color: '#6b7280',
                     fontSize: '14px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px'
+                    gap: '8px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                   }}>
                     <div style={{
                       width: '16px',
                       height: '16px',
-                      border: '2px solid #555',
-                      borderTop: '2px solid #007bff',
+                      border: '2px solid #d1d5db',
+                      borderTop: '2px solid #4338ca',
                       borderRadius: '50%',
                       animation: 'spin 1s linear infinite'
                     }}></div>
@@ -425,10 +430,10 @@ export default function StaticChatPane({ selectedDocuments = [] }) {
         {/* Input */}
         <div style={{
           padding: '16px 20px',
-          borderTop: '1px solid #2a2a2a',
-          backgroundColor: '#252525',
-          borderBottomLeftRadius: '12px',
-          borderBottomRightRadius: '12px'
+          borderTop: '1px solid #e5e7eb',
+          backgroundColor: '#f8fafc',
+          borderBottomLeftRadius: '8px',
+          borderBottomRightRadius: '8px'
         }}>
           <div style={{ display: 'flex', gap: '12px' }}>
             <textarea
@@ -436,21 +441,30 @@ export default function StaticChatPane({ selectedDocuments = [] }) {
               value={currentMessage}
               onChange={(e) => setCurrentMessage(e.target.value)}
               onKeyPress={handleKeyPress}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#4338ca';
+                e.target.style.boxShadow = '0 0 0 3px rgba(67, 56, 202, 0.1)';
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#d1d5db';
+                e.target.style.boxShadow = 'none';
+              }}
               placeholder="Ask a question about your documents..."
               disabled={isLoading}
               style={{
                 flex: 1,
                 padding: '12px',
-                border: '1px solid #444',
+                border: '1px solid #d1d5db',
                 borderRadius: '8px',
                 resize: 'none',
                 fontSize: '14px',
-                fontFamily: 'inherit',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 minHeight: '44px',
                 maxHeight: '120px',
-                backgroundColor: '#1e1e1e',
-                color: '#ffffff',
-                outline: 'none'
+                backgroundColor: '#ffffff',
+                color: '#374151',
+                outline: 'none',
+                transition: 'border-color 0.2s ease'
               }}
               rows={1}
             />
@@ -459,24 +473,25 @@ export default function StaticChatPane({ selectedDocuments = [] }) {
               disabled={!currentMessage.trim() || isLoading}
               style={{
                 padding: '12px 20px',
-                backgroundColor: (!currentMessage.trim() || isLoading) ? '#444' : '#007bff',
+                backgroundColor: (!currentMessage.trim() || isLoading) ? '#9ca3af' : '#4338ca',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
                 cursor: (!currentMessage.trim() || isLoading) ? 'not-allowed' : 'pointer',
                 fontSize: '14px',
                 fontWeight: '500',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 minWidth: '80px',
                 transition: 'background-color 0.2s ease'
               }}
               onMouseEnter={(e) => {
                 if (currentMessage.trim() && !isLoading) {
-                  e.target.style.backgroundColor = '#0056b3';
+                  e.target.style.backgroundColor = '#312e81';
                 }
               }}
               onMouseLeave={(e) => {
                 if (currentMessage.trim() && !isLoading) {
-                  e.target.style.backgroundColor = '#007bff';
+                  e.target.style.backgroundColor = '#4338ca';
                 }
               }}
             >
@@ -486,8 +501,9 @@ export default function StaticChatPane({ selectedDocuments = [] }) {
           <div style={{
             marginTop: '8px',
             fontSize: '12px',
-            color: '#888',
-            textAlign: 'center'
+            color: '#6b7280',
+            textAlign: 'center',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}>
             Press Enter to send, Shift+Enter for new line
           </div>
