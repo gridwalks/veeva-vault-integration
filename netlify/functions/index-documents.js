@@ -2,6 +2,7 @@ import { getSessionId } from "./vault-auth.js";
 import { getPool, initDatabase } from "./db.js";
 import OpenAI from 'openai';
 import mammoth from 'mammoth';
+import { parseDocument } from 'docx-parser';
 import { chunkText, validateChunks, generateChunkPreview } from './chunking-utils.js';
 
 const openai = new OpenAI({
@@ -22,81 +23,130 @@ async function extractTextFromBuffer(fileBuffer, fileName) {
   console.log(`First 10 bytes (hex): ${firstBytes}`);
 
   if (fileExtension === 'docx') {
-    // Use mammoth.js for DOCX files - this is the proper way to extract text
+    console.log('Attempting DOCX text extraction with multiple methods...');
+    console.log('Buffer details:', {
+      length: fileBuffer.length,
+      type: typeof fileBuffer,
+      constructor: fileBuffer.constructor.name,
+      isBuffer: Buffer.isBuffer(fileBuffer)
+    });
+    
+    let extractionAttempts = [];
+    
+    // Method 1: Try mammoth.js
     try {
-      console.log('Using mammoth.js for DOCX text extraction');
-      console.log('Buffer details:', {
-        length: fileBuffer.length,
-        type: typeof fileBuffer,
-        constructor: fileBuffer.constructor.name,
-        isBuffer: Buffer.isBuffer(fileBuffer)
-      });
-      
+      console.log('Method 1: Trying mammoth.js...');
       const result = await mammoth.extractRawText({ buffer: fileBuffer });
-      extractedText = result.value;
-      extractionMethod = 'mammoth_docx';
+      const mammothText = result.value;
       
-      console.log('Mammoth extraction result:', {
-        textLength: extractedText.length,
-        extractedPreview: extractedText.substring(0, 200),
-        warnings: result.messages.length
+      console.log('Mammoth result:', {
+        textLength: mammothText.length,
+        preview: mammothText.substring(0, 200),
+        warnings: result.messages.length,
+        containsRawContent: mammothText.includes('[Content_Types]') || mammothText.includes('PK')
       });
       
-      if (result.messages.length > 0) {
-        console.log('Mammoth extraction warnings:', result.messages);
+      // Check if mammoth actually extracted meaningful text
+      if (mammothText && mammothText.trim().length > 0 && 
+          !mammothText.includes('[Content_Types]') && 
+          !mammothText.includes('PK') &&
+          !mammothText.includes('.xml')) {
+        extractedText = mammothText;
+        extractionMethod = 'mammoth_docx';
+        console.log('✅ Mammoth extraction successful');
+        extractionAttempts.push({ method: 'mammoth', success: true, textLength: mammothText.length });
+      } else {
+        console.log('❌ Mammoth returned raw content or empty text');
+        extractionAttempts.push({ method: 'mammoth', success: false, reason: 'raw_content_or_empty' });
       }
-      
-      // Check if extraction was successful
-      if (!extractedText || extractedText.trim().length === 0) {
-        console.warn('Mammoth extraction returned empty text');
-        extractedText = 'Document text extraction failed - no readable text found in DOCX file.';
-        extractionMethod = 'extraction_failed';
-      }
-    } catch (error) {
-      console.error('Mammoth DOCX extraction failed:', error);
-      console.log('Falling back to simple text extraction...');
-      
-      // Fallback: try simple text extraction (but this will likely be garbled)
+    } catch (mammothError) {
+      console.log('❌ Mammoth extraction failed:', mammothError.message);
+      extractionAttempts.push({ method: 'mammoth', success: false, reason: mammothError.message });
+    }
+    
+    // Method 2: Try docx-parser if mammoth failed
+    if (!extractedText || extractionMethod === 'extraction_failed') {
       try {
-        extractedText = fileBuffer.toString('utf-8');
-        extractionMethod = 'fallback_simple_text_extraction';
+        console.log('Method 2: Trying docx-parser...');
+        const docxResult = await parseDocument(fileBuffer);
+        const docxText = docxResult.text || '';
         
-        console.log('Fallback extraction result:', {
-          textLength: extractedText.length,
-          extractedPreview: extractedText.substring(0, 200)
+        console.log('Docx-parser result:', {
+          textLength: docxText.length,
+          preview: docxText.substring(0, 200)
         });
         
-        // Filter out obvious ZIP/XML content from the garbled text
-        const lines = extractedText.split('\n');
-        const readableLines = lines.filter(line => 
-          line.trim().length > 0 && 
-          !line.includes('[Content_Types]') && 
-          !line.includes('PK') &&
-          !line.includes('.xml') &&
-          !line.includes('_rels/') &&
-          !line.includes('word/document.xml') &&
-          line.length < 500 && // Avoid very long lines
-          /[a-zA-Z]/.test(line) // Must contain at least one letter
-        );
+        if (docxText && docxText.trim().length > 0) {
+          extractedText = docxText;
+          extractionMethod = 'docx_parser';
+          console.log('✅ Docx-parser extraction successful');
+          extractionAttempts.push({ method: 'docx_parser', success: true, textLength: docxText.length });
+        } else {
+          console.log('❌ Docx-parser returned empty text');
+          extractionAttempts.push({ method: 'docx_parser', success: false, reason: 'empty_text' });
+        }
+      } catch (docxError) {
+        console.log('❌ Docx-parser extraction failed:', docxError.message);
+        extractionAttempts.push({ method: 'docx_parser', success: false, reason: docxError.message });
+      }
+    }
+    
+    // Method 3: Simple text extraction with aggressive filtering (last resort)
+    if (!extractedText || extractionMethod === 'extraction_failed') {
+      try {
+        console.log('Method 3: Trying simple text extraction with filtering...');
+        const rawText = fileBuffer.toString('utf-8');
+        
+        console.log('Raw text result:', {
+          textLength: rawText.length,
+          preview: rawText.substring(0, 200),
+          containsRawContent: rawText.includes('[Content_Types]') || rawText.includes('PK')
+        });
+        
+        // Aggressive filtering to extract any readable text
+        const lines = rawText.split('\n');
+        const readableLines = lines.filter(line => {
+          const trimmed = line.trim();
+          return trimmed.length > 0 && 
+                 trimmed.length < 1000 && // Avoid very long lines
+                 !trimmed.includes('[Content_Types]') && 
+                 !trimmed.includes('PK') &&
+                 !trimmed.includes('.xml') &&
+                 !trimmed.includes('_rels/') &&
+                 !trimmed.includes('word/document.xml') &&
+                 /[a-zA-Z]{3,}/.test(trimmed); // Must contain at least 3 consecutive letters
+        });
         
         if (readableLines.length > 0) {
           extractedText = readableLines.join(' ').trim();
-          extractionMethod = 'filtered_fallback_extraction';
-          console.log('Filtered fallback text:', {
+          extractionMethod = 'filtered_simple_extraction';
+          console.log('✅ Filtered simple extraction successful:', {
             textLength: extractedText.length,
             preview: extractedText.substring(0, 200)
           });
+          extractionAttempts.push({ method: 'filtered_simple', success: true, textLength: extractedText.length });
         } else {
-          console.log('No readable text found in fallback extraction');
-          extractedText = 'Document text extraction failed - DOCX file could not be processed.';
-          extractionMethod = 'extraction_failed';
+          console.log('❌ No readable text found in simple extraction');
+          extractionAttempts.push({ method: 'filtered_simple', success: false, reason: 'no_readable_text' });
         }
-      } catch (fallbackError) {
-        console.error('Fallback extraction also failed:', fallbackError);
-        extractedText = 'Document text extraction failed - DOCX file could not be processed.';
-        extractionMethod = 'extraction_failed';
+      } catch (simpleError) {
+        console.log('❌ Simple extraction failed:', simpleError.message);
+        extractionAttempts.push({ method: 'filtered_simple', success: false, reason: simpleError.message });
       }
     }
+    
+    // Final fallback
+    if (!extractedText || extractionMethod === 'extraction_failed') {
+      console.log('❌ All extraction methods failed');
+      extractedText = 'Document text extraction failed - DOCX file could not be processed by any method.';
+      extractionMethod = 'all_methods_failed';
+    }
+    
+    console.log('Extraction summary:', {
+      finalMethod: extractionMethod,
+      finalTextLength: extractedText.length,
+      attempts: extractionAttempts
+    });
   } else if (fileExtension === 'pdf') {
     // Extract text from PDF files using pdf-parse
     try {
@@ -1203,3 +1253,4 @@ ${fallbackText.substring(0, 4000)}`
     return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
   }
 };
+
