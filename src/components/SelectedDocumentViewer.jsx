@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function SelectedDocumentViewer({ selectedDocuments, onDocumentsSelected }) {
+const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocumentsSelected }, ref) => {
   const [activeDocument, setActiveDocument] = React.useState(null);
   const [documentContent, setDocumentContent] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
@@ -42,6 +42,11 @@ export default function SelectedDocumentViewer({ selectedDocuments, onDocumentsS
   const handleRemoveDocument = (documentToRemove) => {
     onDocumentsSelected(selectedDocuments.filter(doc => doc.veeva_document_id !== documentToRemove.veeva_document_id));
   };
+
+  // Expose handleOpenDocument function to parent component
+  React.useImperativeHandle(ref, () => ({
+    handleOpenDocument
+  }));
 
   return (
     <>
@@ -324,4 +329,6 @@ export default function SelectedDocumentViewer({ selectedDocuments, onDocumentsS
 
     </>
   );
-}
+});
+
+export default SelectedDocumentViewer;

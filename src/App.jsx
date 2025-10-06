@@ -12,7 +12,14 @@ export default function App() {
   const { isAuthenticated, loginWithRedirect, logout, user } = useAuth0();
   const [currentScreen, setCurrentScreen] = useState("main");
   const [selectedDocuments, setSelectedDocuments] = useState([]);
+  const [documentViewerRef, setDocumentViewerRef] = useState(null);
 
+  const handleOpenDocumentInPane = (document) => {
+    // Call the SelectedDocumentViewer's handleOpenDocument function
+    if (documentViewerRef && documentViewerRef.handleOpenDocument) {
+      documentViewerRef.handleOpenDocument(document);
+    }
+  };
 
   if (!isAuthenticated) {
     return <AuthScreen onLogin={() => loginWithRedirect()} />;
@@ -40,7 +47,10 @@ export default function App() {
             overflow: 'hidden',
             boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
           }}>
-            <StaticChatPane selectedDocuments={selectedDocuments} />
+            <StaticChatPane 
+              selectedDocuments={selectedDocuments} 
+              onOpenDocumentInPane={handleOpenDocumentInPane}
+            />
           </div>
 
                 {/* Right Panel - Selected Documents Viewer */}
@@ -48,6 +58,7 @@ export default function App() {
                   flex: '1'
                 }}>
                   <SelectedDocumentViewer 
+                    ref={setDocumentViewerRef}
                     selectedDocuments={selectedDocuments}
                     onDocumentsSelected={setSelectedDocuments}
                   />

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import DocumentViewer from './DocumentViewer.jsx';
 
-export default function StaticChatPane({ selectedDocuments = [] }) {
+export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane }) {
   const [conversationHistory, setConversationHistory] = useState([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -94,11 +94,23 @@ export default function StaticChatPane({ selectedDocuments = [] }) {
   };
 
   const handleOpenDocument = (document) => {
-    setSelectedDocument({
-      url: `/api/download-file?docId=${document.id}&major=${document.version.split('.')[0]}&minor=${document.version.split('.')[1]}`,
-      name: document.name
-    });
-    setViewerOpen(true);
+    if (onOpenDocumentInPane) {
+      // Open document in the selected documents pane
+      onOpenDocumentInPane({
+        veeva_document_id: document.id,
+        document_name: document.name,
+        document_type: document.type,
+        version: document.version,
+        document_number: document.number
+      });
+    } else {
+      // Fallback to document viewer if no callback provided
+      setSelectedDocument({
+        url: `/api/download-file?docId=${document.id}&major=${document.version.split('.')[0]}&minor=${document.version.split('.')[1]}`,
+        name: document.name
+      });
+      setViewerOpen(true);
+    }
   };
 
   const handleCloseViewer = () => {
