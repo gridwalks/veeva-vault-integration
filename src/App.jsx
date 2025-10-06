@@ -6,6 +6,7 @@ import Header from "./components/Header.jsx";
 import LeftMenu from "./components/LeftMenu.jsx";
 import AdminScreen from "./components/AdminScreen.jsx";
 import IndexedDocumentList from "./components/IndexedDocumentList.jsx";
+import AuthScreen from "./components/AuthScreen.jsx";
 // import StatusPanel from "./components/StatusPanel.jsx";
 
 export default function App() {
@@ -43,16 +44,7 @@ export default function App() {
   }, [isAuthenticated]);
 
   if (!isAuthenticated) {
-    return (
-      <>
-        <Header />
-        <main style={{maxWidth: 860, margin: "20px auto", padding: "0 16px", textAlign: "center"}}>
-          <h1>Approved Documents</h1>
-          <p>Please log in to view documents.</p>
-          <button onClick={() => loginWithRedirect()}>Log in</button>
-        </main>
-      </>
-    );
+    return <AuthScreen onLogin={() => loginWithRedirect()} />;
   }
 
   return (
