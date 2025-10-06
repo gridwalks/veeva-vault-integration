@@ -3,7 +3,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { listApproved, indexDocuments, getIndexedDocuments } from "./api";
 import DocumentList from "./components/DocumentList.jsx";
 import IndexedDocumentList from "./components/IndexedDocumentList.jsx";
-import DocumentChat from "./components/DocumentChat.jsx";
+import StaticChatPane from "./components/StaticChatPane.jsx";
 import Header from "./components/Header.jsx";
 import LeftMenu from "./components/LeftMenu.jsx";
 // import StatusPanel from "./components/StatusPanel.jsx";
@@ -16,7 +16,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("documents");
   const [isIndexing, setIsIndexing] = useState(false);
   const [indexResult, setIndexResult] = useState(null);
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedDocuments, setSelectedDocuments] = useState([]);
 
   async function load(offset = 0) {
@@ -176,128 +175,148 @@ export default function App() {
         {user && <span style={{ marginRight: 8 }}>Hello {user.name}</span>}
         <button onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}>Log out</button>
       </div>
-      <main style={{maxWidth: 860, margin: "20px auto", padding: "0 16px 0 90px", textAlign: "center"}}>
-        <h1>Approved Documents</h1>
+      
+      {/* Two-panel layout */}
+      <div style={{
+        display: 'flex',
+        height: 'calc(100vh - 120px)',
+        margin: '0 90px 0 90px',
+        gap: '16px'
+      }}>
+        {/* Left Panel - Documents */}
+        <div style={{
+          flex: '1',
+          backgroundColor: '#f8f9fa',
+          border: '1px solid #e0e0e0',
+          borderRadius: '12px',
+          padding: '20px',
+          overflow: 'auto'
+        }}>
+          <h1 style={{ margin: '0 0 20px 0', textAlign: 'center', color: '#333' }}>Approved Documents</h1>
 
-
-        <form onSubmit={(e) => { 
-          e.preventDefault(); 
-          console.log('Search form submitted:', { query: q, activeTab });
-          if (activeTab === "documents") load(0);
-          else loadIndexed(0);
-        }} style={{display:'flex', gap:8, margin:'12px 0 20px'}}>
-          <input
-            value={q}
-            onChange={e => setQ(e.target.value)}
-            placeholder="Filter by name…"
-            style={{flex:1, padding:'8px 10px'}}
-          />
-          <button style={{padding:'8px 12px'}}>Search</button>
-        </form>
-
-        {/* Index Results */}
-        {indexResult && (
-          <div style={{
-            backgroundColor: indexResult.error ? '#f8d7da' : '#d4edda',
-            color: indexResult.error ? '#721c24' : '#155724',
-            padding: '12px',
-            borderRadius: '4px',
-            marginBottom: '16px',
-            textAlign: 'left'
-          }}>
-            {indexResult.error ? (
-              <p><strong>Error:</strong> {indexResult.error}</p>
-            ) : (
-              <div>
-                <p><strong>Indexing Complete!</strong></p>
-                <p>Total documents: {indexResult.total}</p>
-                <p>Processed: {indexResult.processed}</p>
-                <p>
-                  Created: {indexResult.results?.filter(r => r.action === 'created').length || 0} | 
-                  Updated: {indexResult.results?.filter(r => r.action === 'updated').length || 0} | 
-                  Unchanged: {indexResult.results?.filter(r => r.action === 'unchanged').length || 0}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {data.error && <p style={{color:'#b00020'}}>Error: {data.error}</p>}
-        {indexedData.error && <p style={{color:'#b00020'}}>Error: {indexedData.error}</p>}
-
-        {/* Content based on active tab */}
-        {activeTab === "documents" ? (
-          <>
-            <DocumentList items={data.items} />
-            <div className="pager" style={{display:'flex', gap:12, alignItems:'center', marginTop:12}}>
-              <button 
-                disabled={data.pageOffset <= 0} 
-                onClick={() => {
-                  const newOffset = Math.max(0, data.pageOffset - data.pageSize);
-                  console.log('Previous page clicked:', { newOffset, currentOffset: data.pageOffset });
-                  load(newOffset);
-                }}
-              >
-                Prev
-              </button>
-              <span>{data.pageOffset + 1}–{data.pageOffset + (data.items?.length || 0)} of {data.total}</span>
-              <button 
-                disabled={data.pageOffset + data.pageSize >= data.total} 
-                onClick={() => {
-                  const newOffset = data.pageOffset + data.pageSize;
-                  console.log('Next page clicked:', { newOffset, currentOffset: data.pageOffset });
-                  load(newOffset);
-                }}
-              >
-                Next
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <IndexedDocumentList 
-              items={indexedData.items} 
-              onDocumentsSelected={setSelectedDocuments}
+          <form onSubmit={(e) => { 
+            e.preventDefault(); 
+            console.log('Search form submitted:', { query: q, activeTab });
+            if (activeTab === "documents") load(0);
+            else loadIndexed(0);
+          }} style={{display:'flex', gap:8, margin:'0 0 20px 0'}}>
+            <input
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Filter by name…"
+              style={{flex:1, padding:'8px 10px', border: '1px solid #ddd', borderRadius: '4px'}}
             />
-            <div className="pager" style={{display:'flex', gap:12, alignItems:'center', marginTop:12}}>
-              <button 
-                disabled={indexedData.pageOffset <= 0} 
-                onClick={() => {
-                  const newOffset = Math.max(0, indexedData.pageOffset - indexedData.pageSize);
-                  console.log('Previous indexed page clicked:', { newOffset, currentOffset: indexedData.pageOffset });
-                  loadIndexed(newOffset);
-                }}
-              >
-                Prev
-              </button>
-              <span>{indexedData.pageOffset + 1}–{indexedData.pageOffset + (indexedData.items?.length || 0)} of {indexedData.total}</span>
-              <button 
-                disabled={indexedData.pageOffset + indexedData.pageSize >= indexedData.total} 
-                onClick={() => {
-                  const newOffset = indexedData.pageOffset + indexedData.pageSize;
-                  console.log('Next indexed page clicked:', { newOffset, currentOffset: indexedData.pageOffset });
-                  loadIndexed(newOffset);
-                }}
-              >
-                Next
-              </button>
+            <button style={{padding:'8px 12px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer'}}>Search</button>
+          </form>
+
+          {/* Index Results */}
+          {indexResult && (
+            <div style={{
+              backgroundColor: indexResult.error ? '#f8d7da' : '#d4edda',
+              color: indexResult.error ? '#721c24' : '#155724',
+              padding: '12px',
+              borderRadius: '4px',
+              marginBottom: '16px',
+              textAlign: 'left'
+            }}>
+              {indexResult.error ? (
+                <p><strong>Error:</strong> {indexResult.error}</p>
+              ) : (
+                <div>
+                  <p><strong>Indexing Complete!</strong></p>
+                  <p>Total documents: {indexResult.total}</p>
+                  <p>Processed: {indexResult.processed}</p>
+                  <p>
+                    Created: {indexResult.results?.filter(r => r.action === 'created').length || 0} | 
+                    Updated: {indexResult.results?.filter(r => r.action === 'updated').length || 0} | 
+                    Unchanged: {indexResult.results?.filter(r => r.action === 'unchanged').length || 0}
+                  </p>
+                </div>
+              )}
             </div>
-          </>
-        )}
-      </main>
+          )}
 
-      {/* Document Chat Modal */}
-      <DocumentChat
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        selectedDocuments={selectedDocuments}
-      />
+          {data.error && <p style={{color:'#b00020'}}>Error: {data.error}</p>}
+          {indexedData.error && <p style={{color:'#b00020'}}>Error: {indexedData.error}</p>}
 
-      {/* Right Menu */}
-      <RightMenu
+          {/* Content based on active tab */}
+          {activeTab === "documents" ? (
+            <>
+              <DocumentList items={data.items} />
+              <div className="pager" style={{display:'flex', gap:12, alignItems:'center', marginTop:12}}>
+                <button 
+                  disabled={data.pageOffset <= 0} 
+                  onClick={() => {
+                    const newOffset = Math.max(0, data.pageOffset - data.pageSize);
+                    console.log('Previous page clicked:', { newOffset, currentOffset: data.pageOffset });
+                    load(newOffset);
+                  }}
+                >
+                  Prev
+                </button>
+                <span>{data.pageOffset + 1}–{data.pageOffset + (data.items?.length || 0)} of {data.total}</span>
+                <button 
+                  disabled={data.pageOffset + data.pageSize >= data.total} 
+                  onClick={() => {
+                    const newOffset = data.pageOffset + data.pageSize;
+                    console.log('Next page clicked:', { newOffset, currentOffset: data.pageOffset });
+                    load(newOffset);
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <IndexedDocumentList 
+                items={indexedData.items} 
+                onDocumentsSelected={setSelectedDocuments}
+              />
+              <div className="pager" style={{display:'flex', gap:12, alignItems:'center', marginTop:12}}>
+                <button 
+                  disabled={indexedData.pageOffset <= 0} 
+                  onClick={() => {
+                    const newOffset = Math.max(0, indexedData.pageOffset - indexedData.pageSize);
+                    console.log('Previous indexed page clicked:', { newOffset, currentOffset: indexedData.pageOffset });
+                    loadIndexed(newOffset);
+                  }}
+                >
+                  Prev
+                </button>
+                <span>{indexedData.pageOffset + 1}–{indexedData.pageOffset + (indexedData.items?.length || 0)} of {indexedData.total}</span>
+                <button 
+                  disabled={indexedData.pageOffset + indexedData.pageSize >= indexedData.total} 
+                  onClick={() => {
+                    const newOffset = indexedData.pageOffset + indexedData.pageSize;
+                    console.log('Next indexed page clicked:', { newOffset, currentOffset: indexedData.pageOffset });
+                    loadIndexed(newOffset);
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Right Panel - Chat */}
+        <div style={{
+          flex: '1',
+          backgroundColor: '#1e1e1e',
+          border: '1px solid #2a2a2a',
+          borderRadius: '12px',
+          overflow: 'hidden'
+        }}>
+          <StaticChatPane selectedDocuments={selectedDocuments} />
+        </div>
+      </div>
+
+      {/* Left Menu */}
+      <LeftMenu
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        onChatOpen={() => setIsChatOpen(true)}
+        onChatOpen={() => {}} // Chat is now always visible
         indexedCount={indexedData.items.length}
         isIndexing={isIndexing}
         onIndexDocuments={handleIndexDocuments}

@@ -15,13 +15,6 @@ export default function LeftMenu({ activeTab, onTabChange, onChatOpen, indexedCo
       onClick: () => onTabChange('indexed')
     },
     {
-      id: 'chat',
-      icon: '💬',
-      label: 'Chat with Documents',
-      onClick: onChatOpen,
-      disabled: indexedCount === 0
-    },
-    {
       id: 'index',
       icon: '⚡',
       label: 'Index Documents',
