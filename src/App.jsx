@@ -5,6 +5,7 @@ import StaticChatPane from "./components/StaticChatPane.jsx";
 import Header from "./components/Header.jsx";
 import LeftMenu from "./components/LeftMenu.jsx";
 import AdminScreen from "./components/AdminScreen.jsx";
+import IndexedDocumentList from "./components/IndexedDocumentList.jsx";
 // import StatusPanel from "./components/StatusPanel.jsx";
 
 export default function App() {
