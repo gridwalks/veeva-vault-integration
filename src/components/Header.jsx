@@ -27,7 +27,8 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout }
           alt="AcceleraQA Logo" 
           style={{ 
             height: '32px', 
-            width: '32px'
+            width: 'auto',
+            objectFit: 'contain'
           }} 
         />
         
