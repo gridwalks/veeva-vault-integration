@@ -15,6 +15,11 @@ async function extractTextFromBuffer(fileBuffer, fileName) {
   let extractionMethod = '';
 
   console.log(`Extracting text from file: ${fileName} (${fileExtension})`);
+  console.log(`File buffer info: ${fileBuffer.length} bytes, type: ${typeof fileBuffer}, constructor: ${fileBuffer.constructor.name}`);
+  
+  // Log first few bytes to check for encoding issues
+  const firstBytes = Array.from(fileBuffer.slice(0, 10)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+  console.log(`First 10 bytes (hex): ${firstBytes}`);
 
   if (fileExtension === 'docx') {
     // Extract text from DOCX files using mammoth
@@ -460,10 +465,11 @@ export const handler = async (event) => {
 
                 if (downloadRes.ok) {
                   const documentArrayBuffer = await downloadRes.arrayBuffer();
-                  // Convert ArrayBuffer to Node.js Buffer
+                  // Convert ArrayBuffer to Node.js Buffer - keep binary data intact
                   const documentBuffer = Buffer.from(documentArrayBuffer);
                   const documentName = doc.name__v || `document_${doc.id}`;
                   
+                  console.log(`Buffer conversion: ArrayBuffer ${documentArrayBuffer.byteLength} bytes -> Buffer ${documentBuffer.length} bytes`);
                   console.log(`Downloaded ${documentBuffer.byteLength} bytes for document: ${doc.id}`);
                   
                   // Extract text from document using local extraction
@@ -622,9 +628,11 @@ ${documentText.substring(0, 4000)}`
                   
                   if (downloadRes.ok) {
                     const documentArrayBuffer = await downloadRes.arrayBuffer();
-                    // Convert ArrayBuffer to Node.js Buffer
+                    // Convert ArrayBuffer to Node.js Buffer - keep binary data intact
                     const documentBuffer = Buffer.from(documentArrayBuffer);
                     const documentName = doc.name__v || `document_${doc.id}`;
+                    
+                    console.log(`Buffer conversion: ArrayBuffer ${documentArrayBuffer.byteLength} bytes -> Buffer ${documentBuffer.length} bytes`);
                     const extractionResult = await extractTextFromBuffer(documentBuffer, documentName);
                     documentTextForChunking = extractionResult.extractedText;
                     console.log(`Extracted ${extractionResult.textLength} characters for chunking`);
@@ -785,9 +793,11 @@ ${documentText.substring(0, 4000)}`
 
             if (downloadRes.ok) {
               const documentArrayBuffer = await downloadRes.arrayBuffer();
-              // Convert ArrayBuffer to Node.js Buffer
+              // Convert ArrayBuffer to Node.js Buffer - keep binary data intact
               const documentBuffer = Buffer.from(documentArrayBuffer);
               const documentName = doc.name__v || `document_${doc.id}`;
+              
+              console.log(`Buffer conversion: ArrayBuffer ${documentArrayBuffer.byteLength} bytes -> Buffer ${documentBuffer.length} bytes`);
               
               console.log(`Downloaded ${documentBuffer.byteLength} bytes for document: ${doc.id}`);
               
