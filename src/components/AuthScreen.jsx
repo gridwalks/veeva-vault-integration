@@ -1,5 +1,5 @@
 import React from 'react';
-import acceleraqaLogo from '../../assets/acceleraqa-logo.svg';
+import acceleraqaLogo from '../../assets/AceleraQA_logo.png';
 
 export default function AuthScreen({ onLogin }) {
   return (

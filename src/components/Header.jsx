@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Menu, User, Shield, LogOut, Home } from 'lucide-react';
-import acceleraqaLogo from '../../assets/acceleraqa-logo.svg';
+import acceleraqaLogo from '../../assets/AceleraQA_logo.png';
 
 export default function Header({ user, currentScreen, onScreenChange, onLogout }) {
   const [menuOpen, setMenuOpen] = useState(false);
