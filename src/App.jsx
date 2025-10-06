@@ -2,7 +2,6 @@ import { useState, useRef } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 import StaticChatPane from "./components/StaticChatPane.jsx";
 import Header from "./components/Header.jsx";
-import LeftMenu from "./components/LeftMenu.jsx";
 import AdminScreen from "./components/AdminScreen.jsx";
 import SelectedDocumentViewer from "./components/SelectedDocumentViewer.jsx";
 import AuthScreen from "./components/AuthScreen.jsx";
@@ -39,7 +38,12 @@ export default function App() {
 
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh' }}>
-      <Header user={user} />
+      <Header 
+        user={user}
+        currentScreen={currentScreen}
+        onScreenChange={setCurrentScreen}
+        onLogout={() => logout({ logoutParams: { returnTo: window.location.origin } })}
+      />
       
       {/* Main Content Area */}
       {currentScreen === "main" ? (
@@ -47,7 +51,7 @@ export default function App() {
         <div style={{
           display: 'flex',
           height: 'calc(100vh - 120px)',
-          margin: '0 16px 0 312px',
+          margin: '0 16px',
           gap: '16px'
         }}>
           {/* Left Panel - Chat */}
@@ -78,18 +82,10 @@ export default function App() {
         </div>
       ) : (
         /* Admin Screen */
-        <div style={{ margin: '0 16px 0 312px' }}>
+        <div style={{ margin: '0 16px' }}>
           <AdminScreen />
         </div>
       )}
-
-      {/* Left Menu */}
-            <LeftMenu
-              currentScreen={currentScreen}
-              onScreenChange={setCurrentScreen}
-              onChatOpen={() => {}} // Chat is now always visible
-              onLogout={() => logout({ logoutParams: { returnTo: window.location.origin } })}
-            />
     </div>
   );
 }

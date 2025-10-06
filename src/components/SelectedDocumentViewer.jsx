@@ -25,16 +25,51 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
       console.log('Converting document to PDF...', { docId: document.veeva_document_id, major, minor });
       
       try {
+        // First, download the original document
+        const originalUrl = `/api/download-file?docId=${document.veeva_document_id}&major=${major}&minor=${minor}`;
+        console.log('Downloading original document for conversion from URL:', originalUrl);
+        
+        const originalResponse = await fetch(originalUrl);
+        if (!originalResponse.ok) {
+          throw new Error(`Failed to download original document: ${originalResponse.status} ${originalResponse.statusText}`);
+        }
+        
+        const originalBlob = await originalResponse.blob();
+        const fileType = originalResponse.headers.get('content-type') || 'application/octet-stream';
+        
+        console.log('Original document downloaded for conversion:', {
+          size: originalBlob.size,
+          type: fileType
+        });
+
+        // Determine the file name with proper extension
+        let fileName = document.document_name || 'document';
+        
+        // If the document name doesn't have an extension, try to infer it from content-type
+        if (!fileName.includes('.')) {
+          const extensionMap = {
+            'application/pdf': '.pdf',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+            'application/msword': '.doc',
+            'text/plain': '.txt',
+            'application/rtf': '.rtf'
+          };
+          
+          const extension = extensionMap[fileType] || '';
+          fileName = fileName + extension;
+        }
+
+        console.log('Using filename for conversion:', fileName);
+
+        // Create FormData for the conversion request
+        const formData = new FormData();
+        formData.append('file', originalBlob, fileName);
+        formData.append('output', 'pdf');
+
+        // Send the file to PDF conversion service
         const convertResponse = await fetch('/api/convert-to-pdf', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            docId: document.veeva_document_id,
-            major: major,
-            minor: minor
-          })
+          body: formData
         });
         
         if (!convertResponse.ok) {
@@ -42,32 +77,21 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
           throw new Error('PDF conversion service unavailable');
         }
         
-        const convertData = await convertResponse.json();
-        console.log('PDF conversion result:', convertData);
+        const convertedBlob = await convertResponse.blob();
+        const pdfObjectUrl = URL.createObjectURL(convertedBlob);
         
-        if (convertData.error) {
-          console.warn(`PDF conversion error: ${convertData.error}, falling back to original document`);
-          throw new Error('PDF conversion failed');
+        console.log('PDF conversion successful, size:', convertedBlob.size);
+        
+        // Validate the PDF blob
+        if (convertedBlob.size === 0) {
+          throw new Error('Generated PDF is empty');
         }
         
-        // Now load the converted PDF
-        const pdfUrl = convertData.pdfUrl || convertData.url;
-        if (!pdfUrl) {
-          throw new Error('No PDF URL returned from conversion service');
+        // Check if the blob looks like a PDF
+        const firstBytes = await convertedBlob.slice(0, 4).text();
+        if (!firstBytes.startsWith('%PDF')) {
+          console.warn('Generated file may not be a valid PDF - header check failed');
         }
-        
-        console.log('Loading converted PDF from URL:', pdfUrl);
-        
-        // For PDFs, we'll create a blob URL and display it in an iframe
-        const pdfResponse = await fetch(pdfUrl);
-        if (!pdfResponse.ok) {
-          throw new Error(`Failed to fetch PDF: ${pdfResponse.status} ${pdfResponse.statusText}`);
-        }
-        
-        const pdfBlob = await pdfResponse.blob();
-        const pdfObjectUrl = URL.createObjectURL(pdfBlob);
-        
-        console.log('PDF loaded successfully, size:', pdfBlob.size);
         
         // Set the PDF URL for display
         setDocumentContent(pdfObjectUrl);
