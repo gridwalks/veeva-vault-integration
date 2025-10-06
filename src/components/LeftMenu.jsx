@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function LeftMenu({ currentScreen, onScreenChange, onChatOpen, indexedCount, isIndexing, onIndexDocuments, onRegenerateSummaries }) {
+export default function LeftMenu({ currentScreen, onScreenChange, onChatOpen, indexedCount, isIndexing, onIndexDocuments, onRegenerateSummaries, onLogout }) {
   const menuItems = [
     {
       id: 'main',
@@ -28,11 +28,14 @@ export default function LeftMenu({ currentScreen, onScreenChange, onChatOpen, in
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
+      justifyContent: 'space-between',
       paddingTop: '24px',
-      gap: '16px',
+      paddingBottom: '24px',
       zIndex: 1000,
       boxShadow: '1px 0 3px 0 rgba(0, 0, 0, 0.1)'
     }}>
+      {/* Top Menu Items */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {menuItems.map((item) => {
         const isActive = item.id === currentScreen;
         
@@ -75,6 +78,38 @@ export default function LeftMenu({ currentScreen, onScreenChange, onChatOpen, in
           </button>
         );
       })}
+      </div>
+
+      {/* Bottom Logout Button */}
+      <button
+        onClick={onLogout}
+        title="Log out"
+        style={{
+          width: '40px',
+          height: '40px',
+          borderRadius: '8px',
+          border: 'none',
+          backgroundColor: 'transparent',
+          color: '#dc2626',
+          fontSize: '18px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'all 0.2s ease',
+          opacity: 1
+        }}
+        onMouseEnter={(e) => {
+          e.target.style.backgroundColor = '#fef2f2';
+          e.target.style.color = '#b91c1c';
+        }}
+        onMouseLeave={(e) => {
+          e.target.style.backgroundColor = 'transparent';
+          e.target.style.color = '#dc2626';
+        }}
+      >
+        🚪
+      </button>
     </div>
   );
 }

@@ -58,27 +58,6 @@ export default function App() {
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh' }}>
       <Header user={user} />
-      <div style={{ textAlign: 'right', margin: '10px 16px 10px 90px' }}>
-        <button 
-          onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#4338ca',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            transition: 'background-color 0.2s ease'
-          }}
-          onMouseEnter={(e) => e.target.style.backgroundColor = '#312e81'}
-          onMouseLeave={(e) => e.target.style.backgroundColor = '#4338ca'}
-        >
-          Log out
-        </button>
-      </div>
       
       {/* Main Content Area */}
       {currentScreen === "main" ? (
@@ -177,6 +156,7 @@ export default function App() {
         isIndexing={false}
         onIndexDocuments={() => {}}
         onRegenerateSummaries={() => {}}
+        onLogout={() => logout({ logoutParams: { returnTo: window.location.origin } })}
       />
     </div>
   );
