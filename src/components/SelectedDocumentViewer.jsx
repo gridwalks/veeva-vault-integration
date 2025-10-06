@@ -5,7 +5,8 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
   const [documentContent, setDocumentContent] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
 
-  const handleOpenDocument = async (document) => {
+  const handleOpenDocument = React.useCallback(async (document) => {
+    console.log('handleOpenDocument called with:', document);
     setIsLoading(true);
     setActiveDocument(document);
     
@@ -32,7 +33,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   const handleCloseDocument = () => {
     setActiveDocument(null);
@@ -46,7 +47,12 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
   // Expose handleOpenDocument function to parent component
   React.useImperativeHandle(ref, () => ({
     handleOpenDocument
-  }));
+  }), [handleOpenDocument]);
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log('SelectedDocumentViewer mounted, ref should be available');
+  }, []);
 
   return (
     <>

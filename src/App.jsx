@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 import StaticChatPane from "./components/StaticChatPane.jsx";
 import Header from "./components/Header.jsx";
@@ -12,12 +12,18 @@ export default function App() {
   const { isAuthenticated, loginWithRedirect, logout, user } = useAuth0();
   const [currentScreen, setCurrentScreen] = useState("main");
   const [selectedDocuments, setSelectedDocuments] = useState([]);
-  const [documentViewerRef, setDocumentViewerRef] = useState(null);
+  const documentViewerRef = useRef(null);
 
   const handleOpenDocumentInPane = (document) => {
+    console.log('handleOpenDocumentInPane called with:', document);
+    console.log('documentViewerRef.current:', documentViewerRef.current);
+    
     // Call the SelectedDocumentViewer's handleOpenDocument function
-    if (documentViewerRef && documentViewerRef.handleOpenDocument) {
-      documentViewerRef.handleOpenDocument(document);
+    if (documentViewerRef.current && documentViewerRef.current.handleOpenDocument) {
+      console.log('Calling handleOpenDocument on ref');
+      documentViewerRef.current.handleOpenDocument(document);
+    } else {
+      console.warn('documentViewerRef or handleOpenDocument not available');
     }
   };
 
@@ -58,7 +64,7 @@ export default function App() {
                   flex: '1'
                 }}>
                   <SelectedDocumentViewer 
-                    ref={setDocumentViewerRef}
+                    ref={documentViewerRef}
                     selectedDocuments={selectedDocuments}
                     onDocumentsSelected={setSelectedDocuments}
                   />
