@@ -55,13 +55,27 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }
       });
 
       if (!response.ok) {
-        throw new Error(`Chat request failed: ${response.status} ${response.statusText}`);
+        let errorMessage = `Chat request failed: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+            if (errorData.details) {
+              errorMessage += `\n\nDetails: ${errorData.details}`;
+            }
+          }
+        } catch (parseError) {
+          // If parsing fails, use the default error message
+          errorMessage = `Chat request failed: ${response.status} ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
       
       if (data.error) {
-        throw new Error(data.error);
+        const errorMessage = data.details ? `${data.error}\n\nDetails: ${data.details}` : data.error;
+        throw new Error(errorMessage);
       }
 
       // Update conversation with AI response
@@ -446,7 +460,8 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }
               backgroundColor: '#f8d7da',
               color: '#721c24',
               borderTop: '1px solid #f5c6cb',
-              fontSize: '14px'
+              fontSize: '14px',
+              whiteSpace: 'pre-wrap'
             }}>
               <strong>Error:</strong> {error}
             </div>

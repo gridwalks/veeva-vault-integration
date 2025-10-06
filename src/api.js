@@ -150,13 +150,33 @@ export async function chatWithDocuments({ message, documentIds = [], conversatio
     });
     
     if (!res.ok) {
-      const errorText = await res.text();
+      let errorMessage = `Failed to send chat message: ${res.status} ${res.statusText}`;
+      let errorDetails = null;
+      
+      try {
+        const errorData = await res.json();
+        if (errorData.error) {
+          errorMessage = errorData.error;
+          errorDetails = errorData.details;
+        }
+      } catch (parseError) {
+        // If parsing fails, fall back to text
+        const errorText = await res.text();
+        console.error('Failed to send chat message:', {
+          status: res.status,
+          statusText: res.statusText,
+          errorText
+        });
+      }
+      
       console.error('Failed to send chat message:', {
         status: res.status,
         statusText: res.statusText,
-        errorText
+        errorMessage,
+        errorDetails
       });
-      throw new Error(`Failed to send chat message: ${res.status} ${res.statusText}`);
+      
+      throw new Error(errorDetails ? `${errorMessage}\nDetails: ${errorDetails}` : errorMessage);
     }
     
     const data = await res.json();

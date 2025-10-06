@@ -10,6 +10,31 @@ export const handler = async (event) => {
   console.log('=== CHAT WITH DOCUMENTS STARTED ===');
   
   try {
+    // Check for required environment variables
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('OPENAI_API_KEY environment variable is not set');
+      return {
+        statusCode: 500,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          error: "OpenAI API key is not configured. Please contact your administrator.",
+          details: "OPENAI_API_KEY environment variable is missing"
+        })
+      };
+    }
+
+    if (!process.env.DATABASE_URL) {
+      console.error('DATABASE_URL environment variable is not set');
+      return {
+        statusCode: 500,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          error: "Database is not configured. Please contact your administrator.",
+          details: "DATABASE_URL environment variable is missing"
+        })
+      };
+    }
+
     // Parse request body
     const body = JSON.parse(event.body || '{}');
     const { message, documentIds, conversationHistory = [] } = body;
@@ -54,69 +79,77 @@ export const handler = async (event) => {
     // Get relevant chunks using semantic search
     let relevantChunks = [];
     let relevantDocuments = [];
+    let vectorSearchFailed = false;
     
     if (queryEmbedding) {
       // Perform vector similarity search
       console.log('Performing semantic search using embeddings...');
       const vectorSearchStartTime = Date.now();
       
-      // Convert embedding array to PostgreSQL vector format
-      const embeddingStr = '[' + queryEmbedding.join(',') + ']';
-      
-      let vectorQuery;
-      let vectorParams;
-      
-      if (documentIds && documentIds.length > 0) {
-        // Search within specific documents
-        const placeholders = documentIds.map((_, index) => `$${index + 2}`).join(',');
-        vectorQuery = `
-          SELECT 
-            dc.chunk_text,
-            dc.veeva_document_id,
-            dc.chunk_index,
-            di.document_name,
-            di.document_number,
-            di.major_version,
-            di.minor_version,
-            di.document_type,
-            di.status,
-            1 - (dc.embedding <=> $1::vector) as similarity
-          FROM Veeva_Doc_Chat_document_chunks dc
-          JOIN Veeva_Doc_Chat_document_index di ON dc.document_id = di.id
-          WHERE dc.veeva_document_id IN (${placeholders})
-          ORDER BY dc.embedding <=> $1::vector
-          LIMIT 10
-        `;
-        vectorParams = [embeddingStr, ...documentIds];
-      } else {
-        // Search across all documents
-        vectorQuery = `
-          SELECT 
-            dc.chunk_text,
-            dc.veeva_document_id,
-            dc.chunk_index,
-            di.document_name,
-            di.document_number,
-            di.major_version,
-            di.minor_version,
-            di.document_type,
-            di.status,
-            1 - (dc.embedding <=> $1::vector) as similarity
-          FROM Veeva_Doc_Chat_document_chunks dc
-          JOIN Veeva_Doc_Chat_document_index di ON dc.document_id = di.id
-          ORDER BY dc.embedding <=> $1::vector
-          LIMIT 10
-        `;
-        vectorParams = [embeddingStr];
+      try {
+        // Convert embedding array to PostgreSQL vector format
+        const embeddingStr = '[' + queryEmbedding.join(',') + ']';
+        
+        let vectorQuery;
+        let vectorParams;
+        
+        if (documentIds && documentIds.length > 0) {
+          // Search within specific documents
+          const placeholders = documentIds.map((_, index) => `$${index + 2}`).join(',');
+          vectorQuery = `
+            SELECT 
+              dc.chunk_text,
+              dc.veeva_document_id,
+              dc.chunk_index,
+              di.document_name,
+              di.document_number,
+              di.major_version,
+              di.minor_version,
+              di.document_type,
+              di.status,
+              1 - (dc.embedding <=> $1::vector) as similarity
+            FROM Veeva_Doc_Chat_document_chunks dc
+            JOIN Veeva_Doc_Chat_document_index di ON dc.document_id = di.id
+            WHERE dc.veeva_document_id IN (${placeholders})
+            ORDER BY dc.embedding <=> $1::vector
+            LIMIT 10
+          `;
+          vectorParams = [embeddingStr, ...documentIds];
+        } else {
+          // Search across all documents
+          vectorQuery = `
+            SELECT 
+              dc.chunk_text,
+              dc.veeva_document_id,
+              dc.chunk_index,
+              di.document_name,
+              di.document_number,
+              di.major_version,
+              di.minor_version,
+              di.document_type,
+              di.status,
+              1 - (dc.embedding <=> $1::vector) as similarity
+            FROM Veeva_Doc_Chat_document_chunks dc
+            JOIN Veeva_Doc_Chat_document_index di ON dc.document_id = di.id
+            ORDER BY dc.embedding <=> $1::vector
+            LIMIT 10
+          `;
+          vectorParams = [embeddingStr];
+        }
+        
+        const vectorResult = await pool.query(vectorQuery, vectorParams);
+        relevantChunks = vectorResult.rows;
+        
+        console.log(`Vector search completed in ${Date.now() - vectorSearchStartTime}ms`);
+        console.log(`Found ${relevantChunks.length} relevant chunks with similarity scores:`, 
+          relevantChunks.map(c => ({ doc: c.document_name, chunk: c.chunk_index, similarity: c.similarity.toFixed(3) }))
+        );
+      } catch (vectorError) {
+        console.error('Vector search failed:', vectorError.message);
+        console.warn('Falling back to keyword search. pgvector may not be enabled.');
+        vectorSearchFailed = true;
+        queryEmbedding = null; // Force fallback to keyword search
       }
-      
-      const vectorResult = await pool.query(vectorQuery, vectorParams);
-      relevantChunks = vectorResult.rows;
-      
-      console.log(`Vector search completed in ${Date.now() - vectorSearchStartTime}ms`);
-      console.log(`Found ${relevantChunks.length} relevant chunks with similarity scores:`, 
-        relevantChunks.map(c => ({ doc: c.document_name, chunk: c.chunk_index, similarity: c.similarity.toFixed(3) }))
-      );
       
       // Get unique documents from the chunks
       const uniqueDocIds = [...new Set(relevantChunks.map(c => c.veeva_document_id))];
@@ -358,16 +391,33 @@ ${documentContext}`;
     console.error('Error:', {
       message: error.message,
       stack: error.stack,
+      code: error.code,
+      name: error.name,
       duration: `${totalDuration}ms`,
       timestamp: new Date().toISOString()
     });
+
+    // Provide more specific error messages based on error type
+    let userMessage = "Failed to process chat request";
+    let details = error.message;
+
+    if (error.message && error.message.includes('OpenAI')) {
+      userMessage = "Failed to connect to OpenAI API. Please check your API key configuration.";
+    } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      userMessage = "Failed to connect to the database. Please check your database configuration.";
+    } else if (error.message && error.message.includes('vector')) {
+      userMessage = "Vector search is not available. Keyword search fallback may be limited.";
+    } else if (error.message && error.message.includes('parse')) {
+      userMessage = "Failed to parse request data. Please check your input.";
+    }
 
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        error: "Failed to process chat request",
-        message: error.message
+        error: userMessage,
+        details: details,
+        timestamp: new Date().toISOString()
       })
     };
   }
