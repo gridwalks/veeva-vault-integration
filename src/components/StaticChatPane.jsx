@@ -4,6 +4,14 @@ import DocumentViewer from './DocumentViewer.jsx';
 
 export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane }) {
   const [conversationHistory, setConversationHistory] = useState([]);
+  
+  // Debug conversation history changes
+  useEffect(() => {
+    console.log('Conversation history updated:', conversationHistory.length, 'messages');
+    conversationHistory.forEach((msg, index) => {
+      console.log(`Message ${index}:`, { role: msg.role, content: msg.content?.substring(0, 50) + '...' });
+    });
+  }, [conversationHistory]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -31,16 +39,25 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     setConversationHistory(newHistory);
 
     try {
+      const requestBody = {
+        message: userMessage,
+        documentIds: selectedDocuments.map(doc => doc.veeva_document_id),
+        conversationHistory: newHistory
+      };
+      
+      console.log('Sending chat request:', {
+        message: userMessage,
+        documentIds: requestBody.documentIds,
+        selectedDocumentsCount: selectedDocuments.length,
+        conversationHistoryLength: newHistory.length
+      });
+      
       const response = await fetch('/api/chat-with-documents', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          message: userMessage,
-          documentIds: selectedDocuments.map(doc => doc.veeva_document_id),
-          conversationHistory: newHistory
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
@@ -54,13 +71,31 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       }
 
       // Update conversation with AI response
-      setConversationHistory(data.conversationHistory);
-      setUsedDocuments(data.documents);
+      console.log('API Response data:', data);
+      
+      // Handle different response formats
+      if (data.conversationHistory) {
+        // API returns full conversation history
+        setConversationHistory(data.conversationHistory);
+      } else if (data.response) {
+        // API returns just the response, append to existing history
+        setConversationHistory(prev => [
+          ...prev,
+          { role: 'assistant', content: data.response }
+        ]);
+      } else {
+        console.error('Unexpected API response format:', data);
+        throw new Error('Unexpected response format from chat API');
+      }
+      
+      setUsedDocuments(data.documents || []);
 
       console.log('Chat response received:', {
-        responseLength: data.response.length,
-        documentsUsed: data.documents.length,
-        metadata: data.metadata
+        responseLength: data.response?.length || 0,
+        documentsUsed: (data.documents || []).length,
+        metadata: data.metadata,
+        hasConversationHistory: !!data.conversationHistory,
+        hasResponse: !!data.response
       });
 
     } catch (err) {
@@ -123,6 +158,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
   };
 
   const renderMessage = (message, index) => {
+    console.log(`Rendering message ${index}:`, { role: message.role, contentLength: message.content?.length });
     const isUser = message.role === 'user';
     const isAssistant = message.role === 'assistant';
     const isLastAssistantMessage = isAssistant && index === conversationHistory.length - 1;
