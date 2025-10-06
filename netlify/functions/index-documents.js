@@ -459,7 +459,9 @@ export const handler = async (event) => {
                 });
 
                 if (downloadRes.ok) {
-                  const documentBuffer = await downloadRes.arrayBuffer();
+                  const documentArrayBuffer = await downloadRes.arrayBuffer();
+                  // Convert ArrayBuffer to Node.js Buffer
+                  const documentBuffer = Buffer.from(documentArrayBuffer);
                   const documentName = doc.name__v || `document_${doc.id}`;
                   
                   console.log(`Downloaded ${documentBuffer.byteLength} bytes for document: ${doc.id}`);
@@ -619,7 +621,9 @@ ${documentText.substring(0, 4000)}`
                   });
                   
                   if (downloadRes.ok) {
-                    const documentBuffer = await downloadRes.arrayBuffer();
+                    const documentArrayBuffer = await downloadRes.arrayBuffer();
+                    // Convert ArrayBuffer to Node.js Buffer
+                    const documentBuffer = Buffer.from(documentArrayBuffer);
                     const documentName = doc.name__v || `document_${doc.id}`;
                     const extractionResult = await extractTextFromBuffer(documentBuffer, documentName);
                     documentTextForChunking = extractionResult.extractedText;
@@ -698,7 +702,9 @@ ${documentText.substring(0, 4000)}`
                 });
                 
                 if (downloadRes.ok) {
-                  const documentBuffer = await downloadRes.arrayBuffer();
+                  const documentArrayBuffer = await downloadRes.arrayBuffer();
+                  // Convert ArrayBuffer to Node.js Buffer
+                  const documentBuffer = Buffer.from(documentArrayBuffer);
                   const documentName = doc.name__v || `document_${doc.id}`;
                   const extractionResult = await extractTextFromBuffer(documentBuffer, documentName);
                   const documentText = extractionResult.extractedText;
@@ -778,7 +784,9 @@ ${documentText.substring(0, 4000)}`
             });
 
             if (downloadRes.ok) {
-              const documentBuffer = await downloadRes.arrayBuffer();
+              const documentArrayBuffer = await downloadRes.arrayBuffer();
+              // Convert ArrayBuffer to Node.js Buffer
+              const documentBuffer = Buffer.from(documentArrayBuffer);
               const documentName = doc.name__v || `document_${doc.id}`;
               
               console.log(`Downloaded ${documentBuffer.byteLength} bytes for document: ${doc.id}`);
