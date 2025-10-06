@@ -36,33 +36,52 @@ async function extractTextFromBuffer(fileBuffer, fileName) {
       extractedText = result.value;
       extractionMethod = 'mammoth_docx';
       
-      console.log('DOCX extraction successful:', {
+      console.log('DOCX extraction result:', {
         textLength: extractedText.length,
         messages: result.messages,
-        extractedPreview: extractedText.substring(0, 200)
+        extractedPreview: extractedText.substring(0, 200),
+        hasWarnings: result.messages && result.messages.length > 0,
+        containsRawContent: extractedText.includes('[Content_Types]') || extractedText.includes('PK')
       });
       
-      // If mammoth returns empty or very short text, it might have failed
-      if (!extractedText || extractedText.trim().length < 10) {
-        console.warn('Mammoth extraction returned very little text, trying fallback...');
-        // Try fallback text extraction
-        extractedText = fileBuffer.toString('utf-8');
-        extractionMethod = 'fallback_text_after_mammoth';
-        console.log('Fallback extraction result:', {
-          textLength: extractedText.length,
-          preview: extractedText.substring(0, 200)
-        });
+      // If mammoth returns raw ZIP content, it failed
+      if (extractedText.includes('[Content_Types]') || extractedText.includes('PK')) {
+        console.error('Mammoth returned raw ZIP content instead of extracted text!');
+        console.log('This indicates mammoth failed to parse the DOCX file properly.');
+        
+        // Store the raw content for filtering
+        const rawContent = extractedText;
+        extractionMethod = 'mammoth_failed_raw_content';
+        
+        // Try to extract some readable text from the raw content
+        const lines = rawContent.split('\n');
+        const readableLines = lines.filter(line => 
+          line.trim().length > 0 && 
+          !line.includes('[Content_Types]') && 
+          !line.includes('PK') &&
+          !line.includes('.xml') &&
+          line.length < 200 && // Avoid very long lines that are likely XML
+          /[a-zA-Z]/.test(line) // Must contain at least one letter
+        );
+        
+        if (readableLines.length > 0) {
+          extractedText = readableLines.join(' ').trim();
+          extractionMethod = 'filtered_raw_content';
+          console.log('Extracted some readable text from raw content:', {
+            textLength: extractedText.length,
+            preview: extractedText.substring(0, 200)
+          });
+        } else {
+          console.log('No readable text found in raw content');
+          extractedText = 'Document text extraction failed - mammoth returned raw ZIP content instead of parsed text.';
+          extractionMethod = 'extraction_failed';
+        }
       }
+      
     } catch (error) {
-      console.error('DOCX extraction failed:', error);
-      console.log('Trying fallback text extraction...');
-      // Try fallback
-      extractedText = fileBuffer.toString('utf-8');
-      extractionMethod = 'fallback_text_after_error';
-      console.log('Fallback extraction result:', {
-        textLength: extractedText.length,
-        preview: extractedText.substring(0, 200)
-      });
+      console.error('DOCX extraction failed with error:', error);
+      extractedText = '';
+      extractionMethod = 'mammoth_error';
     }
   } else if (fileExtension === 'pdf') {
     // Extract text from PDF files using pdf-parse
