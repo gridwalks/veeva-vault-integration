@@ -1,34 +1,18 @@
 import React from 'react';
 
-export default function LeftMenu({ activeTab, onTabChange, onChatOpen, indexedCount, isIndexing, onIndexDocuments, onRegenerateSummaries }) {
+export default function LeftMenu({ currentScreen, onScreenChange, onChatOpen, indexedCount, isIndexing, onIndexDocuments, onRegenerateSummaries }) {
   const menuItems = [
     {
-      id: 'documents',
-      icon: '📁',
-      label: 'Veeva Documents',
-      onClick: () => onTabChange('documents')
+      id: 'main',
+      icon: '🏠',
+      label: 'Main App',
+      onClick: () => onScreenChange('main')
     },
     {
-      id: 'indexed',
-      icon: '🔍',
-      label: 'Indexed Documents',
-      onClick: () => onTabChange('indexed')
-    },
-    {
-      id: 'index',
-      icon: '⚡',
-      label: 'Index Documents',
-      onClick: () => onIndexDocuments(false),
-      disabled: isIndexing,
-      activeTab: 'documents'
-    },
-    {
-      id: 'regenerate',
-      icon: '🔄',
-      label: 'Regenerate Summaries',
-      onClick: () => onRegenerateSummaries(true),
-      disabled: isIndexing,
-      activeTab: 'documents'
+      id: 'admin',
+      icon: '⚙️',
+      label: 'Admin Panel',
+      onClick: () => onScreenChange('admin')
     }
   ];
 
@@ -50,12 +34,7 @@ export default function LeftMenu({ activeTab, onTabChange, onChatOpen, indexedCo
       boxShadow: '2px 0 8px rgba(0, 0, 0, 0.3)'
     }}>
       {menuItems.map((item) => {
-        // Only show items that should be visible for the current tab
-        if (item.activeTab && item.activeTab !== activeTab) {
-          return null;
-        }
-
-        const isActive = item.id === activeTab;
+        const isActive = item.id === currentScreen;
         
         return (
           <button
