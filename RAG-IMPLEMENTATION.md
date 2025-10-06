@@ -54,10 +54,15 @@ CREATE TABLE Veeva_Doc_Chat_document_chunks (
 
 1. **Document Download**: Document is downloaded from Veeva Vault
 2. **Text Extraction**: Text is extracted from PDF/DOCX files
-3. **Summary Generation**: AI summary is generated (as before)
+3. **Summary Generation**: AI summary is generated (for new docs or with `?force=true`)
 4. **Chunking**: Document text is split into overlapping chunks
 5. **Embedding**: Each chunk is embedded using OpenAI embeddings API
 6. **Storage**: Chunks and embeddings are stored in the database
+
+**Note**: Chunking happens for ALL documents during indexing:
+- New documents are always chunked
+- Existing documents are checked for chunks - if none exist, they're downloaded and chunked
+- Use `?force=true` to force re-chunking of all documents
 
 ### Query Process
 

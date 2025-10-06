@@ -423,6 +423,7 @@ export const handler = async (event) => {
             }
             
             let updatedSummary = existing.summary;
+            let documentTextForChunking = null;
             
             // If force regenerate is enabled, generate new summary
             if (forceRegenerate) {
@@ -465,6 +466,7 @@ export const handler = async (event) => {
                     });
 
                     const documentText = extractionResult.extractedText;
+                    documentTextForChunking = documentText; // Save for chunking later
                     
                     if (!documentText || documentText.trim().length === 0) {
                       throw new Error('No text content extracted from document');
@@ -525,20 +527,6 @@ ${documentText.substring(0, 4000)}`
                       totalProcessingTime: extractionDuration + openaiDuration,
                       summaryPreview: updatedSummary ? updatedSummary.substring(0, 150) + '...' : 'No summary'
                     });
-
-                    // Chunk and embed document for RAG
-                    console.log(`Chunking and embedding document for RAG: ${doc.id}`);
-                    const chunkResult = await chunkAndEmbedDocument(
-                      documentText,
-                      existing.id, // Use the existing document_index id
-                      doc.id,
-                      pool
-                    );
-                    console.log(`Chunking result:`, {
-                      success: chunkResult.success,
-                      chunksCreated: chunkResult.chunksCreated,
-                      error: chunkResult.error
-                    });
                     
                   } catch (extractionError) {
                     console.error(`Text extraction failed for document ${doc.id} during force regenerate:`, {
@@ -596,6 +584,58 @@ ${documentText.substring(0, 4000)}`
               action: forceRegenerate ? 'force_regenerate' : 'metadata_update'
             });
             
+            // Always chunk and embed the document (regardless of forceRegenerate)
+            // Check if chunks exist, if not, download and chunk
+            if (!documentTextForChunking) {
+              console.log(`No document text from summary generation, checking if chunks exist for document: ${doc.id}`);
+              
+              try {
+                const chunkCheck = await pool.query(
+                  'SELECT COUNT(*) as count FROM Veeva_Doc_Chat_document_chunks WHERE document_id = $1',
+                  [existing.id]
+                );
+                const chunkCount = parseInt(chunkCheck.rows[0].count);
+                
+                if (chunkCount === 0) {
+                  console.log(`No chunks found, downloading and chunking document: ${doc.id}`);
+                  
+                  // Download and extract text for chunking
+                  const downloadUrl = `https://${domain}/api/${v}/objects/documents/${doc.id}/file`;
+                  const downloadRes = await fetch(downloadUrl, {
+                    headers: { "Authorization": sessionId }
+                  });
+                  
+                  if (downloadRes.ok) {
+                    const documentBuffer = await downloadRes.arrayBuffer();
+                    const documentName = doc.name__v || `document_${doc.id}`;
+                    const extractionResult = await extractTextFromBuffer(documentBuffer, documentName);
+                    documentTextForChunking = extractionResult.extractedText;
+                    console.log(`Extracted ${extractionResult.textLength} characters for chunking`);
+                  }
+                } else {
+                  console.log(`Chunks already exist (${chunkCount} chunks), skipping chunking`);
+                }
+              } catch (chunkCheckError) {
+                console.error(`Error checking/creating chunks:`, chunkCheckError);
+              }
+            }
+            
+            // Chunk and embed if we have document text
+            if (documentTextForChunking) {
+              console.log(`Chunking and embedding document for RAG: ${doc.id}`);
+              const chunkResult = await chunkAndEmbedDocument(
+                documentTextForChunking,
+                existing.id,
+                doc.id,
+                pool
+              );
+              console.log(`Chunking result:`, {
+                success: chunkResult.success,
+                chunksCreated: chunkResult.chunksCreated,
+                error: chunkResult.error
+              });
+            }
+            
           results.push({
             action: 'updated',
             document: documentData,
@@ -605,6 +645,54 @@ ${documentText.substring(0, 4000)}`
           console.log(`Document updated: ${doc.name__v} at ${updateTimestamp}`);
           } else {
             console.log(`Document unchanged: ${doc.name__v}`);
+            
+            // Even if document is unchanged, check if it needs chunking
+            try {
+              const chunkCheck = await pool.query(
+                'SELECT COUNT(*) as count FROM Veeva_Doc_Chat_document_chunks WHERE document_id = $1',
+                [existing.id]
+              );
+              const chunkCount = parseInt(chunkCheck.rows[0].count);
+              
+              if (chunkCount === 0) {
+                console.log(`Document unchanged but has no chunks, chunking now: ${doc.id}`);
+                
+                // Download and extract text for chunking
+                const downloadUrl = `https://${domain}/api/${v}/objects/documents/${doc.id}/file`;
+                const downloadRes = await fetch(downloadUrl, {
+                  headers: { "Authorization": sessionId }
+                });
+                
+                if (downloadRes.ok) {
+                  const documentBuffer = await downloadRes.arrayBuffer();
+                  const documentName = doc.name__v || `document_${doc.id}`;
+                  const extractionResult = await extractTextFromBuffer(documentBuffer, documentName);
+                  const documentText = extractionResult.extractedText;
+                  
+                  if (documentText && documentText.trim().length > 0) {
+                    console.log(`Extracted ${extractionResult.textLength} characters, chunking and embedding`);
+                    const chunkResult = await chunkAndEmbedDocument(
+                      documentText,
+                      existing.id,
+                      doc.id,
+                      pool
+                    );
+                    console.log(`Chunking result:`, {
+                      success: chunkResult.success,
+                      chunksCreated: chunkResult.chunksCreated,
+                      error: chunkResult.error
+                    });
+                  }
+                } else {
+                  console.error(`Failed to download document for chunking: ${doc.id}`);
+                }
+              } else {
+                console.log(`Document unchanged and already has ${chunkCount} chunks`);
+              }
+            } catch (chunkCheckError) {
+              console.error(`Error checking/creating chunks for unchanged document:`, chunkCheckError);
+            }
+            
             results.push({
               action: 'unchanged',
               document: documentData,
@@ -616,6 +704,7 @@ ${documentText.substring(0, 4000)}`
           // New document - fetch content and generate summary
           console.log(`Processing new document: ${doc.name__v}`);
           let summary = null;
+          let documentText = null; // Define at this scope for chunking later
           try {
             // Download document content
             console.log(`Downloading content for document: ${doc.id}`);
@@ -653,7 +742,7 @@ ${documentText.substring(0, 4000)}`
                   fileType: extractionResult.fileType
                 });
 
-                const documentText = extractionResult.extractedText;
+                documentText = extractionResult.extractedText; // Assign to outer scope variable
                 
                 if (!documentText || documentText.trim().length === 0) {
                   throw new Error('No text content extracted from document');
@@ -844,7 +933,7 @@ ${fallbackText.substring(0, 4000)}`
           });
 
           // Chunk and embed the new document for RAG (if we have document text)
-          if (typeof documentText !== 'undefined' && documentText) {
+          if (documentText && documentText.trim().length > 0) {
             console.log(`Chunking and embedding new document for RAG: ${doc.id}`);
             const chunkResult = await chunkAndEmbedDocument(
               documentText,
@@ -857,6 +946,8 @@ ${fallbackText.substring(0, 4000)}`
               chunksCreated: chunkResult.chunksCreated,
               error: chunkResult.error
             });
+          } else {
+            console.log(`No document text available for chunking new document: ${doc.id}`);
           }
 
           results.push({
