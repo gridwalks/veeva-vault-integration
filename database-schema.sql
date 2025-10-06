@@ -3,7 +3,7 @@
 -- Enable pgvector extension for vector similarity search
 CREATE EXTENSION IF NOT EXISTS vector;
 
-CREATE TABLE IF NOT EXISTS document_index (
+CREATE TABLE IF NOT EXISTS Veeva_Doc_Chat_document_index (
   id SERIAL PRIMARY KEY,
   veeva_document_id VARCHAR(255) UNIQUE NOT NULL,
   document_number VARCHAR(255) NOT NULL,
@@ -19,19 +19,19 @@ CREATE TABLE IF NOT EXISTS document_index (
 );
 
 -- Create indexes for faster lookups
-CREATE INDEX IF NOT EXISTS idx_document_index_veeva_id 
-ON document_index(veeva_document_id);
+CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_document_index_veeva_id 
+ON Veeva_Doc_Chat_document_index(veeva_document_id);
 
-CREATE INDEX IF NOT EXISTS idx_document_index_number 
-ON document_index(document_number);
+CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_document_index_number 
+ON Veeva_Doc_Chat_document_index(document_number);
 
-CREATE INDEX IF NOT EXISTS idx_document_index_name 
-ON document_index(document_name);
+CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_document_index_name 
+ON Veeva_Doc_Chat_document_index(document_name);
 
 -- Table for storing document chunks with embeddings for RAG
-CREATE TABLE IF NOT EXISTS document_chunks (
+CREATE TABLE IF NOT EXISTS Veeva_Doc_Chat_document_chunks (
   id SERIAL PRIMARY KEY,
-  document_id INTEGER NOT NULL REFERENCES document_index(id) ON DELETE CASCADE,
+  document_id INTEGER NOT NULL REFERENCES Veeva_Doc_Chat_document_index(id) ON DELETE CASCADE,
   veeva_document_id VARCHAR(255) NOT NULL,
   chunk_index INTEGER NOT NULL,
   chunk_text TEXT NOT NULL,
@@ -42,17 +42,17 @@ CREATE TABLE IF NOT EXISTS document_chunks (
 );
 
 -- Create indexes for faster chunk retrieval and vector search
-CREATE INDEX IF NOT EXISTS idx_chunks_document_id 
-ON document_chunks(document_id);
+CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_chunks_document_id 
+ON Veeva_Doc_Chat_document_chunks(document_id);
 
-CREATE INDEX IF NOT EXISTS idx_chunks_veeva_document_id 
-ON document_chunks(veeva_document_id);
+CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_chunks_veeva_document_id 
+ON Veeva_Doc_Chat_document_chunks(veeva_document_id);
 
 -- Create IVFFLAT index for faster vector similarity search
 -- Note: This index should be created after inserting data for better performance
--- CREATE INDEX IF NOT EXISTS idx_chunks_embedding 
--- ON document_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+-- CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_chunks_embedding 
+-- ON Veeva_Doc_Chat_document_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 -- Sample data insertion (optional)
--- INSERT INTO document_index (veeva_document_id, document_number, document_name, major_version, minor_version, document_type, status, summary) 
+-- INSERT INTO Veeva_Doc_Chat_document_index (veeva_document_id, document_number, document_name, major_version, minor_version, document_type, status, summary) 
 -- VALUES ('sample-id', 'DOC-001', 'Sample Document', 1, 0, 'Standard Operating Procedure', 'STEADYSTATE', 'This is a sample document summary.');

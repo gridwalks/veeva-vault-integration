@@ -23,11 +23,17 @@ This Veeva Vault integration now includes a powerful RAG search capability that 
 
 ## Database Schema Updates
 
-### New Table: `document_chunks`
+### New Tables
+
+#### `Veeva_Doc_Chat_document_index`
+Main document index table (prefixed for namespace organization)
+
+#### `Veeva_Doc_Chat_document_chunks`
+Stores document chunks with embeddings for RAG:
 ```sql
-CREATE TABLE document_chunks (
+CREATE TABLE Veeva_Doc_Chat_document_chunks (
   id SERIAL PRIMARY KEY,
-  document_id INTEGER REFERENCES document_index(id) ON DELETE CASCADE,
+  document_id INTEGER REFERENCES Veeva_Doc_Chat_document_index(id) ON DELETE CASCADE,
   veeva_document_id VARCHAR(255) NOT NULL,
   chunk_index INTEGER NOT NULL,
   chunk_text TEXT NOT NULL,
@@ -142,8 +148,8 @@ SELECT
   di.document_name,
   COUNT(dc.id) as chunk_count,
   SUM(dc.token_count) as total_tokens
-FROM document_index di
-LEFT JOIN document_chunks dc ON di.id = dc.document_id
+FROM Veeva_Doc_Chat_document_index di
+LEFT JOIN Veeva_Doc_Chat_document_chunks dc ON di.id = dc.document_id
 GROUP BY di.id, di.document_name
 ORDER BY chunk_count DESC;
 ```
@@ -155,8 +161,8 @@ SELECT
   dc1.chunk_text as query_chunk,
   dc2.chunk_text as similar_chunk,
   1 - (dc1.embedding <=> dc2.embedding) as similarity
-FROM document_chunks dc1
-CROSS JOIN document_chunks dc2
+FROM Veeva_Doc_Chat_document_chunks dc1
+CROSS JOIN Veeva_Doc_Chat_document_chunks dc2
 WHERE dc1.id = 123  -- Your test chunk ID
   AND dc2.id != dc1.id
 ORDER BY dc1.embedding <=> dc2.embedding

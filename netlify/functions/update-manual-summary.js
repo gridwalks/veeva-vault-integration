@@ -41,7 +41,7 @@ export const handler = async (event) => {
 
     // Update the manual summary for the document
     const query = `
-      UPDATE document_index 
+      UPDATE Veeva_Doc_Chat_document_index 
       SET manual_summary = $1, updated_at = CURRENT_TIMESTAMP
       WHERE id = $2
       RETURNING id, veeva_document_id, document_name, manual_summary, updated_at

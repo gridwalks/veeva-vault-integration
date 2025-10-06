@@ -33,14 +33,14 @@ export const handler = async (event) => {
       currentTime: testQuery.rows[0]?.current_time
     });
 
-    console.log('Test 5: Checking document_index table...');
+    console.log('Test 5: Checking Veeva_Doc_Chat_document_index table...');
     const tableCheck = await pool.query(`
       SELECT 
         table_name, 
         column_name, 
         data_type 
       FROM information_schema.columns 
-      WHERE table_name = 'document_index' 
+      WHERE table_name = 'Veeva_Doc_Chat_document_index' 
       ORDER BY ordinal_position
     `);
     
@@ -53,7 +53,7 @@ export const handler = async (event) => {
     });
 
     console.log('Test 6: Counting existing records...');
-    const countQuery = await pool.query('SELECT COUNT(*) as count FROM document_index');
+    const countQuery = await pool.query('SELECT COUNT(*) as count FROM Veeva_Doc_Chat_document_index');
     const recordCount = parseInt(countQuery.rows[0]?.count || 0);
     console.log('Test 6: Record count:', {
       totalRecords: recordCount
@@ -61,7 +61,7 @@ export const handler = async (event) => {
 
     console.log('Test 7: Testing insert operation...');
     const testInsert = await pool.query(`
-      INSERT INTO document_index 
+      INSERT INTO Veeva_Doc_Chat_document_index 
       (veeva_document_id, document_number, document_name, major_version, minor_version, document_type, status, summary)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING id
@@ -85,7 +85,7 @@ export const handler = async (event) => {
 
     console.log('Test 8: Testing select operation...');
     const selectTest = await pool.query(
-      'SELECT * FROM document_index WHERE id = $1',
+      'SELECT * FROM Veeva_Doc_Chat_document_index WHERE id = $1',
       [insertedId]
     );
     
@@ -100,7 +100,7 @@ export const handler = async (event) => {
     });
 
     console.log('Test 9: Cleaning up test record...');
-    await pool.query('DELETE FROM document_index WHERE id = $1', [insertedId]);
+    await pool.query('DELETE FROM Veeva_Doc_Chat_document_index WHERE id = $1', [insertedId]);
     console.log('Test 9: Test record deleted');
 
     return {

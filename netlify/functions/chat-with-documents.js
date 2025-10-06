@@ -81,8 +81,8 @@ export const handler = async (event) => {
             di.document_type,
             di.status,
             1 - (dc.embedding <=> $1::vector) as similarity
-          FROM document_chunks dc
-          JOIN document_index di ON dc.document_id = di.id
+          FROM Veeva_Doc_Chat_document_chunks dc
+          JOIN Veeva_Doc_Chat_document_index di ON dc.document_id = di.id
           WHERE dc.veeva_document_id IN (${placeholders})
           ORDER BY dc.embedding <=> $1::vector
           LIMIT 10
@@ -102,8 +102,8 @@ export const handler = async (event) => {
             di.document_type,
             di.status,
             1 - (dc.embedding <=> $1::vector) as similarity
-          FROM document_chunks dc
-          JOIN document_index di ON dc.document_id = di.id
+          FROM Veeva_Doc_Chat_document_chunks dc
+          JOIN Veeva_Doc_Chat_document_index di ON dc.document_id = di.id
           ORDER BY dc.embedding <=> $1::vector
           LIMIT 10
         `;
@@ -125,7 +125,7 @@ export const handler = async (event) => {
         const docQuery = `
           SELECT veeva_document_id, document_number, document_name, 
                  major_version, minor_version, document_type, status, summary, manual_summary
-          FROM document_index 
+          FROM Veeva_Doc_Chat_document_index 
           WHERE veeva_document_id IN (${docPlaceholders})
         `;
         const docResult = await pool.query(docQuery, uniqueDocIds);
@@ -146,7 +146,7 @@ export const handler = async (event) => {
         const query = `
           SELECT veeva_document_id, document_number, document_name, 
                  major_version, minor_version, document_type, status, summary, manual_summary
-          FROM document_index 
+          FROM Veeva_Doc_Chat_document_index 
           WHERE ${searchConditions}
           ORDER BY 
             CASE 
@@ -169,7 +169,7 @@ export const handler = async (event) => {
         const query = `
           SELECT veeva_document_id, document_number, document_name, 
                  major_version, minor_version, document_type, status, summary, manual_summary
-          FROM document_index 
+          FROM Veeva_Doc_Chat_document_index 
           WHERE veeva_document_id IN (${placeholders})
           ORDER BY document_name
         `;
@@ -183,7 +183,7 @@ export const handler = async (event) => {
         const query = `
           SELECT veeva_document_id, document_number, document_name, 
                  major_version, minor_version, document_type, status, summary, manual_summary
-          FROM document_index 
+          FROM Veeva_Doc_Chat_document_index 
           ORDER BY updated_at DESC
           LIMIT 5
         `;

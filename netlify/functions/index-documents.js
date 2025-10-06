@@ -102,7 +102,7 @@ async function chunkAndEmbedDocument(documentText, documentId, veevaDocumentId, 
     }
 
     // Delete existing chunks for this document (in case of re-indexing)
-    await pool.query('DELETE FROM document_chunks WHERE document_id = $1', [documentId]);
+    await pool.query('DELETE FROM Veeva_Doc_Chat_document_chunks WHERE document_id = $1', [documentId]);
     console.log(`Deleted existing chunks for document ${documentId}`);
 
     // Generate embeddings for each chunk in batches
@@ -134,7 +134,7 @@ async function chunkAndEmbedDocument(documentText, documentId, veevaDocumentId, 
           const embeddingStr = '[' + embedding.join(',') + ']';
 
           await pool.query(`
-            INSERT INTO document_chunks 
+            INSERT INTO Veeva_Doc_Chat_document_chunks 
             (document_id, veeva_document_id, chunk_index, chunk_text, embedding, token_count)
             VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (document_id, chunk_index) 
@@ -365,7 +365,7 @@ export const handler = async (event) => {
         // Check if document already exists
         console.log(`Checking if document ${doc.id} already exists in database...`);
         const existingDoc = await pool.query(
-          'SELECT * FROM document_index WHERE veeva_document_id = $1',
+          'SELECT * FROM Veeva_Doc_Chat_document_index WHERE veeva_document_id = $1',
           [doc.id]
         );
         
@@ -573,7 +573,7 @@ ${documentText.substring(0, 4000)}`
             
             // Update existing record with new summary if force regenerate was used
             const updateResult = await pool.query(`
-              UPDATE document_index 
+              UPDATE Veeva_Doc_Chat_document_index 
               SET document_name = $1, major_version = $2, minor_version = $3, 
                   status = $4, summary = $5, updated_at = CURRENT_TIMESTAMP
               WHERE veeva_document_id = $6
@@ -816,7 +816,7 @@ ${fallbackText.substring(0, 4000)}`
           ]);
           
           const insertResult = await pool.query(`
-            INSERT INTO document_index 
+            INSERT INTO Veeva_Doc_Chat_document_index 
             (veeva_document_id, document_number, document_name, major_version, minor_version, document_type, status, summary, indexed_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             RETURNING id

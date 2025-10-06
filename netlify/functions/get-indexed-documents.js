@@ -28,7 +28,7 @@ export const handler = async (event) => {
       SELECT id, veeva_document_id, document_number, document_name, 
              major_version, minor_version, document_type, status, 
              summary, manual_summary, indexed_at, updated_at
-      FROM document_index
+      FROM Veeva_Doc_Chat_document_index
     `;
     
     const queryParams = [];
@@ -54,7 +54,7 @@ export const handler = async (event) => {
     });
 
     // Get total count for pagination
-    let countQuery = 'SELECT COUNT(*) FROM document_index';
+    let countQuery = 'SELECT COUNT(*) FROM Veeva_Doc_Chat_document_index';
     if (nameLike) {
       countQuery += ' WHERE document_name ILIKE $1';
     }

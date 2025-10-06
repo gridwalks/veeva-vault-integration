@@ -6,7 +6,7 @@ export const handler = async (event) => {
     const pool = getPool();
     
     // Get all documents to check their summaries
-    const result = await pool.query('SELECT veeva_document_id, document_name, summary FROM document_index ORDER BY veeva_document_id LIMIT 10');
+    const result = await pool.query('SELECT veeva_document_id, document_name, summary FROM Veeva_Doc_Chat_document_index ORDER BY veeva_document_id LIMIT 10');
     
     const summaries = result.rows.map(row => {
       const hasNewFormat = row.summary ? 

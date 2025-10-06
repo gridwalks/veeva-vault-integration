@@ -17,7 +17,7 @@ export const handler = async (event) => {
     // Get one existing document to test
     await initDatabase();
     const pool = getPool();
-    const existingDoc = await pool.query('SELECT * FROM document_index LIMIT 1');
+    const existingDoc = await pool.query('SELECT * FROM Veeva_Doc_Chat_document_index LIMIT 1');
     
     if (existingDoc.rows.length > 0) {
       const existing = existingDoc.rows[0];
