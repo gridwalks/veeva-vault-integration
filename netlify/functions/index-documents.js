@@ -24,17 +24,45 @@ async function extractTextFromBuffer(fileBuffer, fileName) {
   if (fileExtension === 'docx') {
     // Extract text from DOCX files using mammoth
     try {
+      console.log('Attempting DOCX extraction with mammoth...');
+      console.log('Buffer details:', {
+        length: fileBuffer.length,
+        type: typeof fileBuffer,
+        constructor: fileBuffer.constructor.name,
+        isBuffer: Buffer.isBuffer(fileBuffer)
+      });
+      
       const result = await mammoth.extractRawText({ buffer: fileBuffer });
       extractedText = result.value;
       extractionMethod = 'mammoth_docx';
       
       console.log('DOCX extraction successful:', {
         textLength: extractedText.length,
-        messages: result.messages
+        messages: result.messages,
+        extractedPreview: extractedText.substring(0, 200)
       });
+      
+      // If mammoth returns empty or very short text, it might have failed
+      if (!extractedText || extractedText.trim().length < 10) {
+        console.warn('Mammoth extraction returned very little text, trying fallback...');
+        // Try fallback text extraction
+        extractedText = fileBuffer.toString('utf-8');
+        extractionMethod = 'fallback_text_after_mammoth';
+        console.log('Fallback extraction result:', {
+          textLength: extractedText.length,
+          preview: extractedText.substring(0, 200)
+        });
+      }
     } catch (error) {
       console.error('DOCX extraction failed:', error);
-      throw new Error(`Failed to extract text from DOCX file: ${error.message}`);
+      console.log('Trying fallback text extraction...');
+      // Try fallback
+      extractedText = fileBuffer.toString('utf-8');
+      extractionMethod = 'fallback_text_after_error';
+      console.log('Fallback extraction result:', {
+        textLength: extractedText.length,
+        preview: extractedText.substring(0, 200)
+      });
     }
   } else if (fileExtension === 'pdf') {
     // Extract text from PDF files using pdf-parse
