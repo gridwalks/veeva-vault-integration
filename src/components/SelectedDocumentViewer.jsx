@@ -24,50 +24,82 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
       
       console.log('Converting document to PDF...', { docId: document.veeva_document_id, major, minor });
       
-      const convertResponse = await fetch('/api/convert-to-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          docId: document.veeva_document_id,
-          major: major,
-          minor: minor
-        })
-      });
-      
-      if (!convertResponse.ok) {
-        throw new Error(`PDF conversion failed: ${convertResponse.status} ${convertResponse.statusText}`);
+      try {
+        const convertResponse = await fetch('/api/convert-to-pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            docId: document.veeva_document_id,
+            major: major,
+            minor: minor
+          })
+        });
+        
+        if (!convertResponse.ok) {
+          console.warn(`PDF conversion failed: ${convertResponse.status} ${convertResponse.statusText}, falling back to original document`);
+          throw new Error('PDF conversion service unavailable');
+        }
+        
+        const convertData = await convertResponse.json();
+        console.log('PDF conversion result:', convertData);
+        
+        if (convertData.error) {
+          console.warn(`PDF conversion error: ${convertData.error}, falling back to original document`);
+          throw new Error('PDF conversion failed');
+        }
+        
+        // Now load the converted PDF
+        const pdfUrl = convertData.pdfUrl || convertData.url;
+        if (!pdfUrl) {
+          throw new Error('No PDF URL returned from conversion service');
+        }
+        
+        console.log('Loading converted PDF from URL:', pdfUrl);
+        
+        // For PDFs, we'll create a blob URL and display it in an iframe
+        const pdfResponse = await fetch(pdfUrl);
+        if (!pdfResponse.ok) {
+          throw new Error(`Failed to fetch PDF: ${pdfResponse.status} ${pdfResponse.statusText}`);
+        }
+        
+        const pdfBlob = await pdfResponse.blob();
+        const pdfObjectUrl = URL.createObjectURL(pdfBlob);
+        
+        console.log('PDF loaded successfully, size:', pdfBlob.size);
+        
+        // Set the PDF URL for display
+        setDocumentContent(pdfObjectUrl);
+        
+      } catch (convertError) {
+        console.warn('PDF conversion failed, falling back to original document:', convertError.message);
+        
+        // Fallback: try to load the original document and detect if it's already a PDF
+        const originalUrl = `/api/download-file?docId=${document.veeva_document_id}&major=${major}&minor=${minor}`;
+        console.log('Loading original document from URL:', originalUrl);
+        
+        const response = await fetch(originalUrl);
+        console.log('Original document response status:', response.status, 'Content-Type:', response.headers.get('content-type'));
+        
+        if (response.ok) {
+          const contentType = response.headers.get('content-type') || '';
+          const isPdf = contentType.includes('pdf') || contentType.includes('application/pdf');
+          
+          if (isPdf) {
+            // It's already a PDF, load it directly
+            const pdfBlob = await response.blob();
+            const pdfObjectUrl = URL.createObjectURL(pdfBlob);
+            console.log('Original document is PDF, loaded directly, size:', pdfBlob.size);
+            setDocumentContent(pdfObjectUrl);
+          } else {
+            // Not a PDF, show message with download option
+            setDocumentContent('This document cannot be displayed inline. PDF conversion is currently unavailable. Please use the download button to view the document.');
+          }
+        } else {
+          throw new Error(`Failed to load original document: ${response.status} ${response.statusText}`);
+        }
       }
-      
-      const convertData = await convertResponse.json();
-      console.log('PDF conversion result:', convertData);
-      
-      if (convertData.error) {
-        throw new Error(`PDF conversion error: ${convertData.error}`);
-      }
-      
-      // Now load the converted PDF
-      const pdfUrl = convertData.pdfUrl || convertData.url;
-      if (!pdfUrl) {
-        throw new Error('No PDF URL returned from conversion service');
-      }
-      
-      console.log('Loading converted PDF from URL:', pdfUrl);
-      
-      // For PDFs, we'll create a blob URL and display it in an iframe
-      const pdfResponse = await fetch(pdfUrl);
-      if (!pdfResponse.ok) {
-        throw new Error(`Failed to fetch PDF: ${pdfResponse.status} ${pdfResponse.statusText}`);
-      }
-      
-      const pdfBlob = await pdfResponse.blob();
-      const pdfObjectUrl = URL.createObjectURL(pdfBlob);
-      
-      console.log('PDF loaded successfully, size:', pdfBlob.size);
-      
-      // Set the PDF URL for display
-      setDocumentContent(pdfObjectUrl);
       
     } catch (error) {
       console.error('Error converting/loading document:', error);

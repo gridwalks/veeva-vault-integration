@@ -74,15 +74,24 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       console.log('API Response data:', data);
       
       // Handle different response formats
-      if (data.conversationHistory) {
-        // API returns full conversation history
+      if (data.conversationHistory && Array.isArray(data.conversationHistory)) {
+        // API returns full conversation history - use it directly
+        console.log('Using API conversation history:', data.conversationHistory.length, 'messages');
         setConversationHistory(data.conversationHistory);
       } else if (data.response) {
         // API returns just the response, append to existing history
-        setConversationHistory(prev => [
-          ...prev,
-          { role: 'assistant', content: data.response }
-        ]);
+        console.log('Appending API response to existing history');
+        setConversationHistory(prev => {
+          // Remove the last message if it's a duplicate user message
+          const lastMessage = prev[prev.length - 1];
+          if (lastMessage && lastMessage.role === 'user' && lastMessage.content === userMessage) {
+            prev = prev.slice(0, -1);
+          }
+          return [
+            ...prev,
+            { role: 'assistant', content: data.response }
+          ];
+        });
       } else {
         console.error('Unexpected API response format:', data);
         throw new Error('Unexpected response format from chat API');
