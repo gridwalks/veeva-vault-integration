@@ -109,17 +109,38 @@ export function chunkText(text, maxTokensPerChunk = 512, overlapTokens = 50) {
  * @returns {Array} Cleaned chunks
  */
 export function validateChunks(chunks) {
-  return chunks.filter(chunk => {
-    // Remove chunks that are too small (less than 50 characters)
-    if (chunk.text.length < 50) {
-      return false;
+  const results = chunks.map((chunk, index) => {
+    const reasons = [];
+    
+    // TEMPORARY: Much more lenient validation for debugging
+    // Remove chunks that are too small (less than 20 characters after trimming)
+    const trimmedLength = chunk.text.trim().length;
+    if (trimmedLength < 20) {
+      reasons.push(`too_short_after_trim(${trimmedLength})`);
     }
-    // Remove chunks that are mostly whitespace
-    if (chunk.text.trim().length < chunk.text.length * 0.5) {
-      return false;
+    
+    // Remove chunks that are ALL whitespace
+    if (trimmedLength === 0) {
+      reasons.push(`all_whitespace`);
     }
-    return true;
+    
+    const isValid = reasons.length === 0;
+    
+    if (!isValid) {
+      console.log(`Chunk ${index} rejected: ${reasons.join(', ')} - Preview: "${chunk.text.substring(0, 100)}"`);
+    }
+    
+    return { chunk, isValid, reasons };
   });
+  
+  const validChunks = results.filter(r => r.isValid).map(r => r.chunk);
+  const rejectedCount = results.filter(r => !r.isValid).length;
+  
+  if (rejectedCount > 0) {
+    console.log(`Validation summary: ${validChunks.length} valid, ${rejectedCount} rejected`);
+  }
+  
+  return validChunks;
 }
 
 /**

@@ -68,7 +68,8 @@ async function extractTextFromBuffer(fileBuffer, fileName) {
     .replace(/\r\n/g, '\n') // Normalize line endings
     .replace(/\n{3,}/g, '\n\n') // Reduce multiple line breaks
     .replace(/[ \t]+/g, ' ') // Normalize whitespace
-    .replace(/[^\x20-\x7E\n\r\t]/g, ' ') // Remove non-printable characters except newlines and tabs
+    // LESS AGGRESSIVE: Only remove actual control characters, keep Unicode
+    .replace(/[\x00-\x1F\x7F]/g, ' ') // Remove control characters only
     .trim();
 
   console.log('Text extraction successful:', {
