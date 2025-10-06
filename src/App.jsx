@@ -56,10 +56,28 @@ export default function App() {
   }
 
   return (
-    <>
+    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh' }}>
       <Header user={user} />
       <div style={{ textAlign: 'right', margin: '10px 16px 10px 90px' }}>
-        <button onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}>Log out</button>
+        <button 
+          onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#4338ca',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            transition: 'background-color 0.2s ease'
+          }}
+          onMouseEnter={(e) => e.target.style.backgroundColor = '#312e81'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = '#4338ca'}
+        >
+          Log out
+        </button>
       </div>
       
       {/* Main Content Area */}
@@ -74,10 +92,11 @@ export default function App() {
           {/* Left Panel - Chat */}
           <div style={{
             flex: '1',
-            backgroundColor: '#1e1e1e',
-            border: '1px solid #2a2a2a',
-            borderRadius: '12px',
-            overflow: 'hidden'
+            backgroundColor: '#ffffff',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            overflow: 'hidden',
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
           }}>
             <StaticChatPane selectedDocuments={selectedDocuments} />
           </div>
@@ -85,16 +104,30 @@ export default function App() {
           {/* Right Panel - Indexed Documents for Selection */}
           <div style={{
             flex: '1',
-            backgroundColor: '#f8f9fa',
-            border: '1px solid #e0e0e0',
-            borderRadius: '12px',
-            padding: '20px',
-            overflow: 'auto'
+            backgroundColor: '#ffffff',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            padding: '24px',
+            overflow: 'auto',
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
           }}>
-            <h2 style={{ margin: '0 0 20px 0', textAlign: 'center', color: '#333' }}>
+            <h2 style={{ 
+              margin: '0 0 20px 0', 
+              textAlign: 'center', 
+              color: '#374151',
+              fontSize: '20px',
+              fontWeight: '600',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            }}>
               Available Documents
             </h2>
-            <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>
+            <p style={{ 
+              textAlign: 'center', 
+              color: '#6b7280', 
+              marginBottom: '20px',
+              fontSize: '14px',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            }}>
               Select documents to chat with from the indexed documents below.
             </p>
             
@@ -145,6 +178,6 @@ export default function App() {
         onIndexDocuments={() => {}}
         onRegenerateSummaries={() => {}}
       />
-    </>
+    </div>
   );
 }

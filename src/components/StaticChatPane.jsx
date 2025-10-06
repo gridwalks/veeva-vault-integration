@@ -225,22 +225,22 @@ export default function StaticChatPane({ selectedDocuments = [] }) {
   return (
     <>
       <div style={{
-        backgroundColor: '#1e1e1e',
-        border: '1px solid #2a2a2a',
-        borderRadius: '12px',
+        backgroundColor: '#ffffff',
+        border: '1px solid #e5e7eb',
+        borderRadius: '8px',
         height: '100vh',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
       }}>
         {/* Header */}
         <div style={{
           padding: '16px 20px',
-          borderBottom: '1px solid #2a2a2a',
-          backgroundColor: '#252525',
-          borderTopLeftRadius: '12px',
-          borderTopRightRadius: '12px'
+          borderBottom: '1px solid #e5e7eb',
+          backgroundColor: '#f8fafc',
+          borderTopLeftRadius: '8px',
+          borderTopRightRadius: '8px'
         }}>
           <div style={{
             display: 'flex',
@@ -251,8 +251,9 @@ export default function StaticChatPane({ selectedDocuments = [] }) {
               <h3 style={{ 
                 margin: 0, 
                 fontSize: '18px',
-                color: '#ffffff',
-                fontWeight: '600'
+                color: '#374151',
+                fontWeight: '600',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
                 Document Chat Agent
               </h3>
@@ -260,7 +261,8 @@ export default function StaticChatPane({ selectedDocuments = [] }) {
                 <p style={{ 
                   margin: '4px 0 0 0', 
                   fontSize: '12px', 
-                  color: '#b0b0b0' 
+                  color: '#6b7280',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
                   {selectedDocuments.length} document{selectedDocuments.length !== 1 ? 's' : ''} selected
                 </p>
@@ -271,16 +273,18 @@ export default function StaticChatPane({ selectedDocuments = [] }) {
                 onClick={clearConversation}
                 style={{
                   padding: '6px 12px',
-                  backgroundColor: '#444',
-                  color: '#fff',
+                  backgroundColor: '#6b7280',
+                  color: '#ffffff',
                   border: 'none',
                   borderRadius: '6px',
                   cursor: 'pointer',
                   fontSize: '12px',
+                  fontWeight: '500',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   transition: 'background-color 0.2s ease'
                 }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#555'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#444'}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#4b5563'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#6b7280'}
                 title="Clear conversation"
               >
                 Clear

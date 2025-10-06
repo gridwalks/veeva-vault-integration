@@ -20,18 +20,18 @@ export default function LeftMenu({ currentScreen, onScreenChange, onChatOpen, in
     <div style={{
       position: 'fixed',
       left: 0,
-      top: 0,
-      height: '100vh',
+      top: '64px',
+      height: 'calc(100vh - 64px)',
       width: '64px',
-      backgroundColor: '#1e1e1e',
-      borderRight: '1px solid #2a2a2a',
+      backgroundColor: '#ffffff',
+      borderRight: '1px solid #e5e7eb',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      paddingTop: '100px',
-      gap: '20px',
+      paddingTop: '24px',
+      gap: '16px',
       zIndex: 1000,
-      boxShadow: '2px 0 8px rgba(0, 0, 0, 0.3)'
+      boxShadow: '1px 0 3px 0 rgba(0, 0, 0, 0.1)'
     }}>
       {menuItems.map((item) => {
         const isActive = item.id === currentScreen;
@@ -43,33 +43,31 @@ export default function LeftMenu({ currentScreen, onScreenChange, onChatOpen, in
             disabled={item.disabled}
             title={item.label}
             style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '10px',
+              width: '40px',
+              height: '40px',
+              borderRadius: '8px',
               border: 'none',
-              backgroundColor: isActive ? '#007bff' : item.disabled ? '#3a3a3a' : 'transparent',
-              color: isActive ? 'white' : item.disabled ? '#666' : '#b0b0b0',
-              fontSize: '20px',
+              backgroundColor: isActive ? '#4338ca' : item.disabled ? '#f3f4f6' : 'transparent',
+              color: isActive ? 'white' : item.disabled ? '#9ca3af' : '#6b7280',
+              fontSize: '18px',
               cursor: item.disabled ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'all 0.3s ease',
-              opacity: item.disabled ? 0.4 : 1,
-              boxShadow: isActive ? '0 4px 12px rgba(0, 123, 255, 0.3)' : 'none'
+              transition: 'all 0.2s ease',
+              opacity: item.disabled ? 0.5 : 1,
+              boxShadow: isActive ? '0 1px 3px 0 rgba(67, 56, 202, 0.1)' : 'none'
             }}
             onMouseEnter={(e) => {
               if (!item.disabled && !isActive) {
-                e.target.style.backgroundColor = '#2a2a2a';
-                e.target.style.color = 'white';
-                e.target.style.transform = 'scale(1.05)';
+                e.target.style.backgroundColor = '#f3f4f6';
+                e.target.style.color = '#374151';
               }
             }}
             onMouseLeave={(e) => {
               if (!item.disabled && !isActive) {
                 e.target.style.backgroundColor = 'transparent';
-                e.target.style.color = '#b0b0b0';
-                e.target.style.transform = 'scale(1)';
+                e.target.style.color = '#6b7280';
               }
             }}
           >

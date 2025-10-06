@@ -7,9 +7,10 @@ export default function Header({ user }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '20px 16px',
-      backgroundColor: '#ffffff',
-      borderBottom: '1px solid #e0e0e0'
+      padding: '0 16px',
+      backgroundColor: '#f8fafc',
+      borderBottom: '1px solid #e5e7eb',
+      height: '64px'
     }}>
       {/* Left Section - Logo and App Name */}
       <div style={{
@@ -30,24 +31,26 @@ export default function Header({ user }) {
         {/* Main text */}
         <h1 style={{
           margin: 0,
-          fontSize: '28px',
-          fontWeight: 'bold',
-          color: '#5C3E9E',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-          letterSpacing: '-0.5px'
+          fontSize: '24px',
+          fontWeight: '600',
+          color: '#4338ca',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          letterSpacing: '-0.025em'
         }}>
           AcceleraQA
         </h1>
         
         {/* Beta badge */}
         <span style={{
-          fontSize: '14px',
-          fontWeight: '500',
-          color: '#666666',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-          marginLeft: '8px'
+          fontSize: '12px',
+          fontWeight: '600',
+          color: '#6b7280',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          marginLeft: '8px',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em'
         }}>
-          | BETA
+          | Beta
         </span>
       </div>
 
@@ -60,27 +63,38 @@ export default function Header({ user }) {
         }}>
           {/* User Icon */}
           <div style={{
-            width: '24px',
-            height: '24px',
+            width: '32px',
+            height: '32px',
             borderRadius: '50%',
-            backgroundColor: '#e0e0e0',
+            backgroundColor: '#4338ca',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: '14px',
-            color: '#666666'
+            color: '#ffffff',
+            fontWeight: '600'
           }}>
-            👤
+            {user.email ? user.email.charAt(0).toUpperCase() : 'U'}
           </div>
           
           {/* User Details */}
-          <span style={{
-            fontSize: '14px',
-            color: '#666666',
-            fontFamily: 'system-ui, -apple-system, sans-serif'
-          }}>
-            {user.email} (admin)
-          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+            <span style={{
+              fontSize: '14px',
+              color: '#374151',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              fontWeight: '500'
+            }}>
+              {user.email}
+            </span>
+            <span style={{
+              fontSize: '12px',
+              color: '#6b7280',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            }}>
+              admin
+            </span>
+          </div>
         </div>
       )}
     </header>

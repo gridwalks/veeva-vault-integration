@@ -150,13 +150,21 @@ export default function AdminScreen() {
     <div style={{
       height: 'calc(100vh - 120px)',
       margin: '0 90px 0 90px',
-      padding: '20px',
-      backgroundColor: '#f8f9fa',
-      border: '1px solid #e0e0e0',
-      borderRadius: '12px',
-      overflow: 'auto'
+      padding: '24px',
+      backgroundColor: '#ffffff',
+      border: '1px solid #e5e7eb',
+      borderRadius: '8px',
+      overflow: 'auto',
+      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
     }}>
-      <h1 style={{ margin: '0 0 20px 0', textAlign: 'center', color: '#333' }}>
+      <h1 style={{ 
+        margin: '0 0 24px 0', 
+        textAlign: 'center', 
+        color: '#374151',
+        fontSize: '24px',
+        fontWeight: '600',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      }}>
         Document Administration
       </h1>
 
@@ -169,11 +177,15 @@ export default function AdminScreen() {
           }}
           style={{
             padding: '8px 16px',
-            backgroundColor: activeTab === "documents" ? '#007bff' : '#f0f0f0',
-            color: activeTab === "documents" ? 'white' : 'black',
+            backgroundColor: activeTab === "documents" ? '#4338ca' : '#f3f4f6',
+            color: activeTab === "documents" ? 'white' : '#374151',
             border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            transition: 'all 0.2s ease'
           }}
         >
           Veeva Documents
@@ -185,11 +197,15 @@ export default function AdminScreen() {
           }}
           style={{
             padding: '8px 16px',
-            backgroundColor: activeTab === "indexed" ? '#007bff' : '#f0f0f0',
-            color: activeTab === "indexed" ? 'white' : 'black',
+            backgroundColor: activeTab === "indexed" ? '#4338ca' : '#f3f4f6',
+            color: activeTab === "indexed" ? 'white' : '#374151',
             border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            transition: 'all 0.2s ease'
           }}
         >
           Indexed Documents
