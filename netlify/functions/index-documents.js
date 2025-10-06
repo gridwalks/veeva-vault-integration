@@ -640,12 +640,23 @@ ${documentText.substring(0, 4000)}`
             action: 'updated',
             document: documentData,
             summary: updatedSummary,
-            timestamp: updateTimestamp
+            timestamp: updateTimestamp,
+            chunked: !!documentTextForChunking,
+            chunkingAttempted: true
           });
           console.log(`Document updated: ${doc.name__v} at ${updateTimestamp}`);
           } else {
             console.log(`Document unchanged: ${doc.name__v}`);
             console.log(`Checking chunk status for unchanged document ${doc.id} (db id: ${existing.id})...`);
+            
+            // Track chunking info for response
+            let chunkingInfo = {
+              chunkCheckAttempted: true,
+              chunkCount: null,
+              chunkingAttempted: false,
+              chunkingSuccess: false,
+              chunkingError: null
+            };
             
             // Even if document is unchanged, check if it needs chunking
             try {
@@ -654,6 +665,7 @@ ${documentText.substring(0, 4000)}`
                 [existing.id]
               );
               const chunkCount = parseInt(chunkCheck.rows[0].count);
+              chunkingInfo.chunkCount = chunkCount;
               
               console.log(`Chunk check result for ${doc.name__v}:`, {
                 documentId: doc.id,
@@ -664,6 +676,7 @@ ${documentText.substring(0, 4000)}`
               
               if (chunkCount === 0) {
                 console.log(`⚠️ Document unchanged but has no chunks, will download and chunk: ${doc.id}`);
+                chunkingInfo.chunkingAttempted = true;
                 
                 // Download and extract text for chunking
                 const downloadUrl = `https://${domain}/api/${v}/objects/documents/${doc.id}/file`;
@@ -685,6 +698,8 @@ ${documentText.substring(0, 4000)}`
                       doc.id,
                       pool
                     );
+                    chunkingInfo.chunkingSuccess = chunkResult.success;
+                    chunkingInfo.chunksCreated = chunkResult.chunksCreated;
                     console.log(`✓ Chunking completed for ${doc.name__v}:`, {
                       success: chunkResult.success,
                       chunksCreated: chunkResult.chunksCreated,
@@ -692,12 +707,14 @@ ${documentText.substring(0, 4000)}`
                     });
                   } else {
                     console.error(`✗ No text extracted from document ${doc.id}`);
+                    chunkingInfo.chunkingError = 'No text extracted';
                   }
                 } else {
                   console.error(`✗ Failed to download document for chunking: ${doc.id}`, {
                     status: downloadRes.status,
                     statusText: downloadRes.statusText
                   });
+                  chunkingInfo.chunkingError = `Download failed: ${downloadRes.status}`;
                 }
               } else {
                 console.log(`✓ Document unchanged and already has ${chunkCount} chunks - skipping`);
@@ -707,12 +724,14 @@ ${documentText.substring(0, 4000)}`
                 message: chunkCheckError.message,
                 stack: chunkCheckError.stack
               });
+              chunkingInfo.chunkingError = chunkCheckError.message;
             }
             
             results.push({
               action: 'unchanged',
               document: documentData,
-              summary: existing.summary
+              summary: existing.summary,
+              chunkingDebug: chunkingInfo
             });
           }
         } else {
