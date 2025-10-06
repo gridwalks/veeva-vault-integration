@@ -25,12 +25,18 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
       if (response.ok) {
         const contentType = response.headers.get('content-type') || '';
         const isPdf = document.document_type === 'PDF' || contentType.includes('pdf') || url.toLowerCase().includes('.pdf');
+        const isDocx = document.document_type?.toLowerCase().includes('document') || 
+                      contentType.includes('application/vnd.openxmlformats-officedocument') ||
+                      contentType.includes('application/octet-stream');
         
         if (isPdf) {
           console.log('Document is PDF, showing message');
           setDocumentContent('PDF documents cannot be displayed inline. Please use the download feature.');
+        } else if (isDocx) {
+          console.log('Document is DOCX/Word document, showing message');
+          setDocumentContent('Word documents (DOCX) cannot be displayed inline. Please use the download feature or convert to PDF first.');
         } else {
-          // Try to get text content
+          // Try to get text content for other file types
           try {
             const text = await response.text();
             console.log('Document text content length:', text.length);
@@ -38,7 +44,13 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
             if (text.trim().length === 0) {
               setDocumentContent('Document appears to be empty or binary content that cannot be displayed as text.');
             } else {
-              setDocumentContent(text);
+              // Check if content looks like binary/garbled
+              const hasBinaryChars = /[\x00-\x08\x0E-\x1F\x7F-\xFF]/.test(text.substring(0, 1000));
+              if (hasBinaryChars) {
+                setDocumentContent('This document appears to be a binary file that cannot be displayed as text. Please use the download feature.');
+              } else {
+                setDocumentContent(text);
+              }
             }
           } catch (textError) {
             console.error('Error reading text content:', textError);
@@ -178,24 +190,50 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                     {activeDocument.document_type} • Version {activeDocument.version} • {activeDocument.document_number}
                   </div>
                 </div>
-                <button
-                  onClick={handleCloseDocument}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: '#6b7280',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    transition: 'background-color 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#4b5563'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#6b7280'}
-                >
-                  ← Back to List
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => {
+                      const url = `/api/download-file?docId=${activeDocument.veeva_document_id}&major=${activeDocument.version?.split('.')[0] || 1}&minor=${activeDocument.version?.split('.')[1] || 0}`;
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = activeDocument.document_name;
+                      link.click();
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#10b981',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      transition: 'background-color 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
+                  >
+                    📥 Download
+                  </button>
+                  <button
+                    onClick={handleCloseDocument}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#6b7280',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      transition: 'background-color 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#4b5563'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#6b7280'}
+                  >
+                    ← Back to List
+                  </button>
+                </div>
               </div>
 
               {/* Document Content */}
@@ -230,7 +268,52 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                     whiteSpace: 'pre-wrap',
                     wordWrap: 'break-word'
                   }}>
-                    {documentContent}
+                    {documentContent.startsWith('PDF documents cannot be displayed') || 
+                     documentContent.startsWith('Word documents (DOCX) cannot be displayed') ||
+                     documentContent.startsWith('This document appears to be a binary file') ||
+                     documentContent.startsWith('Document appears to be empty') ||
+                     documentContent.startsWith('Document content could not be read') ? (
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '100%',
+                        textAlign: 'center',
+                        padding: '40px'
+                      }}>
+                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>📄</div>
+                        <h4 style={{
+                          margin: '0 0 8px 0',
+                          color: '#374151',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                        }}>
+                          Document Preview Not Available
+                        </h4>
+                        <p style={{
+                          margin: '0 0 16px 0',
+                          fontSize: '14px',
+                          lineHeight: '1.5',
+                          color: '#6b7280',
+                          maxWidth: '400px',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                        }}>
+                          {documentContent}
+                        </p>
+                        <div style={{
+                          padding: '12px 20px',
+                          backgroundColor: '#f3f4f6',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          color: '#6b7280',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                        }}>
+                          Use the Download button above to save the document to your computer
+                        </div>
+                      </div>
+                    ) : (
+                      documentContent
+                    )}
                   </div>
                 )}
               </div>
