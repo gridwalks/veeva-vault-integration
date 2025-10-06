@@ -12,24 +12,46 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
     
     try {
       // Fetch document content
-      const url = `/api/download-file?docId=${document.veeva_document_id}&major=${document.version?.split('.')[0] || 1}&minor=${document.version?.split('.')[1] || 0}`;
+      const versionParts = document.version ? document.version.split('.') : ['1', '0'];
+      const major = versionParts[0] || 1;
+      const minor = versionParts[1] || 0;
+      const url = `/api/download-file?docId=${document.veeva_document_id}&major=${major}&minor=${minor}`;
+      console.log('Fetching document from URL:', url);
+      console.log('Document version parts:', { version: document.version, major, minor });
+      
       const response = await fetch(url);
+      console.log('Response status:', response.status, 'Content-Type:', response.headers.get('content-type'));
       
       if (response.ok) {
-        // For PDFs, we'll show a message since we can't render PDFs inline
-        if (document.document_type === 'PDF') {
+        const contentType = response.headers.get('content-type') || '';
+        const isPdf = document.document_type === 'PDF' || contentType.includes('pdf') || url.toLowerCase().includes('.pdf');
+        
+        if (isPdf) {
+          console.log('Document is PDF, showing message');
           setDocumentContent('PDF documents cannot be displayed inline. Please use the download feature.');
         } else {
-          // For other document types, try to get text content
-          const text = await response.text();
-          setDocumentContent(text);
+          // Try to get text content
+          try {
+            const text = await response.text();
+            console.log('Document text content length:', text.length);
+            
+            if (text.trim().length === 0) {
+              setDocumentContent('Document appears to be empty or binary content that cannot be displayed as text.');
+            } else {
+              setDocumentContent(text);
+            }
+          } catch (textError) {
+            console.error('Error reading text content:', textError);
+            setDocumentContent('Document content could not be read as text. This may be a binary file.');
+          }
         }
       } else {
-        setDocumentContent('Error loading document content.');
+        console.error('Failed to fetch document:', response.status, response.statusText);
+        setDocumentContent(`Error loading document content. Server returned: ${response.status} ${response.statusText}`);
       }
     } catch (error) {
       console.error('Error loading document:', error);
-      setDocumentContent('Error loading document content.');
+      setDocumentContent(`Error loading document content: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -83,14 +105,35 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
           }}>
             Selected Documents
           </h3>
-          <p style={{
-            margin: '4px 0 0 0',
-            fontSize: '12px',
-            color: '#6b7280',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          }}>
-            {selectedDocuments.length} document{selectedDocuments.length !== 1 ? 's' : ''} selected for chat
-          </p>
+              <p style={{
+                margin: '4px 0 0 0',
+                fontSize: '12px',
+                color: '#6b7280',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}>
+                {selectedDocuments.length} document{selectedDocuments.length !== 1 ? 's' : ''} selected for chat
+              </p>
+              {selectedDocuments.length > 0 && (
+                <button
+                  onClick={() => {
+                    console.log('Test: Opening first document for testing');
+                    handleOpenDocument(selectedDocuments[0]);
+                  }}
+                  style={{
+                    marginTop: '8px',
+                    padding: '4px 8px',
+                    backgroundColor: '#10b981',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    cursor: 'pointer',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}
+                >
+                  Test Open First Doc
+                </button>
+              )}
         </div>
 
         {/* Content */}

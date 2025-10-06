@@ -94,15 +94,19 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
   };
 
   const handleOpenDocument = (document) => {
+    console.log('StaticChatPane handleOpenDocument called with:', document);
+    
     if (onOpenDocumentInPane) {
       // Open document in the selected documents pane
-      onOpenDocumentInPane({
+      const mappedDocument = {
         veeva_document_id: document.id,
         document_name: document.name,
         document_type: document.type,
         version: document.version,
         document_number: document.number
-      });
+      };
+      console.log('Mapped document for pane:', mappedDocument);
+      onOpenDocumentInPane(mappedDocument);
     } else {
       // Fallback to document viewer if no callback provided
       setSelectedDocument({

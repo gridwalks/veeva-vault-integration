@@ -15,15 +15,21 @@ export default function App() {
   const documentViewerRef = useRef(null);
 
   const handleOpenDocumentInPane = (document) => {
-    console.log('handleOpenDocumentInPane called with:', document);
-    console.log('documentViewerRef.current:', documentViewerRef.current);
+    console.log('App: handleOpenDocumentInPane called with:', document);
+    console.log('App: documentViewerRef.current:', documentViewerRef.current);
     
     // Call the SelectedDocumentViewer's handleOpenDocument function
     if (documentViewerRef.current && documentViewerRef.current.handleOpenDocument) {
-      console.log('Calling handleOpenDocument on ref');
-      documentViewerRef.current.handleOpenDocument(document);
+      console.log('App: Calling handleOpenDocument on ref');
+      try {
+        documentViewerRef.current.handleOpenDocument(document);
+      } catch (error) {
+        console.error('App: Error calling handleOpenDocument:', error);
+      }
     } else {
-      console.warn('documentViewerRef or handleOpenDocument not available');
+      console.warn('App: documentViewerRef or handleOpenDocument not available');
+      console.log('App: documentViewerRef.current:', documentViewerRef.current);
+      console.log('App: has handleOpenDocument:', documentViewerRef.current?.handleOpenDocument);
     }
   };
 
