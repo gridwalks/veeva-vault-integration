@@ -5,7 +5,7 @@ import DocumentList from "./components/DocumentList.jsx";
 import IndexedDocumentList from "./components/IndexedDocumentList.jsx";
 import DocumentChat from "./components/DocumentChat.jsx";
 import Header from "./components/Header.jsx";
-import RightMenu from "./components/RightMenu.jsx";
+import LeftMenu from "./components/LeftMenu.jsx";
 // import StatusPanel from "./components/StatusPanel.jsx";
 
 export default function App() {
@@ -172,11 +172,11 @@ export default function App() {
   return (
     <>
       <Header />
-      <div style={{ textAlign: 'right', margin: '10px 90px 10px 16px' }}>
+      <div style={{ textAlign: 'right', margin: '10px 16px 10px 90px' }}>
         {user && <span style={{ marginRight: 8 }}>Hello {user.name}</span>}
         <button onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}>Log out</button>
       </div>
-      <main style={{maxWidth: 860, margin: "20px auto", padding: "0 90px 0 16px", textAlign: "center"}}>
+      <main style={{maxWidth: 860, margin: "20px auto", padding: "0 16px 0 90px", textAlign: "center"}}>
         <h1>Approved Documents</h1>
 
 

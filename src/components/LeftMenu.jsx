@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function RightMenu({ activeTab, onTabChange, onChatOpen, indexedCount, isIndexing, onIndexDocuments, onRegenerateSummaries }) {
+export default function LeftMenu({ activeTab, onTabChange, onChatOpen, indexedCount, isIndexing, onIndexDocuments, onRegenerateSummaries }) {
   const menuItems = [
     {
       id: 'documents',
@@ -42,19 +42,19 @@ export default function RightMenu({ activeTab, onTabChange, onChatOpen, indexedC
   return (
     <div style={{
       position: 'fixed',
-      right: 0,
+      left: 0,
       top: 0,
       height: '100vh',
       width: '64px',
       backgroundColor: '#1e1e1e',
-      borderLeft: '1px solid #2a2a2a',
+      borderRight: '1px solid #2a2a2a',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       paddingTop: '100px',
       gap: '20px',
       zIndex: 1000,
-      boxShadow: '-2px 0 8px rgba(0, 0, 0, 0.3)'
+      boxShadow: '2px 0 8px rgba(0, 0, 0, 0.3)'
     }}>
       {menuItems.map((item) => {
         // Only show items that should be visible for the current tab
