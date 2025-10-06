@@ -88,17 +88,29 @@ async function extractTextFromBuffer(fileBuffer, fileName) {
 // Function to generate embeddings and store chunks
 async function chunkAndEmbedDocument(documentText, documentId, veevaDocumentId, pool) {
   try {
-    console.log(`Starting chunking process for document ${veevaDocumentId}...`);
+    console.log(`Starting chunking process for document ${veevaDocumentId}...`, {
+      textLength: documentText?.length || 0,
+      textPreview: documentText?.substring(0, 100) || 'No text'
+    });
     
     // Chunk the document text
     const chunks = chunkText(documentText, 512, 50); // 512 tokens per chunk with 50 token overlap
-    const validChunks = validateChunks(chunks);
+    console.log(`Initial chunking created ${chunks.length} chunks`);
     
-    console.log(`Document chunked into ${validChunks.length} valid chunks`);
+    const validChunks = validateChunks(chunks);
+    console.log(`After validation: ${validChunks.length} valid chunks (filtered out ${chunks.length - validChunks.length})`);
 
     if (validChunks.length === 0) {
-      console.warn(`No valid chunks generated for document ${veevaDocumentId}`);
-      return { success: false, chunksCreated: 0 };
+      console.error(`❌ No valid chunks generated for document ${veevaDocumentId}`, {
+        initialChunkCount: chunks.length,
+        textLength: documentText?.length || 0,
+        reason: chunks.length === 0 ? 'chunking_failed' : 'all_chunks_filtered_out'
+      });
+      return { 
+        success: false, 
+        chunksCreated: 0,
+        error: chunks.length === 0 ? 'Chunking failed - no chunks created' : 'All chunks filtered out by validation'
+      };
     }
 
     // Delete existing chunks for this document (in case of re-indexing)
@@ -692,19 +704,26 @@ ${documentText.substring(0, 4000)}`
                   
                   if (documentText && documentText.trim().length > 0) {
                     console.log(`✓ Extracted ${extractionResult.textLength} characters, starting chunking and embedding...`);
-                    const chunkResult = await chunkAndEmbedDocument(
-                      documentText,
-                      existing.id,
-                      doc.id,
-                      pool
-                    );
-                    chunkingInfo.chunkingSuccess = chunkResult.success;
-                    chunkingInfo.chunksCreated = chunkResult.chunksCreated;
-                    console.log(`✓ Chunking completed for ${doc.name__v}:`, {
-                      success: chunkResult.success,
-                      chunksCreated: chunkResult.chunksCreated,
-                      error: chunkResult.error
-                    });
+                    try {
+                      const chunkResult = await chunkAndEmbedDocument(
+                        documentText,
+                        existing.id,
+                        doc.id,
+                        pool
+                      );
+                      chunkingInfo.chunkingSuccess = chunkResult.success;
+                      chunkingInfo.chunksCreated = chunkResult.chunksCreated || 0;
+                      chunkingInfo.chunkingError = chunkResult.error || null;
+                      console.log(`✓ Chunking completed for ${doc.name__v}:`, {
+                        success: chunkResult.success,
+                        chunksCreated: chunkResult.chunksCreated,
+                        error: chunkResult.error
+                      });
+                    } catch (chunkError) {
+                      console.error(`✗ Chunking threw exception for ${doc.id}:`, chunkError);
+                      chunkingInfo.chunkingError = chunkError.message;
+                      chunkingInfo.chunkingSuccess = false;
+                    }
                   } else {
                     console.error(`✗ No text extracted from document ${doc.id}`);
                     chunkingInfo.chunkingError = 'No text extracted';
