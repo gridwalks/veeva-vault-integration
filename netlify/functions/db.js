@@ -60,6 +60,43 @@ export async function initDatabase() {
       console.log('Manual summary column may already exist:', alterError.message);
     }
 
+    // Enable pgvector extension for vector similarity search
+    try {
+      await client.query(`CREATE EXTENSION IF NOT EXISTS vector`);
+      console.log('pgvector extension enabled');
+    } catch (vectorError) {
+      console.warn('Could not enable pgvector extension:', vectorError.message);
+      console.warn('Vector search features will not be available. Please enable pgvector manually.');
+    }
+
+    // Create document_chunks table for RAG
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS document_chunks (
+        id SERIAL PRIMARY KEY,
+        document_id INTEGER NOT NULL REFERENCES document_index(id) ON DELETE CASCADE,
+        veeva_document_id VARCHAR(255) NOT NULL,
+        chunk_index INTEGER NOT NULL,
+        chunk_text TEXT NOT NULL,
+        embedding vector(1536),
+        token_count INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(document_id, chunk_index)
+      )
+    `);
+
+    // Create indexes for chunks
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_chunks_document_id 
+      ON document_chunks(document_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_chunks_veeva_document_id 
+      ON document_chunks(veeva_document_id)
+    `);
+
+    console.log('Document chunks table created or already exists');
+
     const duration = Date.now() - startTime;
     console.log(`Database schema initialized successfully in ${duration}ms`);
   } catch (error) {

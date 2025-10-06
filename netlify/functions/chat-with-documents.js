@@ -34,29 +34,109 @@ export const handler = async (event) => {
       historyLength: conversationHistory.length
     });
 
-    // Get relevant documents based on documentIds or search for relevant ones
+    // Generate embedding for the query
+    console.log('Generating embedding for user query...');
+    const embeddingStartTime = Date.now();
+    let queryEmbedding = null;
+    
+    try {
+      const embeddingResponse = await openai.embeddings.create({
+        model: "text-embedding-ada-002",
+        input: message,
+      });
+      queryEmbedding = embeddingResponse.data[0].embedding;
+      console.log(`Query embedding generated in ${Date.now() - embeddingStartTime}ms`);
+    } catch (embeddingError) {
+      console.error('Error generating query embedding:', embeddingError);
+      // Fall back to keyword search if embedding fails
+    }
+
+    // Get relevant chunks using semantic search
+    let relevantChunks = [];
     let relevantDocuments = [];
     
-    if (documentIds && documentIds.length > 0) {
-      // Get specific documents by IDs
-      const placeholders = documentIds.map((_, index) => `$${index + 1}`).join(',');
-      const query = `
-        SELECT veeva_document_id, document_number, document_name, 
-               major_version, minor_version, document_type, status, summary, manual_summary
-        FROM document_index 
-        WHERE veeva_document_id IN (${placeholders})
-        ORDER BY document_name
-      `;
+    if (queryEmbedding) {
+      // Perform vector similarity search
+      console.log('Performing semantic search using embeddings...');
+      const vectorSearchStartTime = Date.now();
       
-      const result = await pool.query(query, documentIds);
-      relevantDocuments = result.rows;
+      // Convert embedding array to PostgreSQL vector format
+      const embeddingStr = '[' + queryEmbedding.join(',') + ']';
       
-      console.log(`Retrieved ${relevantDocuments.length} specific documents for chat`);
+      let vectorQuery;
+      let vectorParams;
+      
+      if (documentIds && documentIds.length > 0) {
+        // Search within specific documents
+        const placeholders = documentIds.map((_, index) => `$${index + 2}`).join(',');
+        vectorQuery = `
+          SELECT 
+            dc.chunk_text,
+            dc.veeva_document_id,
+            dc.chunk_index,
+            di.document_name,
+            di.document_number,
+            di.major_version,
+            di.minor_version,
+            di.document_type,
+            di.status,
+            1 - (dc.embedding <=> $1::vector) as similarity
+          FROM document_chunks dc
+          JOIN document_index di ON dc.document_id = di.id
+          WHERE dc.veeva_document_id IN (${placeholders})
+          ORDER BY dc.embedding <=> $1::vector
+          LIMIT 10
+        `;
+        vectorParams = [embeddingStr, ...documentIds];
+      } else {
+        // Search across all documents
+        vectorQuery = `
+          SELECT 
+            dc.chunk_text,
+            dc.veeva_document_id,
+            dc.chunk_index,
+            di.document_name,
+            di.document_number,
+            di.major_version,
+            di.minor_version,
+            di.document_type,
+            di.status,
+            1 - (dc.embedding <=> $1::vector) as similarity
+          FROM document_chunks dc
+          JOIN document_index di ON dc.document_id = di.id
+          ORDER BY dc.embedding <=> $1::vector
+          LIMIT 10
+        `;
+        vectorParams = [embeddingStr];
+      }
+      
+      const vectorResult = await pool.query(vectorQuery, vectorParams);
+      relevantChunks = vectorResult.rows;
+      
+      console.log(`Vector search completed in ${Date.now() - vectorSearchStartTime}ms`);
+      console.log(`Found ${relevantChunks.length} relevant chunks with similarity scores:`, 
+        relevantChunks.map(c => ({ doc: c.document_name, chunk: c.chunk_index, similarity: c.similarity.toFixed(3) }))
+      );
+      
+      // Get unique documents from the chunks
+      const uniqueDocIds = [...new Set(relevantChunks.map(c => c.veeva_document_id))];
+      if (uniqueDocIds.length > 0) {
+        const docPlaceholders = uniqueDocIds.map((_, index) => `$${index + 1}`).join(',');
+        const docQuery = `
+          SELECT veeva_document_id, document_number, document_name, 
+                 major_version, minor_version, document_type, status, summary, manual_summary
+          FROM document_index 
+          WHERE veeva_document_id IN (${docPlaceholders})
+        `;
+        const docResult = await pool.query(docQuery, uniqueDocIds);
+        relevantDocuments = docResult.rows;
+      }
     } else {
-      // Search for relevant documents based on the message
+      // Fallback to keyword search if embedding generation failed
+      console.log('Falling back to keyword search...');
       const searchTerms = message.toLowerCase().split(' ').filter(term => term.length > 3);
       
-      if (searchTerms.length > 0) {
+      if (searchTerms.length > 0 && (!documentIds || documentIds.length === 0)) {
         // Create a search query that looks for terms in document names, summaries, manual summaries, and types
         const searchConditions = searchTerms.map((term, index) => 
           `(document_name ILIKE $${index + 1} OR summary ILIKE $${index + 1} OR manual_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1})`
@@ -82,7 +162,22 @@ export const handler = async (event) => {
         const result = await pool.query(query, [...searchParams, searchParams, searchParams, searchParams]);
         relevantDocuments = result.rows;
         
-        console.log(`Found ${relevantDocuments.length} relevant documents based on search terms:`, searchTerms);
+        console.log(`Found ${relevantDocuments.length} relevant documents based on keyword search`);
+      } else if (documentIds && documentIds.length > 0) {
+        // Get specific documents by IDs
+        const placeholders = documentIds.map((_, index) => `$${index + 1}`).join(',');
+        const query = `
+          SELECT veeva_document_id, document_number, document_name, 
+                 major_version, minor_version, document_type, status, summary, manual_summary
+          FROM document_index 
+          WHERE veeva_document_id IN (${placeholders})
+          ORDER BY document_name
+        `;
+        
+        const result = await pool.query(query, documentIds);
+        relevantDocuments = result.rows;
+        
+        console.log(`Retrieved ${relevantDocuments.length} specific documents for chat`);
       } else {
         // If no search terms, get the most recent documents
         const query = `
@@ -100,7 +195,7 @@ export const handler = async (event) => {
       }
     }
 
-    if (relevantDocuments.length === 0) {
+    if (relevantDocuments.length === 0 && relevantChunks.length === 0) {
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json" },
@@ -112,33 +207,66 @@ export const handler = async (event) => {
       };
     }
 
-    // Build context from relevant documents
-    const documentContext = relevantDocuments.map(doc => {
-      let context = `**${doc.document_name}** (${doc.document_number} v${doc.major_version}.${doc.minor_version})
+    // Build context from relevant chunks or documents
+    let documentContext = '';
+    
+    if (relevantChunks.length > 0) {
+      // Use RAG approach with semantic chunks
+      console.log('Building context from relevant chunks (RAG)');
+      documentContext = relevantChunks.map((chunk, index) => {
+        return `**Relevant Section ${index + 1}** from "${chunk.document_name}" (${chunk.document_number} v${chunk.major_version}.${chunk.minor_version})
+Similarity: ${(chunk.similarity * 100).toFixed(1)}%
+
+${chunk.chunk_text}
+
+---`;
+      }).join('\n\n');
+    } else {
+      // Fallback to document summaries
+      console.log('Building context from document summaries (keyword search fallback)');
+      documentContext = relevantDocuments.map(doc => {
+        let context = `**${doc.document_name}** (${doc.document_number} v${doc.major_version}.${doc.minor_version})
 Type: ${doc.document_type || 'Unknown'}
 Status: ${doc.status || 'Unknown'}`;
 
-      // Add AI summary if available
-      if (doc.summary) {
-        context += `\nAI Summary: ${doc.summary}`;
-      }
+        // Add AI summary if available
+        if (doc.summary) {
+          context += `\nAI Summary: ${doc.summary}`;
+        }
 
-      // Add manual summary if available
-      if (doc.manual_summary) {
-        context += `\nManual Summary: ${doc.manual_summary}`;
-      }
+        // Add manual summary if available
+        if (doc.manual_summary) {
+          context += `\nManual Summary: ${doc.manual_summary}`;
+        }
 
-      // If no summaries available
-      if (!doc.summary && !doc.manual_summary) {
-        context += `\nSummary: No summary available`;
-      }
+        // If no summaries available
+        if (!doc.summary && !doc.manual_summary) {
+          context += `\nSummary: No summary available`;
+        }
 
-      context += '\n\n---';
-      return context;
-    }).join('\n\n');
+        context += '\n\n---';
+        return context;
+      }).join('\n\n');
+    }
 
     // Prepare the system prompt
-    const systemPrompt = `You are an AI assistant that helps users understand and work with pharmaceutical documents from Veeva Vault. You have access to both AI-generated summaries and user-added manual summaries from an indexed document collection.
+    const systemPrompt = relevantChunks.length > 0
+      ? `You are an AI assistant that helps users understand and work with pharmaceutical documents from Veeva Vault. You have access to relevant sections from documents retrieved using semantic search (RAG - Retrieval Augmented Generation).
+
+When answering questions:
+1. Use the provided document sections to give accurate, helpful answers based on the actual content
+2. Reference specific documents by name and number when relevant
+3. If the answer isn't in the provided sections, say so clearly - don't make up information
+4. Provide actionable insights based on the document content
+5. Maintain a professional, helpful tone appropriate for the pharmaceutical industry
+6. If asked about processes, procedures, or compliance topics, focus on what the documents actually say
+7. When discussing regulatory standards or practices, use "Good Clinical Practices (GCP)" instead of "Good Manufacturing Practices (GMP)"
+8. The similarity percentage indicates how relevant each section is to the query
+9. Quote or paraphrase the document sections when answering to show your sources
+
+Relevant Document Sections:
+${documentContext}`
+      : `You are an AI assistant that helps users understand and work with pharmaceutical documents from Veeva Vault. You have access to both AI-generated summaries and user-added manual summaries from an indexed document collection.
 
 When answering questions:
 1. Use the provided document context to give accurate, helpful answers
@@ -164,6 +292,8 @@ ${documentContext}`;
     console.log('Sending request to OpenAI:', {
       messageCount: messages.length,
       documentCount: relevantDocuments.length,
+      chunkCount: relevantChunks.length,
+      usingRAG: relevantChunks.length > 0,
       totalContextLength: systemPrompt.length + message.length
     });
 
@@ -214,6 +344,8 @@ ${documentContext}`;
         ],
         metadata: {
           documentsUsed: relevantDocuments.length,
+          chunksUsed: relevantChunks.length,
+          usingRAG: relevantChunks.length > 0,
           responseTime: openaiDuration,
           tokensUsed: completion.usage?.total_tokens || 0
         }

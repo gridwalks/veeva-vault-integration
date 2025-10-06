@@ -2,6 +2,7 @@ import { getSessionId } from "./vault-auth.js";
 import { getPool, initDatabase } from "./db.js";
 import OpenAI from 'openai';
 import mammoth from 'mammoth';
+import { chunkText, validateChunks, generateChunkPreview } from './chunking-utils.js';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -82,6 +83,97 @@ async function extractTextFromBuffer(fileBuffer, fileName) {
     fileType: fileExtension,
     textLength: extractedText.length
   };
+}
+
+// Function to generate embeddings and store chunks
+async function chunkAndEmbedDocument(documentText, documentId, veevaDocumentId, pool) {
+  try {
+    console.log(`Starting chunking process for document ${veevaDocumentId}...`);
+    
+    // Chunk the document text
+    const chunks = chunkText(documentText, 512, 50); // 512 tokens per chunk with 50 token overlap
+    const validChunks = validateChunks(chunks);
+    
+    console.log(`Document chunked into ${validChunks.length} valid chunks`);
+
+    if (validChunks.length === 0) {
+      console.warn(`No valid chunks generated for document ${veevaDocumentId}`);
+      return { success: false, chunksCreated: 0 };
+    }
+
+    // Delete existing chunks for this document (in case of re-indexing)
+    await pool.query('DELETE FROM document_chunks WHERE document_id = $1', [documentId]);
+    console.log(`Deleted existing chunks for document ${documentId}`);
+
+    // Generate embeddings for each chunk in batches
+    const batchSize = 10; // OpenAI recommends batching embeddings
+    let chunksCreated = 0;
+
+    for (let i = 0; i < validChunks.length; i += batchSize) {
+      const batchChunks = validChunks.slice(i, Math.min(i + batchSize, validChunks.length));
+      
+      console.log(`Processing embedding batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(validChunks.length / batchSize)} (${batchChunks.length} chunks)`);
+
+      try {
+        // Generate embeddings for the batch
+        const embeddingStartTime = Date.now();
+        const embeddingResponse = await openai.embeddings.create({
+          model: "text-embedding-ada-002",
+          input: batchChunks.map(chunk => chunk.text),
+        });
+
+        const embeddingDuration = Date.now() - embeddingStartTime;
+        console.log(`Generated ${embeddingResponse.data.length} embeddings in ${embeddingDuration}ms`);
+
+        // Store chunks with embeddings in database
+        for (let j = 0; j < batchChunks.length; j++) {
+          const chunk = batchChunks[j];
+          const embedding = embeddingResponse.data[j].embedding;
+
+          // Convert embedding array to PostgreSQL vector format
+          const embeddingStr = '[' + embedding.join(',') + ']';
+
+          await pool.query(`
+            INSERT INTO document_chunks 
+            (document_id, veeva_document_id, chunk_index, chunk_text, embedding, token_count)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (document_id, chunk_index) 
+            DO UPDATE SET chunk_text = $4, embedding = $5, token_count = $6, created_at = CURRENT_TIMESTAMP
+          `, [
+            documentId,
+            veevaDocumentId,
+            chunk.index,
+            chunk.text,
+            embeddingStr,
+            chunk.tokenCount
+          ]);
+
+          chunksCreated++;
+          
+          if ((chunksCreated % 10) === 0) {
+            console.log(`Stored ${chunksCreated}/${validChunks.length} chunks with embeddings`);
+          }
+        }
+      } catch (batchError) {
+        console.error(`Error processing embedding batch:`, {
+          message: batchError.message,
+          batchStart: i,
+          batchSize: batchChunks.length
+        });
+        // Continue with next batch
+      }
+    }
+
+    console.log(`Successfully created ${chunksCreated} chunks with embeddings for document ${veevaDocumentId}`);
+    return { success: true, chunksCreated };
+
+  } catch (error) {
+    console.error(`Error in chunkAndEmbedDocument for ${veevaDocumentId}:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    return { success: false, chunksCreated: 0, error: error.message };
+  }
 }
 
 export const handler = async (event) => {
@@ -433,6 +525,20 @@ ${documentText.substring(0, 4000)}`
                       totalProcessingTime: extractionDuration + openaiDuration,
                       summaryPreview: updatedSummary ? updatedSummary.substring(0, 150) + '...' : 'No summary'
                     });
+
+                    // Chunk and embed document for RAG
+                    console.log(`Chunking and embedding document for RAG: ${doc.id}`);
+                    const chunkResult = await chunkAndEmbedDocument(
+                      documentText,
+                      existing.id, // Use the existing document_index id
+                      doc.id,
+                      pool
+                    );
+                    console.log(`Chunking result:`, {
+                      success: chunkResult.success,
+                      chunksCreated: chunkResult.chunksCreated,
+                      error: chunkResult.error
+                    });
                     
                   } catch (extractionError) {
                     console.error(`Text extraction failed for document ${doc.id} during force regenerate:`, {
@@ -713,6 +819,7 @@ ${fallbackText.substring(0, 4000)}`
             INSERT INTO document_index 
             (veeva_document_id, document_number, document_name, major_version, minor_version, document_type, status, summary, indexed_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            RETURNING id
           `, [
             documentData.veeva_document_id,
             documentData.document_number,
@@ -725,14 +832,32 @@ ${fallbackText.substring(0, 4000)}`
           ]);
 
           const insertTimestamp = new Date().toISOString();
+          const newDocumentId = insertResult.rows[0].id;
           console.log(`INSERT query result:`, {
             rowCount: insertResult.rowCount,
             command: insertResult.command,
             oid: insertResult.oid,
+            newDocumentId: newDocumentId,
             timestamp: insertTimestamp,
             documentId: doc.id,
             documentName: doc.name__v
           });
+
+          // Chunk and embed the new document for RAG (if we have document text)
+          if (typeof documentText !== 'undefined' && documentText) {
+            console.log(`Chunking and embedding new document for RAG: ${doc.id}`);
+            const chunkResult = await chunkAndEmbedDocument(
+              documentText,
+              newDocumentId, // Use the newly created document_index id
+              doc.id,
+              pool
+            );
+            console.log(`Chunking result for new document:`, {
+              success: chunkResult.success,
+              chunksCreated: chunkResult.chunksCreated,
+              error: chunkResult.error
+            });
+          }
 
           results.push({
             action: 'created',
