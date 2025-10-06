@@ -5,6 +5,7 @@ import DocumentList from "./components/DocumentList.jsx";
 import IndexedDocumentList from "./components/IndexedDocumentList.jsx";
 import DocumentChat from "./components/DocumentChat.jsx";
 import Header from "./components/Header.jsx";
+import RightMenu from "./components/RightMenu.jsx";
 // import StatusPanel from "./components/StatusPanel.jsx";
 
 export default function App() {
@@ -171,69 +172,13 @@ export default function App() {
   return (
     <>
       <Header />
-      <div style={{ textAlign: 'right', margin: '10px 16px' }}>
+      <div style={{ textAlign: 'right', margin: '10px 90px 10px 16px' }}>
         {user && <span style={{ marginRight: 8 }}>Hello {user.name}</span>}
         <button onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}>Log out</button>
       </div>
-      <main style={{maxWidth: 860, margin: "20px auto", padding: "0 16px", textAlign: "center"}}>
+      <main style={{maxWidth: 860, margin: "20px auto", padding: "0 90px 0 16px", textAlign: "center"}}>
         <h1>Approved Documents</h1>
 
-        {/* Tab Navigation */}
-        <div style={{display: 'flex', gap: '8px', marginBottom: '20px', justifyContent: 'center'}}>
-          <button
-            onClick={() => {
-              console.log('Switching to documents tab');
-              setActiveTab("documents");
-            }}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: activeTab === "documents" ? '#007bff' : '#f0f0f0',
-              color: activeTab === "documents" ? 'white' : 'black',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Veeva Documents
-          </button>
-          <button
-            onClick={() => {
-              console.log('Switching to indexed documents tab');
-              setActiveTab("indexed");
-            }}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: activeTab === "indexed" ? '#007bff' : '#f0f0f0',
-              color: activeTab === "indexed" ? 'white' : 'black',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Indexed Documents
-          </button>
-          {indexedData.items.length > 0 && (
-            <button
-              onClick={() => {
-                console.log('Opening document chat');
-                setIsChatOpen(true);
-              }}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              💬 Chat with Documents
-            </button>
-          )}
-        </div>
 
         <form onSubmit={(e) => { 
           e.preventDefault(); 
@@ -248,40 +193,6 @@ export default function App() {
             style={{flex:1, padding:'8px 10px'}}
           />
           <button style={{padding:'8px 12px'}}>Search</button>
-          {activeTab === "documents" && (
-            <>
-              <button
-                type="button"
-                onClick={() => handleIndexDocuments(false)}
-                disabled={isIndexing}
-                style={{
-                  padding:'8px 12px',
-                  backgroundColor: isIndexing ? '#ccc' : '#28a745',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: isIndexing ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {isIndexing ? 'Indexing...' : 'Index Documents'}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleIndexDocuments(true)}
-                disabled={isIndexing}
-                style={{
-                  padding:'8px 12px',
-                  backgroundColor: isIndexing ? '#ccc' : '#ff6b35',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: isIndexing ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {isIndexing ? 'Regenerating...' : 'Regenerate Summaries'}
-              </button>
-            </>
-          )}
         </form>
 
         {/* Index Results */}
@@ -380,6 +291,17 @@ export default function App() {
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         selectedDocuments={selectedDocuments}
+      />
+
+      {/* Right Menu */}
+      <RightMenu
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onChatOpen={() => setIsChatOpen(true)}
+        indexedCount={indexedData.items.length}
+        isIndexing={isIndexing}
+        onIndexDocuments={handleIndexDocuments}
+        onRegenerateSummaries={handleIndexDocuments}
       />
     </>
   );
