@@ -5,8 +5,8 @@ import DocumentList from "./components/DocumentList.jsx";
 import IndexedDocumentList from "./components/IndexedDocumentList.jsx";
 import StatusBar from "./components/StatusBar.jsx";
 import DocumentChat from "./components/DocumentChat.jsx";
+import Header from "./components/Header.jsx";
 // import StatusPanel from "./components/StatusPanel.jsx";
-import yprimeLogo from "../assets/YP_New_Logo.png";
 
 export default function App() {
   const { isAuthenticated, loginWithRedirect, logout, user } = useAuth0();
@@ -160,8 +160,8 @@ export default function App() {
     return (
       <>
         <StatusBar />
+        <Header />
         <main style={{maxWidth: 860, margin: "20px auto", padding: "0 16px", textAlign: "center"}}>
-          <img src={yprimeLogo} alt="YPrime logo" style={{ height: 40, margin: "0 auto 20px" }} />
           <h1>Approved Documents</h1>
           <p>Please log in to view documents.</p>
           <button onClick={() => loginWithRedirect()}>Log in</button>
@@ -173,12 +173,12 @@ export default function App() {
   return (
     <>
       <StatusBar />
+      <Header />
       <div style={{ textAlign: 'right', margin: '10px 16px' }}>
         {user && <span style={{ marginRight: 8 }}>Hello {user.name}</span>}
         <button onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}>Log out</button>
       </div>
       <main style={{maxWidth: 860, margin: "20px auto", padding: "0 16px", textAlign: "center"}}>
-        <img src={yprimeLogo} alt="YPrime logo" style={{ height: 40, margin: "0 auto 20px" }} />
         <h1>Approved Documents</h1>
 
         {/* Tab Navigation */}
