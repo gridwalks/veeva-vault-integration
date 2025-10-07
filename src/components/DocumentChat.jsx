@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import DocumentViewer from './DocumentViewer.jsx';
+import { chatWithDocuments } from '../api';
 
 export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], onOpenDocumentInPane }) {
   const [conversationHistory, setConversationHistory] = useState([]);
@@ -42,41 +43,11 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     setConversationHistory(newHistory);
 
     try {
-      const response = await fetch('/api/chat-with-documents', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: userMessage,
-          documentIds: selectedDocuments.map(doc => doc.veeva_document_id),
-          conversationHistory: newHistory
-        })
+      const data = await chatWithDocuments({
+        message: userMessage,
+        documentIds: selectedDocuments.map(doc => doc.veeva_document_id),
+        conversationHistory: newHistory
       });
-
-      if (!response.ok) {
-        let errorMessage = `Chat request failed: ${response.status}`;
-        try {
-          const errorData = await response.json();
-          if (errorData.error) {
-            errorMessage = errorData.error;
-            if (errorData.details) {
-              errorMessage += `\n\nDetails: ${errorData.details}`;
-            }
-          }
-        } catch (parseError) {
-          // If parsing fails, use the default error message
-          errorMessage = `Chat request failed: ${response.status} ${response.statusText}`;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
-      
-      if (data.error) {
-        const errorMessage = data.details ? `${data.error}\n\nDetails: ${data.details}` : data.error;
-        throw new Error(errorMessage);
-      }
 
       // Update conversation with AI response
       setConversationHistory(data.conversationHistory);
@@ -149,6 +120,16 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
 
   const captureQAInteraction = async (question, answer, documents) => {
     try {
+      console.log('Capturing Q&A interaction:', {
+        question: question.substring(0, 100) + '...',
+        answer: answer.substring(0, 100) + '...',
+        documentsCount: documents.length,
+        documents: documents.map(doc => ({
+          id: doc.id || doc.veeva_document_id,
+          name: doc.name || doc.document_name
+        }))
+      });
+
       const documentIds = documents.map(doc => doc.id || doc.veeva_document_id).filter(Boolean);
       const documentNames = documents.map(doc => doc.name || doc.document_name).filter(Boolean);
       
@@ -168,9 +149,15 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       });
 
       if (!response.ok) {
-        console.warn('Failed to capture Q&A interaction:', response.status);
+        const errorText = await response.text();
+        console.warn('Failed to capture Q&A interaction:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText
+        });
       } else {
-        console.log('Q&A interaction captured successfully');
+        const result = await response.json();
+        console.log('Q&A interaction captured successfully:', result);
       }
     } catch (error) {
       console.warn('Error capturing Q&A interaction:', error);
