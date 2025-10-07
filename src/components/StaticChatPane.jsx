@@ -21,6 +21,15 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
   const [selectedDocument, setSelectedDocument] = useState(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  
+  // Workflow state
+  const [workflowState, setWorkflowState] = useState({
+    isActive: false,
+    instanceId: null,
+    currentStep: null,
+    template: null,
+    responses: {}
+  });
 
   useEffect(() => {
     // Scroll to bottom when new messages are added
@@ -39,7 +48,40 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     const newHistory = [...conversationHistory, { role: 'user', content: userMessage }];
     setConversationHistory(newHistory);
 
+    // Check for exit workflow command
+    if (userMessage.toLowerCase().includes('exit workflow')) {
+      exitWorkflow();
+      return;
+    }
+
+    // If we're in a workflow, handle workflow step submission
+    if (workflowState.isActive && workflowState.currentStep) {
+      await handleWorkflowStepSubmission(userMessage);
+      return;
+    }
+
     try {
+      // First, check if this message should trigger a workflow
+      const workflowDetection = await detectWorkflow(userMessage);
+      
+      if (workflowDetection.shouldStartWorkflow && !workflowDetection.hasActiveWorkflow) {
+        // Start the workflow
+        await startWorkflow(workflowDetection.template, workflowDetection.firstStep);
+        return;
+      } else if (workflowDetection.hasActiveWorkflow) {
+        // User has an active workflow, show appropriate message
+        setConversationHistory(prev => [
+          ...prev,
+          { 
+            role: 'assistant', 
+            content: `You already have an active workflow in progress. Please complete it before starting a new one. Type "exit workflow" to cancel the current workflow.` 
+          }
+        ]);
+        setIsLoading(false);
+        return;
+      }
+
+      // Proceed with normal chat if no workflow detected
       const requestBody = {
         message: userMessage,
         documentIds: selectedDocuments.map(doc => doc.veeva_document_id),
@@ -195,6 +237,232 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     setSelectedDocument(null);
   };
 
+  // Workflow handling functions
+  const detectWorkflow = async (message) => {
+    try {
+      const response = await fetch('/api/workflow-execution/detect-workflow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: message,
+          sessionId: Date.now().toString() // Simple session identifier
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data;
+      } else {
+        console.error('Failed to detect workflow');
+        return { shouldStartWorkflow: false, hasActiveWorkflow: false };
+      }
+    } catch (error) {
+      console.error('Error detecting workflow:', error);
+      return { shouldStartWorkflow: false, hasActiveWorkflow: false };
+    }
+  };
+
+  const startWorkflow = async (template, firstStep) => {
+    try {
+      const response = await fetch('/api/workflow-execution/start-workflow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          templateId: template.id,
+          userId: null, // Could be enhanced to capture user info
+          sessionId: Date.now().toString()
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Update workflow state
+        setWorkflowState({
+          isActive: true,
+          instanceId: data.instance.id,
+          currentStep: data.currentStep,
+          template: template,
+          responses: {}
+        });
+
+        // Add workflow start message to conversation
+        setConversationHistory(prev => [
+          ...prev,
+          { 
+            role: 'assistant', 
+            content: `🚀 **${template.name}** workflow started!\n\n**${data.currentStep.questionText}**\n\n${data.currentStep.helpText ? `*${data.currentStep.helpText}*` : ''}\n\nType "exit workflow" at any time to cancel.` 
+          }
+        ]);
+      } else {
+        const error = await response.json();
+        console.error('Failed to start workflow:', error);
+        setConversationHistory(prev => [
+          ...prev,
+          { 
+            role: 'assistant', 
+            content: `Sorry, I couldn't start the workflow. Please try again.` 
+          }
+        ]);
+      }
+    } catch (error) {
+      console.error('Error starting workflow:', error);
+      setConversationHistory(prev => [
+        ...prev,
+        { 
+          role: 'assistant', 
+          content: `Sorry, I encountered an error starting the workflow. Please try again.` 
+        }
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleWorkflowStepSubmission = async (response) => {
+    try {
+      const submitResponse = await fetch('/api/workflow-execution/submit-step', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          instanceId: workflowState.instanceId,
+          stepId: workflowState.currentStep.id,
+          response: response,
+          userId: null,
+          sessionId: Date.now().toString()
+        })
+      });
+
+      if (submitResponse.ok) {
+        const data = await submitResponse.json();
+        
+        // Update workflow state
+        setWorkflowState(prev => ({
+          ...prev,
+          currentStep: data.nextStep,
+          responses: { ...prev.responses, [data.currentStep.id]: response }
+        }));
+
+        if (data.isComplete) {
+          // Workflow completed, generate final document
+          await completeWorkflow();
+        } else if (data.nextStep) {
+          // Show next step
+          setConversationHistory(prev => [
+            ...prev,
+            { 
+              role: 'assistant', 
+              content: `✅ Response recorded!\n\n**${data.nextStep.questionText}**\n\n${data.nextStep.helpText ? `*${data.nextStep.helpText}*` : ''}` 
+            }
+          ]);
+        }
+      } else {
+        const error = await submitResponse.json();
+        console.error('Failed to submit workflow step:', error);
+        setConversationHistory(prev => [
+          ...prev,
+          { 
+            role: 'assistant', 
+            content: `Sorry, I couldn't process your response. Please try again.` 
+          }
+        ]);
+      }
+    } catch (error) {
+      console.error('Error submitting workflow step:', error);
+      setConversationHistory(prev => [
+        ...prev,
+        { 
+          role: 'assistant', 
+          content: `Sorry, I encountered an error processing your response. Please try again.` 
+        }
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const completeWorkflow = async () => {
+    try {
+      const response = await fetch('/api/workflow-execution/complete-workflow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          instanceId: workflowState.instanceId
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Reset workflow state
+        setWorkflowState({
+          isActive: false,
+          instanceId: null,
+          currentStep: null,
+          template: null,
+          responses: {}
+        });
+
+        // Show completion message with generated document
+        setConversationHistory(prev => [
+          ...prev,
+          { 
+            role: 'assistant', 
+            content: `🎉 **${workflowState.template.name}** completed successfully!\n\n**Generated Document:**\n\n\`\`\`\n${data.generatedDocument}\n\`\`\`\n\nYou can copy this document or ask me to help you format it further.` 
+          }
+        ]);
+      } else {
+        const error = await response.json();
+        console.error('Failed to complete workflow:', error);
+        setConversationHistory(prev => [
+          ...prev,
+          { 
+            role: 'assistant', 
+            content: `Sorry, I couldn't complete the workflow. Please try again.` 
+          }
+        ]);
+      }
+    } catch (error) {
+      console.error('Error completing workflow:', error);
+      setConversationHistory(prev => [
+        ...prev,
+        { 
+          role: 'assistant', 
+          content: `Sorry, I encountered an error completing the workflow. Please try again.` 
+        }
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const exitWorkflow = () => {
+    setWorkflowState({
+      isActive: false,
+      instanceId: null,
+      currentStep: null,
+      template: null,
+      responses: {}
+    });
+    
+    setConversationHistory(prev => [
+      ...prev,
+      { 
+        role: 'assistant', 
+        content: `Workflow cancelled. How can I help you today?` 
+      }
+    ]);
+    setIsLoading(false);
+  };
+
   const renderMessage = (message, index) => {
     console.log(`Rendering message ${index}:`, { role: message.role, contentLength: message.content?.length });
     const isUser = message.role === 'user';
@@ -338,15 +606,32 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
             alignItems: 'center'
           }}>
             <div>
-              <h3 style={{ 
-                margin: 0, 
-                fontSize: '18px',
-                color: '#374151',
-                fontWeight: '600',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
-                Document Chat Agent
-              </h3>
+              <div>
+                <h3 style={{ 
+                  margin: 0, 
+                  fontSize: '18px',
+                  color: '#374151',
+                  fontWeight: '600',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  Document Chat Agent
+                </h3>
+                {workflowState.isActive && workflowState.template && (
+                  <div style={{
+                    marginTop: '4px',
+                    padding: '4px 8px',
+                    backgroundColor: '#4338ca',
+                    color: '#ffffff',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    display: 'inline-block',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    🔄 {workflowState.template.name} - Step {workflowState.currentStep?.stepOrder || 1}
+                  </div>
+                )}
+              </div>
               {selectedDocuments.length > 0 && (
                 <p style={{ 
                   margin: '4px 0 0 0', 
@@ -583,7 +868,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                 e.target.style.borderColor = '#d1d5db';
                 e.target.style.boxShadow = 'none';
               }}
-              placeholder="Ask a question about your documents..."
+              placeholder={workflowState.isActive ? "Answer the workflow question above..." : "Ask a question about your documents..."}
               disabled={isLoading}
               style={{
                 flex: 1,

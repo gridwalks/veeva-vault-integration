@@ -185,6 +185,138 @@ ON qms_chat_qa_interactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_qms_chat_qa_interactions_session_id 
 ON qms_chat_qa_interactions(session_id);
 
+-- Workflow Configuration Tables
+
+-- Table for workflow templates (CAPA, Deviations, Change Control, etc.)
+CREATE TABLE IF NOT EXISTS qms_chat_workflow_templates (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  category VARCHAR(100) DEFAULT 'Quality',
+  is_active BOOLEAN DEFAULT true,
+  trigger_keywords TEXT[], -- Keywords that trigger this workflow in chat
+  document_template TEXT, -- Template for generating final documents
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for workflow templates
+CREATE INDEX IF NOT EXISTS idx_qms_chat_workflow_templates_name 
+ON qms_chat_workflow_templates(name);
+
+CREATE INDEX IF NOT EXISTS idx_qms_chat_workflow_templates_category 
+ON qms_chat_workflow_templates(category);
+
+CREATE INDEX IF NOT EXISTS idx_qms_chat_workflow_templates_is_active 
+ON qms_chat_workflow_templates(is_active);
+
+-- Table for workflow steps/questions
+CREATE TABLE IF NOT EXISTS qms_chat_workflow_steps (
+  id SERIAL PRIMARY KEY,
+  workflow_template_id INTEGER NOT NULL REFERENCES qms_chat_workflow_templates(id) ON DELETE CASCADE,
+  step_order INTEGER NOT NULL,
+  question_text TEXT NOT NULL,
+  input_type VARCHAR(50) NOT NULL, -- 'text', 'textarea', 'select', 'date', 'file', 'checkbox', 'radio'
+  options JSONB, -- For select, radio, checkbox options
+  validation_rules JSONB, -- Required, min/max length, regex, etc.
+  conditional_logic JSONB, -- Show/hide based on previous answers
+  is_required BOOLEAN DEFAULT false,
+  placeholder_text TEXT,
+  help_text TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for workflow steps
+CREATE INDEX IF NOT EXISTS idx_qms_chat_workflow_steps_template_id 
+ON qms_chat_workflow_steps(workflow_template_id);
+
+CREATE INDEX IF NOT EXISTS idx_qms_chat_workflow_steps_order 
+ON qms_chat_workflow_steps(workflow_template_id, step_order);
+
+-- Table for storing workflow instances (user sessions)
+CREATE TABLE IF NOT EXISTS qms_chat_workflow_instances (
+  id SERIAL PRIMARY KEY,
+  workflow_template_id INTEGER NOT NULL REFERENCES qms_chat_workflow_templates(id),
+  user_id VARCHAR(255),
+  session_id VARCHAR(255),
+  status VARCHAR(50) DEFAULT 'in_progress', -- 'in_progress', 'completed', 'abandoned'
+  current_step INTEGER DEFAULT 1,
+  responses JSONB, -- Store all user responses
+  generated_document TEXT, -- Final generated document
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  completed_at TIMESTAMP
+);
+
+-- Create indexes for workflow instances
+CREATE INDEX IF NOT EXISTS idx_qms_chat_workflow_instances_template_id 
+ON qms_chat_workflow_instances(workflow_template_id);
+
+CREATE INDEX IF NOT EXISTS idx_qms_chat_workflow_instances_user_id 
+ON qms_chat_workflow_instances(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_qms_chat_workflow_instances_session_id 
+ON qms_chat_workflow_instances(session_id);
+
+CREATE INDEX IF NOT EXISTS idx_qms_chat_workflow_instances_status 
+ON qms_chat_workflow_instances(status);
+
+-- Insert sample CAPA workflow template
+INSERT INTO qms_chat_workflow_templates (name, description, category, trigger_keywords, document_template) VALUES 
+('CAPA Workflow', 'Corrective and Preventive Action workflow for addressing nonconformities', 'Quality', 
+ ARRAY['capa', 'corrective action', 'preventive action', 'nonconformity', 'deviation', 'issue'],
+ 'CAPA Document Template: {{title}}\n\nProblem Description: {{problem_description}}\n\nRoot Cause: {{root_cause}}\n\nCorrective Actions: {{corrective_actions}}\n\nPreventive Actions: {{preventive_actions}}\n\nResponsible Person: {{responsible_person}}\n\nTarget Date: {{target_date}}\n\nEffectiveness Measures: {{effectiveness_measures}}')
+ON CONFLICT DO NOTHING;
+
+-- Insert sample CAPA workflow steps
+INSERT INTO qms_chat_workflow_steps (workflow_template_id, step_order, question_text, input_type, is_required, placeholder_text, help_text) VALUES 
+(1, 1, 'What type of CAPA are you creating?', 'select', true, NULL, 'Select whether this is a corrective action, preventive action, or both'),
+(1, 2, 'Please provide a brief title for this CAPA', 'text', true, 'e.g., Equipment Calibration Deviation', 'A concise title that describes the issue'),
+(1, 3, 'Describe the problem or nonconformity in detail', 'textarea', true, 'Provide a detailed description of what happened, when, where, and who was involved', 'Include all relevant facts and observations'),
+(1, 4, 'What was the root cause of this issue?', 'textarea', true, 'Describe the underlying cause(s) that led to this problem', 'Focus on the fundamental reason, not just symptoms'),
+(1, 5, 'Who or what was impacted by this issue?', 'checkbox', true, NULL, 'Select all that apply'),
+(1, 6, 'What immediate corrective actions were taken?', 'textarea', true, 'Describe actions taken to address the immediate problem', 'Include containment measures and immediate fixes'),
+(1, 7, 'What preventive measures will be implemented?', 'textarea', true, 'Describe actions to prevent recurrence', 'Focus on systemic improvements and process changes'),
+(1, 8, 'Who will be responsible for implementing these actions?', 'text', true, 'Name or role of the responsible person', 'Include contact information if available'),
+(1, 9, 'What is the target completion date?', 'date', true, NULL, 'When should all actions be completed?'),
+(1, 10, 'How will effectiveness be measured?', 'textarea', true, 'Describe how you will verify that the actions are working', 'Include specific metrics, timelines, and review processes')
+ON CONFLICT DO NOTHING;
+
+-- Update the options for specific steps
+UPDATE qms_chat_workflow_steps 
+SET options = '{"choices": ["Corrective Action", "Preventive Action", "Both"]}'::jsonb
+WHERE step_order = 1 AND workflow_template_id = 1;
+
+UPDATE qms_chat_workflow_steps 
+SET options = '{"choices": ["Patients", "Processes", "Products", "Regulatory", "Staff", "Equipment", "Other"]}'::jsonb
+WHERE step_order = 5 AND workflow_template_id = 1;
+
+-- Add validation rules
+UPDATE qms_chat_workflow_steps 
+SET validation_rules = '{"minLength": 10, "maxLength": 200}'::jsonb
+WHERE step_order = 2 AND workflow_template_id = 1;
+
+UPDATE qms_chat_workflow_steps 
+SET validation_rules = '{"minLength": 50, "maxLength": 2000}'::jsonb
+WHERE step_order = 3 AND workflow_template_id = 1;
+
+UPDATE qms_chat_workflow_steps 
+SET validation_rules = '{"minLength": 20, "maxLength": 1000}'::jsonb
+WHERE step_order = 4 AND workflow_template_id = 1;
+
+UPDATE qms_chat_workflow_steps 
+SET validation_rules = '{"minLength": 20, "maxLength": 1000}'::jsonb
+WHERE step_order = 6 AND workflow_template_id = 1;
+
+UPDATE qms_chat_workflow_steps 
+SET validation_rules = '{"minLength": 20, "maxLength": 1000}'::jsonb
+WHERE step_order = 7 AND workflow_template_id = 1;
+
+UPDATE qms_chat_workflow_steps 
+SET validation_rules = '{"minLength": 20, "maxLength": 1000}'::jsonb
+WHERE step_order = 10 AND workflow_template_id = 1;
+
 -- Sample data insertion (optional)
 -- INSERT INTO Veeva_Doc_Chat_document_index (veeva_document_id, document_number, document_name, major_version, minor_version, document_type, status, summary) 
 -- VALUES ('sample-id', 'DOC-001', 'Sample Document', 1, 0, 'Standard Operating Procedure', 'STEADYSTATE', 'This is a sample document summary.');

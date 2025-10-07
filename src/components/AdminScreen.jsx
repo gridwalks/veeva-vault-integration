@@ -5,6 +5,7 @@ import IndexedDocumentList from "./IndexedDocumentList.jsx";
 import DocumentUpload from "./DocumentUpload.jsx";
 import ExternalResources from "./ExternalResources.jsx";
 import QAManagement from "./QAManagement.jsx";
+import WorkflowManagement from "./WorkflowManagement.jsx";
 
 export default function AdminScreen() {
   const [q, setQ] = useState("");
@@ -273,6 +274,26 @@ export default function AdminScreen() {
         >
           Q&A Management
         </button>
+        <button
+          onClick={() => {
+            console.log('Switching to workflow management tab');
+            setActiveTab("workflow");
+          }}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: activeTab === "workflow" ? '#4338ca' : '#f3f4f6',
+            color: activeTab === "workflow" ? 'white' : '#374151',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          Workflow Management
+        </button>
       </div>
 
       {/* Search form - only show for documents and indexed tabs */}
@@ -429,6 +450,8 @@ export default function AdminScreen() {
         <ExternalResources />
       ) : activeTab === "qa" ? (
         <QAManagement />
+      ) : activeTab === "workflow" ? (
+        <WorkflowManagement />
       ) : null}
 
       {/* Selected Documents for Chat */}
