@@ -97,6 +97,39 @@ export async function initDatabase() {
 
     console.log('Document chunks table created or already exists');
 
+    // Create Q&A interactions table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS qms_chat_qa_interactions (
+        id SERIAL PRIMARY KEY,
+        question TEXT NOT NULL,
+        answer TEXT NOT NULL,
+        document_ids TEXT[],
+        document_names TEXT[],
+        user_id VARCHAR(255),
+        session_id VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create indexes for Q&A interactions
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_qa_interactions_created_at 
+      ON qms_chat_qa_interactions(created_at)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_qa_interactions_user_id 
+      ON qms_chat_qa_interactions(user_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_qa_interactions_session_id 
+      ON qms_chat_qa_interactions(session_id)
+    `);
+
+    console.log('Q&A interactions table created or already exists');
+
     const duration = Date.now() - startTime;
     console.log(`Database schema initialized successfully in ${duration}ms`);
   } catch (error) {

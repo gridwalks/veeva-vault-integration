@@ -408,3 +408,181 @@ export async function deleteExternalResource({ id }) {
     throw error;
   }
 }
+
+// Q&A Interactions API functions
+export async function getQAInteractions({ page = 1, limit = 50, search = '', user_id, session_id } = {}) {
+  const startTime = Date.now();
+  console.log('Fetching Q&A interactions...', { page, limit, search, user_id, session_id });
+  
+  try {
+    const params = new URLSearchParams({ page, limit });
+    if (search) params.set('search', search);
+    if (user_id) params.set('user_id', user_id);
+    if (session_id) params.set('session_id', session_id);
+    
+    const res = await fetch(`/api/qa-interactions?${params}`);
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to load Q&A interactions:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText
+      });
+      throw new Error(`Failed to load Q&A interactions: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Q&A interactions fetched in ${duration}ms:`, {
+      total: data.data?.total || 0,
+      itemsReturned: data.data?.items?.length || 0,
+      page: data.data?.page,
+      totalPages: data.data?.totalPages
+    });
+    
+    return data.data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error fetching Q&A interactions after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
+export async function createQAInteraction({ question, answer, document_ids = [], document_names = [], user_id, session_id }) {
+  const startTime = Date.now();
+  console.log('Creating Q&A interaction...', { question: question.substring(0, 100) + '...' });
+  
+  try {
+    const res = await fetch('/api/qa-interactions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        question,
+        answer,
+        document_ids,
+        document_names,
+        user_id,
+        session_id
+      })
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to create Q&A interaction:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error
+      });
+      throw new Error(errorData.error || `Failed to create Q&A interaction: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Q&A interaction created in ${duration}ms:`, {
+      id: data.data?.id
+    });
+    
+    return data.data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error creating Q&A interaction after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
+export async function deleteQAInteraction({ id }) {
+  const startTime = Date.now();
+  console.log('Deleting Q&A interaction...', { id });
+  
+  try {
+    const res = await fetch(`/api/qa-interactions/${id}`, {
+      method: 'DELETE'
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to delete Q&A interaction:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error
+      });
+      throw new Error(errorData.error || `Failed to delete Q&A interaction: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Q&A interaction deleted in ${duration}ms:`, {
+      id
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error deleting Q&A interaction after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
+export async function exportQAInteractions({ search = '', user_id, session_id, start_date, end_date } = {}) {
+  const startTime = Date.now();
+  console.log('Exporting Q&A interactions...', { search, user_id, session_id, start_date, end_date });
+  
+  try {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (user_id) params.set('user_id', user_id);
+    if (session_id) params.set('session_id', session_id);
+    if (start_date) params.set('start_date', start_date);
+    if (end_date) params.set('end_date', end_date);
+    
+    const res = await fetch(`/api/qa-interactions/export?${params}`);
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to export Q&A interactions:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText
+      });
+      throw new Error(`Failed to export Q&A interactions: ${res.status} ${res.statusText}`);
+    }
+    
+    const csvContent = await res.text();
+    const duration = Date.now() - startTime;
+    console.log(`Q&A interactions exported in ${duration}ms:`, {
+      contentLength: csvContent.length
+    });
+    
+    // Create and download the CSV file
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `qa-interactions-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    
+    return { success: true, contentLength: csvContent.length };
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error exporting Q&A interactions after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}

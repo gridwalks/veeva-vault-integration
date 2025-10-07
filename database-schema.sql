@@ -159,6 +159,29 @@ ON qms_chat_unified_chunks(document_id);
 CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_chunks_veeva_document_id 
 ON qms_chat_unified_chunks(veeva_document_id);
 
+-- Table for storing Q&A interactions
+CREATE TABLE IF NOT EXISTS qms_chat_qa_interactions (
+  id SERIAL PRIMARY KEY,
+  question TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  document_ids TEXT[], -- Array of document IDs that were used to answer the question
+  document_names TEXT[], -- Array of document names for easier reference
+  user_id VARCHAR(255), -- Optional user identifier
+  session_id VARCHAR(255), -- Optional session identifier
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for Q&A interactions
+CREATE INDEX IF NOT EXISTS idx_qms_chat_qa_interactions_created_at 
+ON qms_chat_qa_interactions(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_qms_chat_qa_interactions_user_id 
+ON qms_chat_qa_interactions(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_qms_chat_qa_interactions_session_id 
+ON qms_chat_qa_interactions(session_id);
+
 -- Sample data insertion (optional)
 -- INSERT INTO Veeva_Doc_Chat_document_index (veeva_document_id, document_number, document_name, major_version, minor_version, document_type, status, summary) 
 -- VALUES ('sample-id', 'DOC-001', 'Sample Document', 1, 0, 'Standard Operating Procedure', 'STEADYSTATE', 'This is a sample document summary.');

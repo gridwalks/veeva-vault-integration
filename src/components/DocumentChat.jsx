@@ -82,6 +82,9 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       setConversationHistory(data.conversationHistory);
       setUsedDocuments(data.documents);
 
+      // Capture Q&A interaction for storage
+      await captureQAInteraction(userMessage, data.response, data.documents);
+
       console.log('Chat response received:', {
         responseLength: data.response.length,
         documentsUsed: data.documents.length,
@@ -142,6 +145,37 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
   const handleCloseViewer = () => {
     setViewerOpen(false);
     setSelectedDocument(null);
+  };
+
+  const captureQAInteraction = async (question, answer, documents) => {
+    try {
+      const documentIds = documents.map(doc => doc.id || doc.veeva_document_id).filter(Boolean);
+      const documentNames = documents.map(doc => doc.name || doc.document_name).filter(Boolean);
+      
+      const response = await fetch('/api/qa-interactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question,
+          answer,
+          document_ids: documentIds,
+          document_names: documentNames,
+          user_id: null, // Could be enhanced to capture user info
+          session_id: Date.now().toString() // Simple session identifier
+        })
+      });
+
+      if (!response.ok) {
+        console.warn('Failed to capture Q&A interaction:', response.status);
+      } else {
+        console.log('Q&A interaction captured successfully');
+      }
+    } catch (error) {
+      console.warn('Error capturing Q&A interaction:', error);
+      // Don't throw error as this shouldn't break the chat functionality
+    }
   };
 
   const renderMessage = (message, index) => {

@@ -4,6 +4,7 @@ import DocumentList from "./DocumentList.jsx";
 import IndexedDocumentList from "./IndexedDocumentList.jsx";
 import DocumentUpload from "./DocumentUpload.jsx";
 import ExternalResources from "./ExternalResources.jsx";
+import QAManagement from "./QAManagement.jsx";
 
 export default function AdminScreen() {
   const [q, setQ] = useState("");
@@ -252,6 +253,26 @@ export default function AdminScreen() {
         >
           External Resources
         </button>
+        <button
+          onClick={() => {
+            console.log('Switching to Q&A management tab');
+            setActiveTab("qa");
+          }}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: activeTab === "qa" ? '#4338ca' : '#f3f4f6',
+            color: activeTab === "qa" ? 'white' : '#374151',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          Q&A Management
+        </button>
       </div>
 
       {/* Search form - only show for documents and indexed tabs */}
@@ -406,6 +427,8 @@ export default function AdminScreen() {
         />
       ) : activeTab === "external" ? (
         <ExternalResources />
+      ) : activeTab === "qa" ? (
+        <QAManagement />
       ) : null}
 
       {/* Selected Documents for Chat */}
