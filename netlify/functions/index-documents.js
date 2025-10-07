@@ -283,55 +283,36 @@ async function extractTextFromBuffer(fileBuffer, fileName = '', contentType = ''
       }
     }
     
-    // Method 3: Simple text extraction with aggressive filtering (last resort)
+    // Method 3: As-is UTF-8 conversion (last resort)
     if (!extractedText || extractionMethod === 'extraction_failed') {
       try {
-        console.log('Method 3: Trying simple text extraction with filtering...');
+        console.log('Method 3: Returning raw UTF-8 text from buffer...');
         const rawText = fileBuffer.toString('utf-8');
-        
-        console.log('Raw text result:', {
+
+        extractedText = rawText;
+        extractionMethod = 'raw_utf8';
+        console.log('✅ Raw UTF-8 extraction returned content:', {
           textLength: rawText.length,
-          preview: rawText.substring(0, 200),
-          containsRawContent: rawText.includes('[Content_Types]') || rawText.includes('PK')
+          preview: rawText.substring(0, 200)
         });
-        
-        // Aggressive filtering to extract any readable text
-        const lines = rawText.split('\n');
-        const readableLines = lines.filter(line => {
-          const trimmed = line.trim();
-          return trimmed.length > 0 && 
-                 trimmed.length < 1000 && // Avoid very long lines
-                 !trimmed.includes('[Content_Types]') && 
-                 !trimmed.includes('PK') &&
-                 !trimmed.includes('.xml') &&
-                 !trimmed.includes('_rels/') &&
-                 !trimmed.includes('word/document.xml') &&
-                 /[a-zA-Z]{3,}/.test(trimmed); // Must contain at least 3 consecutive letters
-        });
-        
-        if (readableLines.length > 0) {
-          extractedText = readableLines.join(' ').trim();
-          extractionMethod = 'filtered_simple_extraction';
-          console.log('✅ Filtered simple extraction successful:', {
-            textLength: extractedText.length,
-            preview: extractedText.substring(0, 200)
-          });
-          extractionAttempts.push({ method: 'filtered_simple', success: true, textLength: extractedText.length });
-        } else {
-          console.log('❌ No readable text found in simple extraction');
-          extractionAttempts.push({ method: 'filtered_simple', success: false, reason: 'no_readable_text' });
-        }
+        extractionAttempts.push({ method: 'raw_utf8', success: true, textLength: rawText.length });
       } catch (simpleError) {
-        console.log('❌ Simple extraction failed:', simpleError.message);
-        extractionAttempts.push({ method: 'filtered_simple', success: false, reason: simpleError.message });
+        console.log('❌ Raw UTF-8 extraction failed:', simpleError.message);
+        extractionAttempts.push({ method: 'raw_utf8', success: false, reason: simpleError.message });
       }
     }
-    
-    // Final fallback
+
+    // Final fallback: return whatever raw UTF-8 conversion produces, even if empty
     if (!extractedText || extractionMethod === 'extraction_failed') {
-      console.log('❌ All extraction methods failed');
-      extractedText = 'Document text extraction failed - DOCX file could not be processed by any method.';
-      extractionMethod = 'all_methods_failed';
+      console.log('⚠️ All structured extraction methods failed - falling back to raw UTF-8 output.');
+      try {
+        extractedText = fileBuffer.toString('utf-8');
+        extractionMethod = extractionMethod || 'raw_utf8_fallback';
+      } catch (fallbackError) {
+        console.log('❌ Raw UTF-8 fallback failed:', fallbackError.message);
+        extractedText = '';
+        extractionMethod = 'raw_utf8_fallback_failed';
+      }
     }
     
     console.log('Extraction summary:', {
@@ -356,11 +337,6 @@ async function extractTextFromBuffer(fileBuffer, fileName = '', contentType = ''
         textLength: pdfData.text.length
       });
       
-      // Check if PDF appears to be scanned (no text or very little text)
-      if (!extractedText || extractedText.trim().length < 10) {
-        console.warn('PDF appears to be scanned or image-based - minimal text extracted');
-        extractedText = 'This PDF appears to be a scanned document or image-based PDF. Text extraction is limited. Consider using OCR services for better results.';
-      }
     } catch (error) {
       console.error('PDF extraction failed:', error);
       throw new Error(`Failed to extract text from PDF file: ${error.message}`);
