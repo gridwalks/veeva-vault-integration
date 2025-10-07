@@ -324,7 +324,7 @@ async function convertTextToPdf(textContent, fileName) {
   });
 
   if (processedLines.length === 0) {
-    processedLines.push('No readable text was extracted from this document.');
+    processedLines.push('');
   }
 
   // Break lines into pages
