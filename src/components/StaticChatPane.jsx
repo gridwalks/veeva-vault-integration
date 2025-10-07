@@ -173,12 +173,17 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       console.log('Mapped document for pane:', mappedDocument);
       onOpenDocumentInPane(mappedDocument);
     } else {
-      // Fallback to document viewer if no callback provided
-      setSelectedDocument({
-        url: `/api/download-file?docId=${document.id}&major=${document.version.split('.')[0]}&minor=${document.version.split('.')[1]}`,
-        name: document.name
-      });
-      setViewerOpen(true);
+      // Fallback to direct download if no callback provided
+      const [major, minor] = document.version.split('.');
+      const url = `/api/download-file?docId=${document.id}&major=${major}&minor=${minor}`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.download = '';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
     }
   };
 

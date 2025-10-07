@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import DocumentViewer from './DocumentViewer.jsx';
 
-export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }) {
+export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], onOpenDocumentInPane }) {
   const [conversationHistory, setConversationHistory] = useState([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -119,11 +119,24 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [] }
   };
 
   const handleOpenDocument = (document) => {
-    setSelectedDocument({
-      url: `/api/download-file?docId=${document.id}&major=${document.version.split('.')[0]}&minor=${document.version.split('.')[1]}`,
-      name: document.name
-    });
-    setViewerOpen(true);
+    if (onOpenDocumentInPane) {
+      // Route document to the right pane
+      const mappedDocument = {
+        veeva_document_id: document.id,
+        document_name: document.name,
+        document_type: document.type,
+        version: document.version,
+        document_number: document.number
+      };
+      onOpenDocumentInPane(mappedDocument);
+    } else {
+      // Fallback to document viewer if no callback provided
+      setSelectedDocument({
+        url: `/api/download-file?docId=${document.id}&major=${document.version.split('.')[0]}&minor=${document.version.split('.')[1]}`,
+        name: document.name
+      });
+      setViewerOpen(true);
+    }
   };
 
   const handleCloseViewer = () => {
