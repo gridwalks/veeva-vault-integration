@@ -92,15 +92,15 @@ LIMIT 10  // Retrieve top 10 most relevant chunks
 ### Indexing with Chunking
 ```bash
 # Index all documents (automatically chunks and embeds)
-curl https://your-site.netlify.app/.netlify/functions/index-documents
+curl https://acceleraqa-qms-doc-chat.netlify.app/.netlify/functions/index-documents
 
 # Force re-index (regenerates chunks and embeddings)
-curl https://your-site.netlify.app/.netlify/functions/index-documents?force=true
+curl https://acceleraqa-qms-doc-chat.netlify.app/.netlify/functions/index-documents?force=true
 ```
 
 ### Chat with RAG
 ```bash
-curl -X POST https://your-site.netlify.app/.netlify/functions/chat-with-documents \
+curl -X POST https://acceleraqa-qms-doc-chat.netlify.app/.netlify/functions/chat-with-documents \
   -H "Content-Type: application/json" \
   -d '{
     "message": "What is the approval process for SOPs?",
