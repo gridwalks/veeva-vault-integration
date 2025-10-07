@@ -54,7 +54,7 @@ ON Veeva_Doc_Chat_document_chunks(veeva_document_id);
 -- ON Veeva_Doc_Chat_document_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 -- Table for storing uploaded documents (separate from Veeva documents)
-CREATE TABLE IF NOT EXISTS Veeva_Doc_Chat_documents (
+CREATE TABLE IF NOT EXISTS qms_chat_documents (
   id SERIAL PRIMARY KEY,
   document_name TEXT NOT NULL,
   document_type VARCHAR(255) DEFAULT 'uploaded_document',
@@ -69,17 +69,17 @@ CREATE TABLE IF NOT EXISTS Veeva_Doc_Chat_documents (
 );
 
 -- Create indexes for uploaded documents
-CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_documents_name 
-ON Veeva_Doc_Chat_documents(document_name);
+CREATE INDEX IF NOT EXISTS idx_qms_chat_documents_name 
+ON qms_chat_documents(document_name);
 
-CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_documents_type 
-ON Veeva_Doc_Chat_documents(document_type);
+CREATE INDEX IF NOT EXISTS idx_qms_chat_documents_type 
+ON qms_chat_documents(document_type);
 
-CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_documents_source_type 
-ON Veeva_Doc_Chat_documents(source_type);
+CREATE INDEX IF NOT EXISTS idx_qms_chat_documents_source_type 
+ON qms_chat_documents(source_type);
 
 -- Table for storing external resources/links
-CREATE TABLE IF NOT EXISTS external_resources (
+CREATE TABLE IF NOT EXISTS qms_chat_external_resources (
   id SERIAL PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   url TEXT NOT NULL,
@@ -91,21 +91,21 @@ CREATE TABLE IF NOT EXISTS external_resources (
 );
 
 -- Create indexes for external resources
-CREATE INDEX IF NOT EXISTS idx_external_resources_title 
-ON external_resources(title);
+CREATE INDEX IF NOT EXISTS idx_qms_chat_external_resources_title 
+ON qms_chat_external_resources(title);
 
-CREATE INDEX IF NOT EXISTS idx_external_resources_category 
-ON external_resources(category);
+CREATE INDEX IF NOT EXISTS idx_qms_chat_external_resources_category 
+ON qms_chat_external_resources(category);
 
-CREATE INDEX IF NOT EXISTS idx_external_resources_url 
-ON external_resources(url);
+CREATE INDEX IF NOT EXISTS idx_qms_chat_external_resources_url 
+ON qms_chat_external_resources(url);
 
 -- Update the document_chunks table to support both Veeva and uploaded documents
 -- First, we need to make the document_id reference more flexible
 -- We'll create a new table structure that can handle both types
 
 -- Create a unified documents table that combines both Veeva and uploaded documents
-CREATE TABLE IF NOT EXISTS Veeva_Doc_Chat_unified_documents (
+CREATE TABLE IF NOT EXISTS qms_chat_unified_documents (
   id SERIAL PRIMARY KEY,
   document_name TEXT NOT NULL,
   document_type VARCHAR(255),
@@ -126,23 +126,23 @@ CREATE TABLE IF NOT EXISTS Veeva_Doc_Chat_unified_documents (
 );
 
 -- Create indexes for unified documents
-CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_unified_documents_name 
-ON Veeva_Doc_Chat_unified_documents(document_name);
+CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_documents_name 
+ON qms_chat_unified_documents(document_name);
 
-CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_unified_documents_type 
-ON Veeva_Doc_Chat_unified_documents(document_type);
+CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_documents_type 
+ON qms_chat_unified_documents(document_type);
 
-CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_unified_documents_source_type 
-ON Veeva_Doc_Chat_unified_documents(source_type);
+CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_documents_source_type 
+ON qms_chat_unified_documents(source_type);
 
-CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_unified_documents_veeva_id 
-ON Veeva_Doc_Chat_unified_documents(veeva_document_id);
+CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_documents_veeva_id 
+ON qms_chat_unified_documents(veeva_document_id);
 
 -- Update the document_chunks table to reference the unified documents table
 -- Note: This is a breaking change, so we'll create a new table for chunks
-CREATE TABLE IF NOT EXISTS Veeva_Doc_Chat_unified_chunks (
+CREATE TABLE IF NOT EXISTS qms_chat_unified_chunks (
   id SERIAL PRIMARY KEY,
-  document_id INTEGER NOT NULL REFERENCES Veeva_Doc_Chat_unified_documents(id) ON DELETE CASCADE,
+  document_id INTEGER NOT NULL REFERENCES qms_chat_unified_documents(id) ON DELETE CASCADE,
   veeva_document_id VARCHAR(255), -- Keep for backward compatibility
   chunk_index INTEGER NOT NULL,
   chunk_text TEXT NOT NULL,
@@ -153,11 +153,11 @@ CREATE TABLE IF NOT EXISTS Veeva_Doc_Chat_unified_chunks (
 );
 
 -- Create indexes for unified chunks
-CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_unified_chunks_document_id 
-ON Veeva_Doc_Chat_unified_chunks(document_id);
+CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_chunks_document_id 
+ON qms_chat_unified_chunks(document_id);
 
-CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_unified_chunks_veeva_document_id 
-ON Veeva_Doc_Chat_unified_chunks(veeva_document_id);
+CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_chunks_veeva_document_id 
+ON qms_chat_unified_chunks(veeva_document_id);
 
 -- Sample data insertion (optional)
 -- INSERT INTO Veeva_Doc_Chat_document_index (veeva_document_id, document_number, document_name, major_version, minor_version, document_type, status, summary) 

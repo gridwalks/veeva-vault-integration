@@ -54,6 +54,38 @@ function validateResourceData(data) {
   return errors;
 }
 
+// Helper function to create external_resources table if it doesn't exist
+async function createExternalResourcesTable() {
+  try {
+    console.log('Creating external_resources table...');
+    
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS qms_chat_external_resources (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        url TEXT NOT NULL,
+        description TEXT,
+        category VARCHAR(100),
+        tags TEXT[],
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    
+    // Create indexes
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_external_resources_title ON qms_chat_external_resources(title);
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_external_resources_category ON qms_chat_external_resources(category);
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_external_resources_url ON qms_chat_external_resources(url);
+    `);
+    
+    console.log('external_resources table created successfully');
+  } catch (error) {
+    console.error('Error creating external_resources table:', error);
+    throw error;
+  }
+}
+
 export const handler = async (event) => {
   console.log('=== EXTERNAL RESOURCES API ===');
   console.log('Request:', {
@@ -143,6 +175,22 @@ async function getAllResources() {
   try {
     console.log('Fetching all external resources...');
     
+    // First check if table exists
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'qms_chat_external_resources'
+      );
+    `);
+    
+    const tableExists = tableCheck.rows[0].exists;
+    
+    if (!tableExists) {
+      console.log('external_resources table does not exist, creating it...');
+      await createExternalResourcesTable();
+    }
+    
     const result = await pool.query(`
       SELECT 
         id,
@@ -153,7 +201,7 @@ async function getAllResources() {
         tags,
         created_at,
         updated_at
-      FROM external_resources 
+      FROM qms_chat_external_resources 
       ORDER BY created_at DESC
     `);
 
@@ -197,7 +245,7 @@ async function getResource(resourceId) {
         tags,
         created_at,
         updated_at
-      FROM external_resources 
+      FROM qms_chat_external_resources 
       WHERE id = $1
     `, [resourceId]);
 
@@ -258,9 +306,22 @@ async function createResource(requestBody) {
       };
     }
 
+    // Ensure table exists
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'qms_chat_external_resources'
+      );
+    `);
+    
+    if (!tableCheck.rows[0].exists) {
+      await createExternalResourcesTable();
+    }
+
     // Check if resource with same URL already exists
     const existingResult = await pool.query(
-      'SELECT id FROM external_resources WHERE url = $1',
+      'SELECT id FROM qms_chat_external_resources WHERE url = $1',
       [data.url]
     );
 
@@ -277,7 +338,7 @@ async function createResource(requestBody) {
 
     // Insert new resource
     const result = await pool.query(`
-      INSERT INTO external_resources 
+      INSERT INTO qms_chat_external_resources 
       (title, url, description, category, tags, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING id, title, url, description, category, tags, created_at, updated_at
@@ -340,7 +401,7 @@ async function updateResource(resourceId, requestBody) {
 
     // Check if resource exists
     const existingResult = await pool.query(
-      'SELECT id FROM external_resources WHERE id = $1',
+      'SELECT id FROM qms_chat_external_resources WHERE id = $1',
       [resourceId]
     );
 
@@ -357,7 +418,7 @@ async function updateResource(resourceId, requestBody) {
 
     // Check if another resource with same URL already exists
     const duplicateResult = await pool.query(
-      'SELECT id FROM external_resources WHERE url = $1 AND id != $2',
+      'SELECT id FROM qms_chat_external_resources WHERE url = $1 AND id != $2',
       [data.url, resourceId]
     );
 
@@ -374,7 +435,7 @@ async function updateResource(resourceId, requestBody) {
 
     // Update resource
     const result = await pool.query(`
-      UPDATE external_resources 
+      UPDATE qms_chat_external_resources 
       SET 
         title = $1,
         url = $2,
@@ -428,7 +489,7 @@ async function deleteResource(resourceId) {
     
     // Check if resource exists
     const existingResult = await pool.query(
-      'SELECT id FROM external_resources WHERE id = $1',
+      'SELECT id FROM qms_chat_external_resources WHERE id = $1',
       [resourceId]
     );
 
@@ -444,7 +505,7 @@ async function deleteResource(resourceId) {
     }
 
     // Delete resource
-    await pool.query('DELETE FROM external_resources WHERE id = $1', [resourceId]);
+    await pool.query('DELETE FROM qms_chat_external_resources WHERE id = $1', [resourceId]);
 
     console.log(`Deleted external resource with ID: ${resourceId}`);
 

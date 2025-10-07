@@ -159,11 +159,59 @@ async function generateSummary(text, fileName) {
   }
 }
 
+// Helper function to create documents table if it doesn't exist
+async function createDocumentsTable() {
+  try {
+    console.log('Creating Veeva_Doc_Chat_documents table...');
+    
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS qms_chat_documents (
+        id SERIAL PRIMARY KEY,
+        document_name TEXT NOT NULL,
+        document_type VARCHAR(255) DEFAULT 'uploaded_document',
+        version VARCHAR(50) DEFAULT '1.0',
+        content TEXT,
+        ai_summary TEXT,
+        file_size BIGINT,
+        extraction_method VARCHAR(100),
+        source_type VARCHAR(50) DEFAULT 'upload',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    
+    // Create indexes
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_documents_name ON qms_chat_documents(document_name);
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_documents_type ON qms_chat_documents(document_type);
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_documents_source_type ON qms_chat_documents(source_type);
+    `);
+    
+    console.log('Veeva_Doc_Chat_documents table created successfully');
+  } catch (error) {
+    console.error('Error creating Veeva_Doc_Chat_documents table:', error);
+    throw error;
+  }
+}
+
 // Helper function to store document in database
 async function storeDocument(fileName, extractedText, summary, fileSize, extractionMethod) {
   try {
+    // Ensure table exists
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'qms_chat_documents'
+      );
+    `);
+    
+    if (!tableCheck.rows[0].exists) {
+      await createDocumentsTable();
+    }
+
     const result = await pool.query(`
-      INSERT INTO Veeva_Doc_Chat_documents 
+      INSERT INTO qms_chat_documents 
       (document_name, document_type, version, content, ai_summary, file_size, extraction_method, source_type, created_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
       RETURNING id
@@ -185,10 +233,55 @@ async function storeDocument(fileName, extractedText, summary, fileSize, extract
   }
 }
 
+// Helper function to create chunks table if it doesn't exist
+async function createChunksTable() {
+  try {
+    console.log('Creating Veeva_Doc_Chat_document_chunks table...');
+    
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS qms_chat_document_chunks (
+        id SERIAL PRIMARY KEY,
+        document_id INTEGER NOT NULL REFERENCES qms_chat_documents(id) ON DELETE CASCADE,
+        veeva_document_id VARCHAR(255),
+        chunk_index INTEGER NOT NULL,
+        chunk_text TEXT NOT NULL,
+        embedding vector(1536),
+        token_count INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(document_id, chunk_index)
+      );
+    `);
+    
+    // Create indexes
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_chunks_document_id ON qms_chat_document_chunks(document_id);
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_chunks_veeva_document_id ON qms_chat_document_chunks(veeva_document_id);
+    `);
+    
+    console.log('Veeva_Doc_Chat_document_chunks table created successfully');
+  } catch (error) {
+    console.error('Error creating Veeva_Doc_Chat_document_chunks table:', error);
+    throw error;
+  }
+}
+
 // Helper function to chunk and embed document
 async function chunkAndEmbedDocument(documentText, documentId, fileName) {
   try {
     console.log(`Chunking and embedding document ${fileName}...`);
+    
+    // Ensure chunks table exists
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'qms_chat_document_chunks'
+      );
+    `);
+    
+    if (!tableCheck.rows[0].exists) {
+      await createChunksTable();
+    }
     
     // Chunk the text
     const chunks = chunkText(documentText, {
@@ -202,7 +295,7 @@ async function chunkAndEmbedDocument(documentText, documentId, fileName) {
     }
 
     // Delete existing chunks for this document
-    await pool.query('DELETE FROM Veeva_Doc_Chat_document_chunks WHERE document_id = $1', [documentId]);
+    await pool.query('DELETE FROM qms_chat_document_chunks WHERE document_id = $1', [documentId]);
     console.log(`Deleted existing chunks for document ${documentId}`);
 
     // Generate embeddings for each chunk in batches
@@ -230,7 +323,7 @@ async function chunkAndEmbedDocument(documentText, documentId, fileName) {
           const embeddingStr = '[' + embedding.join(',') + ']';
 
           await pool.query(`
-            INSERT INTO Veeva_Doc_Chat_document_chunks 
+            INSERT INTO qms_chat_document_chunks 
             (document_id, veeva_document_id, chunk_index, chunk_text, embedding, token_count)
             VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (document_id, chunk_index) 
