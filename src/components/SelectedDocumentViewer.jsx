@@ -88,8 +88,10 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
         }
         
         // Check if the blob looks like a PDF
-        const firstBytes = await convertedBlob.slice(0, 4).text();
-        if (!firstBytes.startsWith('%PDF')) {
+        const firstBytes = await convertedBlob.slice(0, 4).arrayBuffer();
+        const header = new Uint8Array(firstBytes);
+        const headerString = String.fromCharCode(...header);
+        if (!headerString.startsWith('%PDF')) {
           console.warn('Generated file may not be a valid PDF - header check failed');
         }
         

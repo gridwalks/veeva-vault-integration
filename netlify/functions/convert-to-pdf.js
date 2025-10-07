@@ -92,7 +92,8 @@ export const handler = async (event) => {
       });
       
       // Validate that it's actually a PDF by checking the header
-      const pdfHeader = fileBuffer.slice(0, 4).toString();
+      const pdfHeaderBytes = fileBuffer.slice(0, 4);
+      const pdfHeader = String.fromCharCode(...pdfHeaderBytes);
       if (pdfHeader !== '%PDF') {
         console.warn('File has .pdf extension but doesn\'t start with %PDF header');
         // Still return it, but log the warning
