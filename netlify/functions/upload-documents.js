@@ -194,7 +194,7 @@ async function generateSummary(text, fileName) {
 // Helper function to create documents table if it doesn't exist
 async function createDocumentsTable() {
   try {
-    console.log('Creating Veeva_Doc_Chat_documents table...');
+    console.log('Creating qms_chat_documents table...');
     
     await pool.query(`
       CREATE TABLE IF NOT EXISTS qms_chat_documents (
@@ -214,6 +214,25 @@ async function createDocumentsTable() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    
+    // Add missing columns if they don't exist (for existing tables)
+    const columnsToAdd = [
+      { name: 'blob_url', type: 'TEXT' },
+      { name: 'original_filename', type: 'TEXT' },
+      { name: 'mime_type', type: 'VARCHAR(255)' }
+    ];
+
+    for (const column of columnsToAdd) {
+      try {
+        await pool.query(`
+          ALTER TABLE qms_chat_documents 
+          ADD COLUMN IF NOT EXISTS ${column.name} ${column.type}
+        `);
+        console.log(`✅ Ensured column exists: ${column.name}`);
+      } catch (error) {
+        console.log(`Column ${column.name} might already exist:`, error.message);
+      }
+    }
     
     // Create indexes
     await pool.query(`
@@ -245,24 +264,49 @@ async function storeDocument(fileName, extractedText, summary, fileSize, extract
       await createDocumentsTable();
     }
 
-    const result = await pool.query(`
-      INSERT INTO qms_chat_documents 
-      (document_name, document_type, version, content, ai_summary, file_size, extraction_method, source_type, blob_url, original_filename, mime_type, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
-      RETURNING id
-    `, [
-      fileName,
-      'uploaded_document',
-      '1.0',
-      extractedText,
-      summary,
-      fileSize,
-      extractionMethod,
-      'upload',
-      blobUrl,
-      originalFileName,
-      mimeType
-    ]);
+    // Try to insert with all columns first, fall back to basic columns if new ones don't exist
+    let result;
+    try {
+      result = await pool.query(`
+        INSERT INTO qms_chat_documents 
+        (document_name, document_type, version, content, ai_summary, file_size, extraction_method, source_type, blob_url, original_filename, mime_type, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
+        RETURNING id
+      `, [
+        fileName,
+        'uploaded_document',
+        '1.0',
+        extractedText,
+        summary,
+        fileSize,
+        extractionMethod,
+        'upload',
+        blobUrl,
+        originalFileName,
+        mimeType
+      ]);
+    } catch (error) {
+      if (error.message.includes('column') && error.message.includes('does not exist')) {
+        console.log('New columns not found, using basic insert...');
+        result = await pool.query(`
+          INSERT INTO qms_chat_documents 
+          (document_name, document_type, version, content, ai_summary, file_size, extraction_method, source_type, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
+          RETURNING id
+        `, [
+          fileName,
+          'uploaded_document',
+          '1.0',
+          extractedText,
+          summary,
+          fileSize,
+          extractionMethod,
+          'upload'
+        ]);
+      } else {
+        throw error;
+      }
+    }
 
     return result.rows[0].id;
   } catch (error) {
@@ -449,11 +493,17 @@ export const handler = async (event) => {
           };
           mimeType = mimeTypeMap[fileExtension] || 'application/octet-stream';
           
+          console.log(`Attempting to save file to blob storage: ${file.fileName} (${mimeType})`);
           blobUrl = await saveFileToBlob(file.buffer, file.fileName, mimeType);
-          console.log(`File saved to blob storage: ${blobUrl}`);
+          console.log(`✅ File saved to blob storage: ${blobUrl}`);
         } catch (blobError) {
-          console.error(`Failed to save file to blob storage: ${blobError.message}`);
+          console.error(`❌ Failed to save file to blob storage:`, {
+            fileName: file.fileName,
+            error: blobError.message,
+            stack: blobError.stack
+          });
           // Continue processing even if blob storage fails
+          blobUrl = null;
         }
 
         // Extract text from file
@@ -548,7 +598,12 @@ export const handler = async (event) => {
     };
 
   } catch (error) {
-    console.error('Upload processing error:', error);
+    console.error('Upload processing error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      cause: error.cause
+    });
     
     return {
       statusCode: 500,
@@ -560,7 +615,9 @@ export const handler = async (event) => {
       },
       body: JSON.stringify({
         success: false,
-        error: error.message
+        error: 'Upload failed',
+        details: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       })
     };
   }

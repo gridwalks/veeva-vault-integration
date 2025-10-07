@@ -24,37 +24,88 @@ export const handler = async (event) => {
 
     const pool = getPool();
     
-    let query = `
-      SELECT * FROM (
-        SELECT 
-          id, veeva_document_id, document_number, document_name, 
-          major_version, minor_version, document_type, status, 
-          summary, manual_summary, indexed_at, updated_at,
-          'veeva' as source_type, null as blob_url, null as original_filename, null as mime_type
-        FROM Veeva_Doc_Chat_document_index
-        
-        UNION ALL
-        
-        SELECT 
-          id as id, 
-          null as veeva_document_id, 
-          null as document_number, 
-          document_name, 
-          '1' as major_version, 
-          '0' as minor_version, 
-          document_type, 
-          'uploaded' as status, 
-          ai_summary as summary, 
-          null as manual_summary, 
-          created_at as indexed_at, 
-          updated_at,
-          'upload' as source_type,
-          blob_url,
-          original_filename,
-          mime_type
-        FROM qms_chat_documents
-      ) combined_documents
-    `;
+    // Check if the new columns exist in qms_chat_documents table
+    let hasNewColumns = false;
+    try {
+      const columnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'qms_chat_documents' 
+        AND column_name IN ('blob_url', 'original_filename', 'mime_type')
+      `);
+      hasNewColumns = columnCheck.rows.length >= 3;
+      console.log('New columns exist:', hasNewColumns);
+    } catch (error) {
+      console.log('Error checking columns:', error.message);
+      hasNewColumns = false;
+    }
+
+    let query;
+    if (hasNewColumns) {
+      query = `
+        SELECT * FROM (
+          SELECT 
+            id, veeva_document_id, document_number, document_name, 
+            major_version, minor_version, document_type, status, 
+            summary, manual_summary, indexed_at, updated_at,
+            'veeva' as source_type, null as blob_url, null as original_filename, null as mime_type
+          FROM Veeva_Doc_Chat_document_index
+          
+          UNION ALL
+          
+          SELECT 
+            id as id, 
+            null as veeva_document_id, 
+            null as document_number, 
+            document_name, 
+            '1' as major_version, 
+            '0' as minor_version, 
+            document_type, 
+            'uploaded' as status, 
+            ai_summary as summary, 
+            null as manual_summary, 
+            created_at as indexed_at, 
+            updated_at,
+            'upload' as source_type,
+            blob_url,
+            original_filename,
+            mime_type
+          FROM qms_chat_documents
+        ) combined_documents
+      `;
+    } else {
+      query = `
+        SELECT * FROM (
+          SELECT 
+            id, veeva_document_id, document_number, document_name, 
+            major_version, minor_version, document_type, status, 
+            summary, manual_summary, indexed_at, updated_at,
+            'veeva' as source_type, null as blob_url, null as original_filename, null as mime_type
+          FROM Veeva_Doc_Chat_document_index
+          
+          UNION ALL
+          
+          SELECT 
+            id as id, 
+            null as veeva_document_id, 
+            null as document_number, 
+            document_name, 
+            '1' as major_version, 
+            '0' as minor_version, 
+            document_type, 
+            'uploaded' as status, 
+            ai_summary as summary, 
+            null as manual_summary, 
+            created_at as indexed_at, 
+            updated_at,
+            'upload' as source_type,
+            null as blob_url,
+            null as original_filename,
+            null as mime_type
+          FROM qms_chat_documents
+        ) combined_documents
+      `;
+    }
     
     const queryParams = [];
     let paramCount = 0;
