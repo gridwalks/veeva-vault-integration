@@ -5,17 +5,106 @@ import mammoth from 'mammoth';
 import { parseDocument } from 'docx-parser';
 import { chunkText, validateChunks, generateChunkPreview } from './chunking-utils.js';
 
+function resolveFilenameFromHeaders(headers, fallbackName = '') {
+  const contentDisposition = headers?.get?.('content-disposition');
+
+  if (!contentDisposition) {
+    return fallbackName;
+  }
+
+  const filenameStarMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (filenameStarMatch?.[1]) {
+    try {
+      return decodeURIComponent(filenameStarMatch[1]);
+    } catch (error) {
+      console.warn('Failed to decode RFC5987 filename, falling back to raw value', {
+        error: error.message,
+        rawValue: filenameStarMatch[1]
+      });
+      return filenameStarMatch[1];
+    }
+  }
+
+  const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+  if (filenameMatch?.[1]) {
+    return filenameMatch[1];
+  }
+
+  return fallbackName;
+}
+
+function ensureFilenameHasExtension(fileName, contentType = '') {
+  if (!fileName) return fileName;
+
+  if (fileName.includes('.')) {
+    return fileName;
+  }
+
+  const normalizedContentType = (contentType || '').split(';')[0]?.trim().toLowerCase();
+  const extensionMap = {
+    'application/pdf': 'pdf',
+    'application/x-pdf': 'pdf',
+    'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/vnd.ms-word.document.macroenabled.12': 'docm',
+  };
+
+  const mappedExtension = extensionMap[normalizedContentType];
+
+  if (mappedExtension) {
+    return `${fileName}.${mappedExtension}`;
+  }
+
+  if (normalizedContentType?.includes('wordprocessingml.document')) {
+    return `${fileName}.docx`;
+  }
+
+  return fileName;
+}
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 // Local text extraction function
-async function extractTextFromBuffer(fileBuffer, fileName) {
-  const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+async function extractTextFromBuffer(fileBuffer, fileName = '', contentType = '') {
+  const normalizedName = fileName || '';
+  const normalizedContentType = (contentType || '').split(';')[0]?.trim().toLowerCase();
+
+  let fileExtension = '';
+
+  if (normalizedName.includes('.')) {
+    fileExtension = normalizedName.split('.').pop().toLowerCase();
+  }
+
+  if (!fileExtension && normalizedContentType) {
+    const contentTypeMap = {
+      'application/pdf': 'pdf',
+      'application/x-pdf': 'pdf',
+      'application/octet-stream': '',
+      'application/msword': 'doc',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+      'application/vnd.ms-word.document.macroenabled.12': 'docm',
+    };
+
+    fileExtension = contentTypeMap[normalizedContentType] || fileExtension;
+
+    if (!fileExtension && normalizedContentType.includes('wordprocessingml.document')) {
+      fileExtension = 'docx';
+    }
+  }
+
+  const isZipArchive = fileBuffer?.length >= 2 && fileBuffer[0] === 0x50 && fileBuffer[1] === 0x4b;
+  if ((!fileExtension || fileExtension === 'bin') && isZipArchive) {
+    fileExtension = 'docx';
+  }
+
   let extractedText = '';
   let extractionMethod = '';
 
-  console.log(`Extracting text from file: ${fileName} (${fileExtension})`);
+  console.log(`Extracting text from file: ${fileName} (${fileExtension || 'unknown'})`, {
+    contentType: normalizedContentType || 'unknown'
+  });
   console.log(`File buffer info: ${fileBuffer.length} bytes, type: ${typeof fileBuffer}, constructor: ${fileBuffer.constructor.name}`);
   
   // Log first few bytes to check for encoding issues
@@ -578,17 +667,25 @@ export const handler = async (event) => {
                   const documentArrayBuffer = await downloadRes.arrayBuffer();
                   // Convert ArrayBuffer to Node.js Buffer - keep binary data intact
                   const documentBuffer = Buffer.from(documentArrayBuffer);
-                  const documentName = doc.name__v || `document_${doc.id}`;
+                  const contentType = downloadRes.headers.get('content-type') || '';
+                  let documentName = resolveFilenameFromHeaders(downloadRes.headers, doc.name__v || `document_${doc.id}`);
+                  documentName = ensureFilenameHasExtension(documentName, contentType);
                   
                   console.log(`Buffer conversion: ArrayBuffer ${documentArrayBuffer.byteLength} bytes -> Buffer ${documentBuffer.length} bytes`);
                   console.log(`Downloaded ${documentBuffer.byteLength} bytes for document: ${doc.id}`);
+                  console.log('Resolved document download metadata:', {
+                    originalName: doc.name__v,
+                    resolvedName: documentName,
+                    contentType,
+                    hasExtension: documentName.includes('.')
+                  });
                   
                   // Extract text from document using local extraction
                   console.log(`Extracting text from document: ${doc.id}`);
                   const extractionStartTime = Date.now();
                   
                   try {
-                    const extractionResult = await extractTextFromBuffer(documentBuffer, documentName);
+                    const extractionResult = await extractTextFromBuffer(documentBuffer, documentName, contentType);
                     const extractionDuration = Date.now() - extractionStartTime;
                     
                     console.log(`Text extraction completed in ${extractionDuration}ms for document: ${doc.id}`, {
@@ -741,10 +838,18 @@ ${documentText.substring(0, 4000)}`
                     const documentArrayBuffer = await downloadRes.arrayBuffer();
                     // Convert ArrayBuffer to Node.js Buffer - keep binary data intact
                     const documentBuffer = Buffer.from(documentArrayBuffer);
-                    const documentName = doc.name__v || `document_${doc.id}`;
+                    const contentType = downloadRes.headers.get('content-type') || '';
+                    let documentName = resolveFilenameFromHeaders(downloadRes.headers, doc.name__v || `document_${doc.id}`);
+                    documentName = ensureFilenameHasExtension(documentName, contentType);
                     
                     console.log(`Buffer conversion: ArrayBuffer ${documentArrayBuffer.byteLength} bytes -> Buffer ${documentBuffer.length} bytes`);
-                    const extractionResult = await extractTextFromBuffer(documentBuffer, documentName);
+                    console.log('Resolved document download metadata:', {
+                      originalName: doc.name__v,
+                      resolvedName: documentName,
+                      contentType,
+                      hasExtension: documentName.includes('.')
+                    });
+                    const extractionResult = await extractTextFromBuffer(documentBuffer, documentName, contentType);
                     documentTextForChunking = extractionResult.extractedText;
                     console.log(`Extracted ${extractionResult.textLength} characters for chunking`);
                   }
@@ -824,8 +929,16 @@ ${documentText.substring(0, 4000)}`
                   const documentArrayBuffer = await downloadRes.arrayBuffer();
                   // Convert ArrayBuffer to Node.js Buffer
                   const documentBuffer = Buffer.from(documentArrayBuffer);
-                  const documentName = doc.name__v || `document_${doc.id}`;
-                  const extractionResult = await extractTextFromBuffer(documentBuffer, documentName);
+                  const contentType = downloadRes.headers.get('content-type') || '';
+                  let documentName = resolveFilenameFromHeaders(downloadRes.headers, doc.name__v || `document_${doc.id}`);
+                  documentName = ensureFilenameHasExtension(documentName, contentType);
+                  console.log('Resolved document download metadata:', {
+                    originalName: doc.name__v,
+                    resolvedName: documentName,
+                    contentType,
+                    hasExtension: documentName.includes('.')
+                  });
+                  const extractionResult = await extractTextFromBuffer(documentBuffer, documentName, contentType);
                   const documentText = extractionResult.extractedText;
                   
                   if (documentText && documentText.trim().length > 0) {
@@ -906,18 +1019,26 @@ ${documentText.substring(0, 4000)}`
               const documentArrayBuffer = await downloadRes.arrayBuffer();
               // Convert ArrayBuffer to Node.js Buffer - keep binary data intact
               const documentBuffer = Buffer.from(documentArrayBuffer);
-              const documentName = doc.name__v || `document_${doc.id}`;
-              
+              const contentType = downloadRes.headers.get('content-type') || '';
+              let documentName = resolveFilenameFromHeaders(downloadRes.headers, doc.name__v || `document_${doc.id}`);
+              documentName = ensureFilenameHasExtension(documentName, contentType);
+
               console.log(`Buffer conversion: ArrayBuffer ${documentArrayBuffer.byteLength} bytes -> Buffer ${documentBuffer.length} bytes`);
-              
+
               console.log(`Downloaded ${documentBuffer.byteLength} bytes for document: ${doc.id}`);
-              
+              console.log('Resolved document download metadata:', {
+                originalName: doc.name__v,
+                resolvedName: documentName,
+                contentType,
+                hasExtension: documentName.includes('.')
+              });
+
               // Extract text from document using local extraction
               console.log(`Extracting text from document: ${doc.id}`);
               const extractionStartTime = Date.now();
-              
+
               try {
-                const extractionResult = await extractTextFromBuffer(documentBuffer, documentName);
+                const extractionResult = await extractTextFromBuffer(documentBuffer, documentName, contentType);
                 const extractionDuration = Date.now() - extractionStartTime;
                 
                 console.log(`Text extraction completed in ${extractionDuration}ms for document: ${doc.id}`, {

@@ -13,30 +13,52 @@ export const handler = async (event) => {
     }
 
     const body = Buffer.from(event.body, 'base64');
-    const parts = body.toString().split(`--${boundary}`);
-    
+    const boundaryMarker = `--${boundary}`;
+    const bodyString = body.toString('latin1');
+    const rawParts = bodyString.split(boundaryMarker);
+
     let fileBuffer = null;
     let fileName = 'document';
     let outputFormat = 'pdf';
 
     // Parse form data manually
-    for (const part of parts) {
-      if (part.includes('Content-Disposition: form-data')) {
-        if (part.includes('name="file"')) {
-          const fileStart = part.indexOf('\r\n\r\n') + 4;
-          const fileEnd = part.lastIndexOf('\r\n');
-          fileBuffer = Buffer.from(part.slice(fileStart, fileEnd));
-          
-          // Extract filename
-          const filenameMatch = part.match(/filename="([^"]+)"/);
-          if (filenameMatch) {
-            fileName = filenameMatch[1];
-          }
-        } else if (part.includes('name="output"')) {
-          const valueStart = part.indexOf('\r\n\r\n') + 4;
-          const valueEnd = part.lastIndexOf('\r\n');
-          outputFormat = part.slice(valueStart, valueEnd).trim();
+    for (const rawPart of rawParts) {
+      const trimmedPart = rawPart.replace(/^\r\n/, '').replace(/\r\n$/, '');
+
+      if (!trimmedPart || trimmedPart === '--') {
+        continue;
+      }
+
+      if (!trimmedPart.includes('Content-Disposition: form-data')) {
+        continue;
+      }
+
+      const partBuffer = Buffer.from(trimmedPart, 'latin1');
+      const headerTerminator = partBuffer.indexOf(Buffer.from('\r\n\r\n', 'latin1'));
+
+      if (headerTerminator === -1) {
+        continue;
+      }
+
+      const headersBuffer = partBuffer.slice(0, headerTerminator);
+      let contentBuffer = partBuffer.slice(headerTerminator + 4);
+
+      // Remove trailing CRLF added before the boundary marker
+      if (contentBuffer.length >= 2 && contentBuffer[contentBuffer.length - 2] === 13 && contentBuffer[contentBuffer.length - 1] === 10) {
+        contentBuffer = contentBuffer.slice(0, -2);
+      }
+
+      const headers = headersBuffer.toString('utf-8');
+
+      if (headers.includes('name="file"')) {
+        fileBuffer = Buffer.from(contentBuffer);
+
+        const filenameMatch = headers.match(/filename="([^"]+)"/);
+        if (filenameMatch) {
+          fileName = filenameMatch[1];
         }
+      } else if (headers.includes('name="output"')) {
+        outputFormat = contentBuffer.toString('utf-8').trim();
       }
     }
 
@@ -228,151 +250,192 @@ async function convertTextToPdf(textContent, fileName) {
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
     .trim();
-  
-  const lines = cleanText.split('\n');
-  const maxLinesPerPage = 45; // Leave room for margins
-  const linesPerPage = Math.min(lines.length, maxLinesPerPage);
-  
+
   // Escape text for PDF (handle parentheses, backslashes, and other special chars)
   const escapeText = (text) => {
     return text
       .replace(/\\/g, '\\\\')
       .replace(/\(/g, '\\(')
       .replace(/\)/g, '\\)')
-      .replace(/\r/g, '')
-      .replace(/\n/g, ' ')
       .replace(/[\x00-\x1F\x7F-\x9F]/g, ''); // Remove control characters
   };
-  
-  // Build content stream
-  let contentStream = `BT\n`;
-  contentStream += `/F1 12 Tf\n`;
-  contentStream += `72 720 Td\n`;
-  contentStream += `(${escapeText(fileName)}) Tj\n`;
-  contentStream += `0 -20 Td\n`;
-  
-  // Add text lines with proper positioning
-  const textLines = lines.slice(0, linesPerPage);
-  textLines.forEach((line, index) => {
-    const yPosition = 680 - (index * 15);
-    
-    // Skip empty lines
-    if (line.trim().length === 0) {
+
+  const wrapLine = (line, maxWidth) => {
+    if (!line) {
+      return [''];
+    }
+
+    const words = line.split(/\s+/);
+    const wrapped = [];
+    let currentLine = '';
+
+    words.forEach((word) => {
+      if (!word) {
+        return;
+      }
+
+      if (currentLine.length === 0) {
+        currentLine = word;
+        return;
+      }
+
+      if ((currentLine + ' ' + word).length <= maxWidth) {
+        currentLine += ' ' + word;
+      } else {
+        wrapped.push(currentLine);
+        if (word.length > maxWidth) {
+          for (let i = 0; i < word.length; i += maxWidth) {
+            wrapped.push(word.slice(i, i + maxWidth));
+          }
+          currentLine = '';
+        } else {
+          currentLine = word;
+        }
+      }
+    });
+
+    if (currentLine.length > 0) {
+      wrapped.push(currentLine);
+    }
+
+    return wrapped.length > 0 ? wrapped : [''];
+  };
+
+  const maxCharsPerLine = 90;
+  const maxLinesPerPage = 45; // Leave room for margins
+  const processedLines = [];
+
+  if (fileName) {
+    processedLines.push(`Document: ${fileName}`);
+    processedLines.push('');
+  }
+
+  const rawLines = cleanText.split('\n');
+  rawLines.forEach((line) => {
+    const trimmed = line.trimEnd();
+    if (trimmed.length === 0) {
+      processedLines.push('');
       return;
     }
-    
-    // Position text cursor
-    contentStream += `72 ${yPosition} Td `;
-    
-    // Add text (limit line length to prevent overflow)
-    const displayLine = line.length > 80 ? line.substring(0, 77) + '...' : line;
-    contentStream += `(${escapeText(displayLine)}) Tj\n`;
+
+    const wrapped = wrapLine(trimmed, maxCharsPerLine);
+    wrapped.forEach((wrappedLine) => processedLines.push(wrappedLine));
   });
-  
-  contentStream += `ET\n`;
-  
-  // Calculate accurate lengths and offsets
-  const contentStreamBytes = Buffer.byteLength(contentStream, 'utf8');
-  
-  // Build PDF objects
+
+  if (processedLines.length === 0) {
+    processedLines.push('No readable text was extracted from this document.');
+  }
+
+  // Break lines into pages
+  const pages = [];
+  for (let i = 0; i < processedLines.length; i += maxLinesPerPage) {
+    pages.push(processedLines.slice(i, i + maxLinesPerPage));
+  }
+
   const objects = [];
-  let currentOffset = 0;
-  
-  // Object 1: Catalog
-  const catalogObj = `1 0 obj
-<<
-/Type /Catalog
-/Pages 2 0 R
->>
-endobj`;
-  objects.push({ id: 1, content: catalogObj, offset: currentOffset });
-  currentOffset += Buffer.byteLength(catalogObj + '\n', 'utf8');
-  
-  // Object 2: Pages
-  const pagesObj = `2 0 obj
-<<
-/Type /Pages
-/Kids [3 0 R]
-/Count 1
->>
-endobj`;
-  objects.push({ id: 2, content: pagesObj, offset: currentOffset });
-  currentOffset += Buffer.byteLength(pagesObj + '\n', 'utf8');
-  
-  // Object 3: Page
-  const pageObj = `3 0 obj
-<<
-/Type /Page
-/Parent 2 0 R
-/MediaBox [0 0 612 792]
-/Contents 4 0 R
-/Resources <<
-/Font <<
-/F1 5 0 R
->>
->>
->>
-endobj`;
-  objects.push({ id: 3, content: pageObj, offset: currentOffset });
-  currentOffset += Buffer.byteLength(pageObj + '\n', 'utf8');
-  
-  // Object 4: Content stream
-  const contentObj = `4 0 obj
-<<
-/Length ${contentStreamBytes}
->>
-stream
-${contentStream}endstream
-endobj`;
-  objects.push({ id: 4, content: contentObj, offset: currentOffset });
-  currentOffset += Buffer.byteLength(contentObj + '\n', 'utf8');
-  
-  // Object 5: Font
-  const fontObj = `5 0 obj
-<<
+  const addObject = (body = '') => {
+    const id = objects.length + 1;
+    objects.push({ id, body });
+    return id;
+  };
+  const setObjectBody = (id, body) => {
+    const index = objects.findIndex((obj) => obj.id === id);
+    if (index !== -1) {
+      objects[index].body = body;
+    }
+  };
+
+  const pagesObjectId = addObject();
+  const catalogObjectId = addObject();
+  const fontObjectId = addObject(`<<
 /Type /Font
 /Subtype /Type1
 /BaseFont /Helvetica
+>>`);
+
+  const pageObjectIds = [];
+
+  pages.forEach((pageLines, pageIndex) => {
+    let contentStream = 'BT\n';
+    contentStream += '/F1 12 Tf\n';
+    contentStream += '72 720 Td\n';
+
+    pageLines.forEach((line, lineIndex) => {
+      if (lineIndex > 0) {
+        contentStream += '0 -16 Td\n';
+      }
+
+      if (!line || line.trim().length === 0) {
+        contentStream += '( ) Tj\n';
+      } else {
+        contentStream += `(${escapeText(line)}) Tj\n`;
+      }
+    });
+
+    contentStream += 'ET';
+
+    const contentLength = Buffer.byteLength(contentStream, 'utf8');
+    const contentObjectId = addObject(`<<
+/Length ${contentLength}
 >>
-endobj`;
-  objects.push({ id: 5, content: fontObj, offset: currentOffset });
-  currentOffset += Buffer.byteLength(fontObj + '\n', 'utf8');
-  
-  // Build xref table
-  const xrefEntries = [];
-  xrefEntries.push('0000000000 65535 f '); // Free object
-  objects.forEach(obj => {
-    const offset = obj.offset.toString().padStart(10, '0');
-    xrefEntries.push(`${offset} 00000 n `);
+stream
+${contentStream}
+endstream`);
+
+    const pageObjectId = addObject(`<<
+/Type /Page
+/Parent ${pagesObjectId} 0 R
+/MediaBox [0 0 612 792]
+/Contents ${contentObjectId} 0 R
+/Resources <<
+/Font <<
+/F1 ${fontObjectId} 0 R
+>>
+>>
+>>`);
+
+    pageObjectIds.push(pageObjectId);
+
+    console.log('Generated PDF page', {
+      pageIndex: pageIndex + 1,
+      linesOnPage: pageLines.length,
+      contentLength
+    });
   });
-  
-  const xrefTable = `xref
-0 ${objects.length + 1}
-${xrefEntries.join('\n')}`;
-  
-  // Build trailer
-  const trailer = `trailer
-<<
-/Size ${objects.length + 1}
-/Root 1 0 R
->>
-startxref
-${currentOffset}
-%%EOF`;
-  
-  // Combine all parts
+
+  setObjectBody(pagesObjectId, `<<
+/Type /Pages
+/Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(' ')}]
+/Count ${pageObjectIds.length}
+>>`);
+
+  setObjectBody(catalogObjectId, `<<
+/Type /Catalog
+/Pages ${pagesObjectId} 0 R
+>>`);
+
+  // Build PDF content with xref table
   let pdfContent = '%PDF-1.4\n';
-  objects.forEach(obj => {
-    pdfContent += obj.content + '\n';
+  let offset = Buffer.byteLength(pdfContent, 'utf8');
+  const xrefEntries = ['0000000000 65535 f '];
+
+  objects.forEach(({ id, body }) => {
+    const objectString = `${id} 0 obj\n${body}\nendobj\n`;
+    const offsetStr = offset.toString().padStart(10, '0');
+    xrefEntries.push(`${offsetStr} 00000 n `);
+    pdfContent += objectString;
+    offset += Buffer.byteLength(objectString, 'utf8');
   });
-  pdfContent += xrefTable + '\n';
-  pdfContent += trailer + '\n';
-  
+
+  const xrefOffset = offset;
+  pdfContent += `xref\n0 ${objects.length + 1}\n${xrefEntries.join('\n')}\n`;
+  pdfContent += `trailer\n<<\n/Size ${objects.length + 1}\n/Root ${catalogObjectId} 0 R\n>>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+
   console.log('PDF generation completed:', {
     totalObjects: objects.length,
-    contentStreamBytes,
+    pageCount: pages.length,
     totalPdfSize: Buffer.byteLength(pdfContent, 'utf8')
   });
-  
+
   return Buffer.from(pdfContent, 'utf8');
 }
