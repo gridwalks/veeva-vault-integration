@@ -216,30 +216,138 @@ export const handler = async (event) => {
 
 // Helper function to extract text from various file types
 async function extractTextFromFile(fileBuffer, fileName, fileExtension) {
-  console.log('Extracting text from file:', { fileName, fileExtension });
-  
+  const normalizedExtension = (fileExtension || '').toLowerCase();
+  console.log('Extracting text from file:', { fileName, fileExtension: normalizedExtension });
+
   try {
-    if (fileExtension === 'pdf') {
+    if (normalizedExtension === 'pdf') {
       // Extract text from PDF files using pdf-parse
       const pdfParse = await import('pdf-parse');
       const pdfData = await pdfParse.default(fileBuffer);
       return pdfData.text;
-    } else if (fileExtension === 'docx') {
+    } else if (normalizedExtension === 'docx' || looksLikeDocx(fileBuffer)) {
       // Extract text from DOCX using mammoth
       const mammoth = await import('mammoth');
       const result = await mammoth.extractRawText({ buffer: fileBuffer });
       return result.value;
-    } else if (fileExtension === 'txt' || fileExtension === 'rtf') {
+    } else if (normalizedExtension === 'txt' || normalizedExtension === 'rtf') {
       // Simple text extraction
-      return fileBuffer.toString('utf-8');
+      const decoded = decodeTextBuffer(fileBuffer);
+      if (!decoded.readable) {
+        throw new Error('Extracted text appears to be binary data.');
+      }
+      return decoded.text;
     } else {
       // Try as plain text as fallback
-      return fileBuffer.toString('utf-8');
+      const decoded = decodeTextBuffer(fileBuffer);
+      if (!decoded.readable) {
+        throw new Error('Extracted text appears to be binary data.');
+      }
+      return decoded.text;
     }
   } catch (error) {
     console.error('Text extraction error:', error);
-    throw new Error(`Failed to extract text from ${fileExtension} file: ${error.message}`);
+    throw new Error(`Failed to extract text from ${normalizedExtension || 'unknown'} file: ${error.message}`);
   }
+}
+
+function looksLikeDocx(buffer) {
+  if (!buffer || buffer.length < 4) {
+    return false;
+  }
+
+  const hasZipSignature = buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04;
+  if (!hasZipSignature) {
+    return false;
+  }
+
+  // Check for docx specific entries inside the archive
+  const contentTypesIndex = buffer.indexOf(Buffer.from('[Content_Types].xml'));
+  const wordFolderIndex = buffer.indexOf(Buffer.from('word/'));
+
+  return contentTypesIndex !== -1 && wordFolderIndex !== -1;
+}
+
+function decodeTextBuffer(buffer) {
+  if (!buffer || buffer.length === 0) {
+    return { readable: false, text: '' };
+  }
+
+  if (isProbablyBinary(buffer)) {
+    return { readable: false, text: '' };
+  }
+
+  // Detect UTF-16 LE BOM
+  if (buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xfe) {
+    const text = buffer.toString('utf16le');
+    return { readable: isTextMostlyReadable(text), text };
+  }
+
+  // Detect UTF-16 BE BOM
+  if (buffer.length >= 2 && buffer[0] === 0xfe && buffer[1] === 0xff) {
+    const text = buffer.toString('utf16be');
+    return { readable: isTextMostlyReadable(text), text };
+  }
+
+  const utf8Text = buffer.toString('utf8');
+  if (isTextMostlyReadable(utf8Text)) {
+    return { readable: true, text: utf8Text };
+  }
+
+  // As a last resort, try latin1 which can be useful for Windows-1252 encoded files
+  const latinText = buffer.toString('latin1');
+  return { readable: isTextMostlyReadable(latinText), text: latinText };
+}
+
+function isProbablyBinary(buffer) {
+  const sampleSize = Math.min(buffer.length, 1024);
+  let suspiciousBytes = 0;
+
+  for (let i = 0; i < sampleSize; i++) {
+    const byte = buffer[i];
+
+    if (byte === 0) {
+      suspiciousBytes++;
+      continue;
+    }
+
+    if (byte < 7 || (byte > 13 && byte < 32)) {
+      suspiciousBytes++;
+    }
+  }
+
+  return suspiciousBytes / sampleSize > 0.3;
+}
+
+function isTextMostlyReadable(text) {
+  if (!text) {
+    return false;
+  }
+
+  const sampleLength = Math.min(text.length, 2000);
+  if (sampleLength === 0) {
+    return false;
+  }
+  let readableChars = 0;
+
+  for (let i = 0; i < sampleLength; i++) {
+    const code = text.charCodeAt(i);
+
+    if (code === 65533) { // Replacement character �
+      continue;
+    }
+
+    if (code === 9 || code === 10 || code === 13) { // tab, newline, carriage return
+      readableChars++;
+      continue;
+    }
+
+    if (code >= 32 && code < 65533) {
+      readableChars++;
+    }
+  }
+
+  return readableChars / sampleLength > 0.6;
 }
 
 // Simple text-to-PDF conversion function

@@ -66,6 +66,109 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+function looksLikeDocxBuffer(buffer) {
+  if (!buffer || buffer.length < 4) {
+    return false;
+  }
+
+  const hasZipSignature = buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04;
+  if (!hasZipSignature) {
+    return false;
+  }
+
+  const contentTypesIndex = buffer.indexOf(Buffer.from('[Content_Types].xml'));
+  const wordFolderIndex = buffer.indexOf(Buffer.from('word/'));
+
+  return contentTypesIndex !== -1 && wordFolderIndex !== -1;
+}
+
+function isProbablyBinaryBuffer(buffer) {
+  const sampleSize = Math.min(buffer.length, 1024);
+  let suspiciousBytes = 0;
+
+  for (let i = 0; i < sampleSize; i++) {
+    const byte = buffer[i];
+
+    if (byte === 0) {
+      suspiciousBytes++;
+      continue;
+    }
+
+    if (byte < 7 || (byte > 13 && byte < 32)) {
+      suspiciousBytes++;
+    }
+  }
+
+  return suspiciousBytes / sampleSize > 0.3;
+}
+
+function isExtractedTextReadable(text) {
+  if (!text) {
+    return false;
+  }
+
+  const sampleLength = Math.min(text.length, 2000);
+  if (sampleLength === 0) {
+    return false;
+  }
+  let readableChars = 0;
+
+  for (let i = 0; i < sampleLength; i++) {
+    const code = text.charCodeAt(i);
+
+    if (code === 65533) { // replacement character
+      continue;
+    }
+
+    if (code === 9 || code === 10 || code === 13) {
+      readableChars++;
+      continue;
+    }
+
+    if (code >= 32 && code < 65533) {
+      readableChars++;
+    }
+  }
+
+  return readableChars / sampleLength > 0.6;
+}
+
+function decodeBufferToReadableText(buffer) {
+  if (!buffer || buffer.length === 0) {
+    throw new Error('Empty buffer');
+  }
+
+  if (isProbablyBinaryBuffer(buffer)) {
+    throw new Error('Buffer appears to contain binary data');
+  }
+
+  if (buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xfe) {
+    const text = buffer.toString('utf16le');
+    if (isExtractedTextReadable(text)) {
+      return { text, encoding: 'utf16le' };
+    }
+  }
+
+  if (buffer.length >= 2 && buffer[0] === 0xfe && buffer[1] === 0xff) {
+    const text = buffer.toString('utf16be');
+    if (isExtractedTextReadable(text)) {
+      return { text, encoding: 'utf16be' };
+    }
+  }
+
+  const utf8Text = buffer.toString('utf8');
+  if (isExtractedTextReadable(utf8Text)) {
+    return { text: utf8Text, encoding: 'utf8' };
+  }
+
+  const latinText = buffer.toString('latin1');
+  if (isExtractedTextReadable(latinText)) {
+    return { text: latinText, encoding: 'latin1' };
+  }
+
+  throw new Error('Unable to decode buffer to readable text');
+}
+
 // Local text extraction function
 async function extractTextFromBuffer(fileBuffer, fileName = '', contentType = '') {
   const normalizedName = fileName || '';
@@ -95,7 +198,7 @@ async function extractTextFromBuffer(fileBuffer, fileName = '', contentType = ''
   }
 
   const isZipArchive = fileBuffer?.length >= 2 && fileBuffer[0] === 0x50 && fileBuffer[1] === 0x4b;
-  if ((!fileExtension || fileExtension === 'bin') && isZipArchive) {
+  if ((!fileExtension || fileExtension === 'bin') && isZipArchive && looksLikeDocxBuffer(fileBuffer)) {
     fileExtension = 'docx';
   }
 
@@ -263,9 +366,16 @@ async function extractTextFromBuffer(fileBuffer, fileName = '', contentType = ''
       throw new Error(`Failed to extract text from PDF file: ${error.message}`);
     }
   } else {
-    // Try to extract as plain text
-    extractedText = fileBuffer.toString('utf-8');
-    extractionMethod = 'fallback_text';
+    // Try to extract as plain text while ensuring readability
+    try {
+      const decoded = decodeBufferToReadableText(fileBuffer);
+      extractedText = decoded.text;
+      extractionMethod = `fallback_text_${decoded.encoding}`;
+    } catch (plainTextError) {
+      console.warn('Plain text extraction failed or produced unreadable output:', plainTextError.message);
+      extractedText = 'Document text extraction failed - the file appears to contain binary data or an unsupported format.';
+      extractionMethod = 'fallback_text_unreadable';
+    }
   }
 
   // Clean up the extracted text
