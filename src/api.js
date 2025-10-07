@@ -132,6 +132,11 @@ export function downloadUrl({ id, major, minor }) {
   return `/api/download-file?${p}`;
 }
 
+export function downloadUploadedDocumentUrl({ documentId }) {
+  const p = new URLSearchParams({ documentId });
+  return `/api/download-uploaded-document?${p}`;
+}
+
 export async function chatWithDocuments({ message, documentIds = [], conversationHistory = [] }) {
   const startTime = Date.now();
   console.log('Sending chat message...', { message: message.substring(0, 100) + '...', documentIds });

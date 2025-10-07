@@ -25,10 +25,35 @@ export const handler = async (event) => {
     const pool = getPool();
     
     let query = `
-      SELECT id, veeva_document_id, document_number, document_name, 
-             major_version, minor_version, document_type, status, 
-             summary, manual_summary, indexed_at, updated_at
-      FROM Veeva_Doc_Chat_document_index
+      SELECT * FROM (
+        SELECT 
+          id, veeva_document_id, document_number, document_name, 
+          major_version, minor_version, document_type, status, 
+          summary, manual_summary, indexed_at, updated_at,
+          'veeva' as source_type, null as blob_url, null as original_filename, null as mime_type
+        FROM Veeva_Doc_Chat_document_index
+        
+        UNION ALL
+        
+        SELECT 
+          id as id, 
+          null as veeva_document_id, 
+          null as document_number, 
+          document_name, 
+          '1' as major_version, 
+          '0' as minor_version, 
+          document_type, 
+          'uploaded' as status, 
+          ai_summary as summary, 
+          null as manual_summary, 
+          created_at as indexed_at, 
+          updated_at,
+          'upload' as source_type,
+          blob_url,
+          original_filename,
+          mime_type
+        FROM qms_chat_documents
+      ) combined_documents
     `;
     
     const queryParams = [];
@@ -54,9 +79,21 @@ export const handler = async (event) => {
     });
 
     // Get total count for pagination
-    let countQuery = 'SELECT COUNT(*) FROM Veeva_Doc_Chat_document_index';
+    let countQuery = `
+      SELECT COUNT(*) FROM (
+        SELECT id FROM Veeva_Doc_Chat_document_index
+        UNION ALL
+        SELECT id FROM qms_chat_documents
+      ) combined_documents
+    `;
     if (nameLike) {
-      countQuery += ' WHERE document_name ILIKE $1';
+      countQuery = `
+        SELECT COUNT(*) FROM (
+          SELECT id FROM Veeva_Doc_Chat_document_index WHERE document_name ILIKE $1
+          UNION ALL
+          SELECT id FROM qms_chat_documents WHERE document_name ILIKE $1
+        ) combined_documents
+      `;
     }
     
     const countStartTime = Date.now();

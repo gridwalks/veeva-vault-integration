@@ -1,4 +1,4 @@
-import { downloadUrl, updateManualSummary } from "../api";
+import { downloadUrl, updateManualSummary, downloadUploadedDocumentUrl } from "../api";
 import { useState } from "react";
 import DocumentViewer from "./DocumentViewer.jsx";
 import ReactMarkdown from "react-markdown";
@@ -13,8 +13,17 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
   const [saveError, setSaveError] = useState(null);
 
   const handleViewDocument = (doc) => {
+    let url;
+    if (doc.source_type === 'upload' && doc.blob_url) {
+      // For uploaded documents, use the blob URL directly
+      url = doc.blob_url;
+    } else {
+      // For Veeva documents, use the download API
+      url = downloadUrl({ id: doc.veeva_document_id, major: doc.major_version, minor: doc.minor_version });
+    }
+    
     setSelectedDocument({
-      url: downloadUrl({ id: doc.veeva_document_id, major: doc.major_version, minor: doc.minor_version }),
+      url: url,
       name: doc.document_name
     });
     setViewerOpen(true);
@@ -165,12 +174,29 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
                     {doc.document_name}
                   </h3>
                 </div>
-                <div style={{display: 'flex', gap: '16px', fontSize: '14px', color: '#666', marginBottom: '8px'}}>
-                  <span><strong>Number:</strong> {doc.document_number}</span>
+                <div style={{display: 'flex', gap: '16px', fontSize: '14px', color: '#666', marginBottom: '8px', flexWrap: 'wrap', alignItems: 'center'}}>
+                  <span><strong>Number:</strong> {doc.document_number || 'N/A'}</span>
                   <span><strong>Version:</strong> {doc.major_version}.{doc.minor_version}</span>
                   <span><strong>Type:</strong> {doc.document_type}</span>
                   <span><strong>Status:</strong> {doc.status}</span>
+                  {doc.source_type === 'upload' && (
+                    <span style={{
+                      backgroundColor: '#17a2b8',
+                      color: 'white',
+                      padding: '2px 6px',
+                      borderRadius: '12px',
+                      fontSize: '10px',
+                      fontWeight: '600'
+                    }}>
+                      UPLOADED
+                    </span>
+                  )}
                 </div>
+                {doc.original_filename && doc.original_filename !== doc.document_name && (
+                  <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>
+                    <strong>Original filename:</strong> {doc.original_filename}
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <button
@@ -187,21 +213,39 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
                 >
                   View
                 </button>
-                <a
-                  href={downloadUrl({ id: doc.veeva_document_id, major: doc.major_version, minor: doc.minor_version })}
-                  style={{
-                    padding: '8px 12px',
-                    backgroundColor: '#28a745',
-                    color: 'white',
-                    textDecoration: 'none',
-                    borderRadius: '4px',
-                    fontSize: '14px'
-                  }}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Download
-                </a>
+                {doc.source_type === 'upload' ? (
+                  <a
+                    href={downloadUploadedDocumentUrl({ documentId: doc.id })}
+                    style={{
+                      padding: '8px 12px',
+                      backgroundColor: '#28a745',
+                      color: 'white',
+                      textDecoration: 'none',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Download
+                  </a>
+                ) : (
+                  <a
+                    href={downloadUrl({ id: doc.veeva_document_id, major: doc.major_version, minor: doc.minor_version })}
+                    style={{
+                      padding: '8px 12px',
+                      backgroundColor: '#28a745',
+                      color: 'white',
+                      textDecoration: 'none',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Download
+                  </a>
+                )}
               </div>
             </div>
           

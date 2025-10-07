@@ -64,6 +64,9 @@ CREATE TABLE IF NOT EXISTS qms_chat_documents (
   file_size BIGINT,
   extraction_method VARCHAR(100),
   source_type VARCHAR(50) DEFAULT 'upload', -- 'upload', 'veeva', 'external'
+  blob_url TEXT, -- URL to the file stored in Netlify Blob
+  original_filename TEXT, -- Original filename when uploaded
+  mime_type VARCHAR(255), -- MIME type of the original file
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

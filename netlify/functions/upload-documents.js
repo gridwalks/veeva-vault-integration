@@ -3,6 +3,7 @@ import { OpenAI } from 'openai';
 import mammoth from 'mammoth';
 import { parseDocument } from 'docx-parser';
 import { chunkText } from './chunking-utils.js';
+import { put } from '@netlify/blobs';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -75,6 +76,37 @@ function parseMultipartFormData(body, contentType) {
   }
 
   return { files, fileCount, uploadType };
+}
+
+// Helper function to save file to Netlify Blob storage
+async function saveFileToBlob(fileBuffer, fileName, mimeType) {
+  try {
+    // Generate a unique filename to avoid conflicts
+    const timestamp = Date.now();
+    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const blobKey = `documents/${timestamp}_${sanitizedFileName}`;
+    
+    console.log(`Saving file to Netlify Blob: ${blobKey}`);
+    
+    // Save file to Netlify Blob
+    await put(blobKey, fileBuffer, {
+      metadata: {
+        originalName: fileName,
+        mimeType: mimeType,
+        uploadedAt: new Date().toISOString(),
+        size: fileBuffer.length
+      }
+    });
+    
+    // Return the blob URL (this will be accessible via Netlify's blob API)
+    const blobUrl = `/.netlify/blobs/${blobKey}`;
+    console.log(`File saved to blob storage: ${blobUrl}`);
+    
+    return blobUrl;
+  } catch (error) {
+    console.error('Error saving file to blob storage:', error);
+    throw error;
+  }
 }
 
 // Helper function to extract text from different file types
@@ -175,6 +207,9 @@ async function createDocumentsTable() {
         file_size BIGINT,
         extraction_method VARCHAR(100),
         source_type VARCHAR(50) DEFAULT 'upload',
+        blob_url TEXT,
+        original_filename TEXT,
+        mime_type VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -195,7 +230,7 @@ async function createDocumentsTable() {
 }
 
 // Helper function to store document in database
-async function storeDocument(fileName, extractedText, summary, fileSize, extractionMethod) {
+async function storeDocument(fileName, extractedText, summary, fileSize, extractionMethod, blobUrl, originalFileName, mimeType) {
   try {
     // Ensure table exists
     const tableCheck = await pool.query(`
@@ -212,8 +247,8 @@ async function storeDocument(fileName, extractedText, summary, fileSize, extract
 
     const result = await pool.query(`
       INSERT INTO qms_chat_documents 
-      (document_name, document_type, version, content, ai_summary, file_size, extraction_method, source_type, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
+      (document_name, document_type, version, content, ai_summary, file_size, extraction_method, source_type, blob_url, original_filename, mime_type, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
       RETURNING id
     `, [
       fileName,
@@ -223,7 +258,10 @@ async function storeDocument(fileName, extractedText, summary, fileSize, extract
       summary,
       fileSize,
       extractionMethod,
-      'upload'
+      'upload',
+      blobUrl,
+      originalFileName,
+      mimeType
     ]);
 
     return result.rows[0].id;
@@ -394,6 +432,30 @@ export const handler = async (event) => {
       console.log(`Processing file: ${file.fileName} (${file.size} bytes)`);
       
       try {
+        // Save file to Netlify Blob storage first
+        let blobUrl = null;
+        let mimeType = 'application/octet-stream';
+        
+        try {
+          // Determine MIME type based on file extension
+          const fileExtension = file.fileName.split('.').pop()?.toLowerCase() || '';
+          const mimeTypeMap = {
+            'pdf': 'application/pdf',
+            'doc': 'application/msword',
+            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'txt': 'text/plain',
+            'csv': 'text/csv',
+            'rtf': 'application/rtf'
+          };
+          mimeType = mimeTypeMap[fileExtension] || 'application/octet-stream';
+          
+          blobUrl = await saveFileToBlob(file.buffer, file.fileName, mimeType);
+          console.log(`File saved to blob storage: ${blobUrl}`);
+        } catch (blobError) {
+          console.error(`Failed to save file to blob storage: ${blobError.message}`);
+          // Continue processing even if blob storage fails
+        }
+
         // Extract text from file
         const { text: extractedText, method: extractionMethod } = await extractTextFromFile(
           file.buffer, 
@@ -409,7 +471,10 @@ export const handler = async (event) => {
           extractedText,
           summary,
           file.size,
-          extractionMethod
+          extractionMethod,
+          blobUrl,
+          file.fileName,
+          mimeType
         );
 
         // Chunk and embed document
@@ -436,7 +501,10 @@ export const handler = async (event) => {
             documentId,
             chunksCreated,
             summary: summary.substring(0, 200) + (summary.length > 200 ? '...' : ''),
-            extractionMethod
+            extractionMethod,
+            blobUrl: blobUrl,
+            originalFileName: file.fileName,
+            mimeType: mimeType
           });
         }
 
