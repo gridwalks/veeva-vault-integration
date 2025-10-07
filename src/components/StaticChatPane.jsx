@@ -16,6 +16,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [usedDocuments, setUsedDocuments] = useState([]);
+  const [usedExternalResources, setUsedExternalResources] = useState([]);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const messagesEndRef = useRef(null);
@@ -119,10 +120,12 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       }
       
       setUsedDocuments(data.documents || []);
+      setUsedExternalResources(data.externalResources || []);
 
       console.log('Chat response received:', {
         responseLength: data.response?.length || 0,
         documentsUsed: (data.documents || []).length,
+        externalResourcesUsed: (data.externalResources || []).length,
         metadata: data.metadata,
         hasConversationHistory: !!data.conversationHistory,
         hasResponse: !!data.response
@@ -411,6 +414,50 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                 >
                   {doc.name.length > 30 ? doc.name.substring(0, 30) + '...' : doc.name}
                 </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Used External Resources */}
+        {usedExternalResources.length > 0 && (
+          <div style={{
+            padding: '12px 20px',
+            backgroundColor: '#1e3a8a',
+            borderBottom: '1px solid #1e3a8a',
+            fontSize: '12px'
+          }}>
+            <div style={{
+              color: '#ffffff',
+              fontWeight: '600',
+              marginBottom: '8px'
+            }}>
+              Related external resources ({usedExternalResources.length}):
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {usedExternalResources.map((resource, index) => (
+                <a
+                  key={index}
+                  href={resource.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    backgroundColor: '#0ea5e9',
+                    color: 'white',
+                    padding: '4px 12px',
+                    borderRadius: '12px',
+                    fontSize: '11px',
+                    fontWeight: '500',
+                    textDecoration: 'none',
+                    display: 'inline-block',
+                    transition: 'background-color 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#0284c7'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#0ea5e9'}
+                  title={`${resource.title} - ${resource.description || 'No description'}`}
+                >
+                  {resource.title.length > 25 ? resource.title.substring(0, 25) + '...' : resource.title}
+                </a>
               ))}
             </div>
           </div>

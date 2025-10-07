@@ -79,6 +79,7 @@ export const handler = async (event) => {
     // Get relevant chunks using semantic search
     let relevantChunks = [];
     let relevantDocuments = [];
+    let relevantExternalResources = [];
     let vectorSearchFailed = false;
     
     if (queryEmbedding) {
@@ -228,13 +229,47 @@ export const handler = async (event) => {
       }
     }
 
-    if (relevantDocuments.length === 0 && relevantChunks.length === 0) {
+    // Search for relevant external resources
+    console.log('Searching for relevant external resources...');
+    try {
+      // Extract keywords from the user message for external resource search
+      const keywords = message.toLowerCase()
+        .split(/\s+/)
+        .filter(word => word.length > 3) // Filter out short words
+        .slice(0, 5); // Take first 5 keywords
+      
+      if (keywords.length > 0) {
+        const keywordConditions = keywords.map((_, index) => 
+          `(LOWER(title) LIKE $${index + 1} OR LOWER(description) LIKE $${index + 1} OR $${index + 1} = ANY(LOWER(unnest(tags))::text))`
+        ).join(' OR ');
+        
+        const externalResourceQuery = `
+          SELECT id, title, url, description, category, tags, created_at
+          FROM qms_chat_external_resources 
+          WHERE ${keywordConditions}
+          ORDER BY created_at DESC
+          LIMIT 5
+        `;
+        
+        const keywordParams = keywords.map(keyword => `%${keyword}%`);
+        const externalResult = await pool.query(externalResourceQuery, keywordParams);
+        relevantExternalResources = externalResult.rows;
+        
+        console.log(`Found ${relevantExternalResources.length} relevant external resources`);
+      }
+    } catch (externalError) {
+      console.error('Error searching external resources:', externalError);
+      // Continue without external resources if search fails
+    }
+
+    if (relevantDocuments.length === 0 && relevantChunks.length === 0 && relevantExternalResources.length === 0) {
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          response: "I couldn't find any relevant documents to answer your question. Please make sure documents have been indexed first.",
+          response: "I couldn't find any relevant documents or external resources to answer your question. Please make sure documents have been indexed first.",
           documents: [],
+          externalResources: [],
           conversationHistory: [...conversationHistory, { role: 'user', content: message }]
         })
       };
@@ -282,9 +317,21 @@ Status: ${doc.status || 'Unknown'}`;
       }).join('\n\n');
     }
 
+    // Build external resources context
+    let externalResourcesContext = '';
+    if (relevantExternalResources.length > 0) {
+      externalResourcesContext = '\n\n**Relevant External Resources:**\n' + 
+        relevantExternalResources.map((resource, index) => {
+          return `${index + 1}. **${resource.title}** (${resource.category || 'Uncategorized'})
+   URL: ${resource.url}
+   ${resource.description ? `Description: ${resource.description}` : ''}
+   ${resource.tags && resource.tags.length > 0 ? `Tags: ${resource.tags.join(', ')}` : ''}`;
+        }).join('\n\n');
+    }
+
     // Prepare the system prompt
     const systemPrompt = relevantChunks.length > 0
-      ? `You are an AI assistant that helps users understand and work with pharmaceutical documents from Veeva Vault. You have access to relevant sections from documents retrieved using semantic search (RAG - Retrieval Augmented Generation).
+      ? `You are an AI assistant that helps users understand and work with pharmaceutical documents from Veeva Vault. You have access to relevant sections from documents retrieved using semantic search (RAG - Retrieval Augmented Generation) and related external resources.
 
 When answering questions:
 1. Use the provided document sections to give accurate, helpful answers based on the actual content
@@ -296,10 +343,12 @@ When answering questions:
 7. When discussing regulatory standards or practices, use "Good Clinical Practices (GCP)" instead of "Good Manufacturing Practices (GMP)"
 8. The similarity percentage indicates how relevant each section is to the query
 9. Quote or paraphrase the document sections when answering to show your sources
+10. When relevant external resources are available, mention them and suggest users check them for additional information
+11. Always provide the external resource titles and URLs when referencing them
 
 Relevant Document Sections:
-${documentContext}`
-      : `You are an AI assistant that helps users understand and work with pharmaceutical documents from Veeva Vault. You have access to both AI-generated summaries and user-added manual summaries from an indexed document collection.
+${documentContext}${externalResourcesContext}`
+      : `You are an AI assistant that helps users understand and work with pharmaceutical documents from Veeva Vault. You have access to both AI-generated summaries and user-added manual summaries from an indexed document collection, as well as related external resources.
 
 When answering questions:
 1. Use the provided document context to give accurate, helpful answers
@@ -311,9 +360,11 @@ When answering questions:
 7. When both AI and manual summaries are available, consider both perspectives and note any differences
 8. Prioritize manual summaries when they provide additional context or corrections to AI summaries
 9. When discussing regulatory standards or practices, use "Good Clinical Practices (GCP)" instead of "Good Manufacturing Practices (GMP)"
+10. When relevant external resources are available, mention them and suggest users check them for additional information
+11. Always provide the external resource titles and URLs when referencing them
 
 Document Context:
-${documentContext}`;
+${documentContext}${externalResourcesContext}`;
 
     // Prepare conversation messages
     const messages = [
@@ -326,6 +377,7 @@ ${documentContext}`;
       messageCount: messages.length,
       documentCount: relevantDocuments.length,
       chunkCount: relevantChunks.length,
+      externalResourceCount: relevantExternalResources.length,
       usingRAG: relevantChunks.length > 0,
       totalContextLength: systemPrompt.length + message.length
     });
@@ -354,6 +406,7 @@ ${documentContext}`;
     console.log('Chat with documents completed:', {
       totalDuration: `${totalDuration}ms`,
       documentsUsed: relevantDocuments.length,
+      externalResourcesUsed: relevantExternalResources.length,
       timestamp: new Date().toISOString()
     });
 
@@ -370,6 +423,14 @@ ${documentContext}`;
           type: doc.document_type,
           status: doc.status
         })),
+        externalResources: relevantExternalResources.map(resource => ({
+          id: resource.id,
+          title: resource.title,
+          url: resource.url,
+          description: resource.description,
+          category: resource.category,
+          tags: resource.tags || []
+        })),
         conversationHistory: [
           ...conversationHistory.slice(-9), // Keep last 9 to make room for new messages
           { role: 'user', content: message },
@@ -378,6 +439,7 @@ ${documentContext}`;
         metadata: {
           documentsUsed: relevantDocuments.length,
           chunksUsed: relevantChunks.length,
+          externalResourcesUsed: relevantExternalResources.length,
           usingRAG: relevantChunks.length > 0,
           responseTime: openaiDuration,
           tokensUsed: completion.usage?.total_tokens || 0
