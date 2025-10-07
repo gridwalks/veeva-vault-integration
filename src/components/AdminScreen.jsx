@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { listApproved, indexDocuments, getIndexedDocuments } from "../api";
 import DocumentList from "./DocumentList.jsx";
 import IndexedDocumentList from "./IndexedDocumentList.jsx";
+import DocumentUpload from "./DocumentUpload.jsx";
+import ExternalResources from "./ExternalResources.jsx";
 
 export default function AdminScreen() {
   const [q, setQ] = useState("");
@@ -169,7 +171,7 @@ export default function AdminScreen() {
       </h1>
 
       {/* Tab Navigation */}
-      <div style={{display: 'flex', gap: '8px', marginBottom: '20px', justifyContent: 'center'}}>
+      <div style={{display: 'flex', gap: '8px', marginBottom: '20px', justifyContent: 'center', flexWrap: 'wrap'}}>
         <button
           onClick={() => {
             console.log('Switching to documents tab');
@@ -210,56 +212,99 @@ export default function AdminScreen() {
         >
           Indexed Documents
         </button>
+        <button
+          onClick={() => {
+            console.log('Switching to upload tab');
+            setActiveTab("upload");
+          }}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: activeTab === "upload" ? '#4338ca' : '#f3f4f6',
+            color: activeTab === "upload" ? 'white' : '#374151',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          Upload Documents
+        </button>
+        <button
+          onClick={() => {
+            console.log('Switching to external resources tab');
+            setActiveTab("external");
+          }}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: activeTab === "external" ? '#4338ca' : '#f3f4f6',
+            color: activeTab === "external" ? 'white' : '#374151',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          External Resources
+        </button>
       </div>
 
-      <form onSubmit={(e) => { 
-        e.preventDefault(); 
-        console.log('Search form submitted:', { query: q, activeTab });
-        if (activeTab === "documents") load(0);
-        else loadIndexed(0);
-      }} style={{display:'flex', gap:8, margin:'0 0 20px 0'}}>
-        <input
-          value={q}
-          onChange={e => setQ(e.target.value)}
-          placeholder="Filter by name…"
-          style={{flex:1, padding:'8px 10px', border: '1px solid #ddd', borderRadius: '4px'}}
-        />
-        <button style={{padding:'8px 12px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer'}}>Search</button>
-        {activeTab === "documents" && (
-          <>
-            <button
-              type="button"
-              onClick={() => handleIndexDocuments(false)}
-              disabled={isIndexing}
-              style={{
-                padding:'8px 12px',
-                backgroundColor: isIndexing ? '#ccc' : '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: isIndexing ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {isIndexing ? 'Indexing...' : 'Index Documents'}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleIndexDocuments(true)}
-              disabled={isIndexing}
-              style={{
-                padding:'8px 12px',
-                backgroundColor: isIndexing ? '#ccc' : '#ff6b35',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: isIndexing ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {isIndexing ? 'Regenerating...' : 'Regenerate Summaries'}
-            </button>
-          </>
-        )}
-      </form>
+      {/* Search form - only show for documents and indexed tabs */}
+      {(activeTab === "documents" || activeTab === "indexed") && (
+        <form onSubmit={(e) => { 
+          e.preventDefault(); 
+          console.log('Search form submitted:', { query: q, activeTab });
+          if (activeTab === "documents") load(0);
+          else loadIndexed(0);
+        }} style={{display:'flex', gap:8, margin:'0 0 20px 0'}}>
+          <input
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            placeholder="Filter by name…"
+            style={{flex:1, padding:'8px 10px', border: '1px solid #ddd', borderRadius: '4px'}}
+          />
+          <button style={{padding:'8px 12px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer'}}>Search</button>
+          {activeTab === "documents" && (
+            <>
+              <button
+                type="button"
+                onClick={() => handleIndexDocuments(false)}
+                disabled={isIndexing}
+                style={{
+                  padding:'8px 12px',
+                  backgroundColor: isIndexing ? '#ccc' : '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: isIndexing ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isIndexing ? 'Indexing...' : 'Index Documents'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleIndexDocuments(true)}
+                disabled={isIndexing}
+                style={{
+                  padding:'8px 12px',
+                  backgroundColor: isIndexing ? '#ccc' : '#ff6b35',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: isIndexing ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isIndexing ? 'Regenerating...' : 'Regenerate Summaries'}
+              </button>
+            </>
+          )}
+        </form>
+      )}
 
       {/* Index Results */}
       {indexResult && (
@@ -319,7 +364,7 @@ export default function AdminScreen() {
             </button>
           </div>
         </>
-      ) : (
+      ) : activeTab === "indexed" ? (
         <>
           <IndexedDocumentList 
             items={indexedData.items} 
@@ -349,7 +394,19 @@ export default function AdminScreen() {
             </button>
           </div>
         </>
-      )}
+      ) : activeTab === "upload" ? (
+        <DocumentUpload 
+          onUploadComplete={(result) => {
+            console.log('Upload completed:', result);
+            // Refresh indexed documents after upload
+            if (result.success) {
+              loadIndexed(0);
+            }
+          }}
+        />
+      ) : activeTab === "external" ? (
+        <ExternalResources />
+      ) : null}
 
       {/* Selected Documents for Chat */}
       <div style={{

@@ -241,3 +241,170 @@ export async function updateManualSummary({ documentId, manualSummary }) {
     throw error;
   }
 }
+
+// External Resources API functions
+export async function getExternalResources() {
+  const startTime = Date.now();
+  console.log('Fetching external resources...');
+  
+  try {
+    const res = await fetch('/api/external-resources');
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to load external resources:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText
+      });
+      throw new Error(`Failed to load external resources: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`External resources fetched in ${duration}ms:`, {
+      count: data.resources?.length || 0
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error fetching external resources after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
+export async function createExternalResource({ title, url, description, category, tags }) {
+  const startTime = Date.now();
+  console.log('Creating external resource...', { title, url, category });
+  
+  try {
+    const res = await fetch('/api/external-resources', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title,
+        url,
+        description,
+        category,
+        tags
+      })
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to create external resource:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error,
+        details: errorData.details
+      });
+      throw new Error(errorData.error || `Failed to create external resource: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`External resource created in ${duration}ms:`, {
+      id: data.resource?.id,
+      title: data.resource?.title
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error creating external resource after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
+export async function updateExternalResource({ id, title, url, description, category, tags }) {
+  const startTime = Date.now();
+  console.log('Updating external resource...', { id, title, url, category });
+  
+  try {
+    const res = await fetch(`/api/external-resources/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title,
+        url,
+        description,
+        category,
+        tags
+      })
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to update external resource:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error,
+        details: errorData.details
+      });
+      throw new Error(errorData.error || `Failed to update external resource: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`External resource updated in ${duration}ms:`, {
+      id: data.resource?.id,
+      title: data.resource?.title
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error updating external resource after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
+export async function deleteExternalResource({ id }) {
+  const startTime = Date.now();
+  console.log('Deleting external resource...', { id });
+  
+  try {
+    const res = await fetch(`/api/external-resources/${id}`, {
+      method: 'DELETE'
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to delete external resource:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error
+      });
+      throw new Error(errorData.error || `Failed to delete external resource: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`External resource deleted in ${duration}ms:`, {
+      id
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error deleting external resource after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
