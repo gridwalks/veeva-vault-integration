@@ -3,7 +3,8 @@ import { OpenAI } from 'openai';
 import mammoth from 'mammoth';
 import { parseDocument } from 'docx-parser';
 import { chunkText } from './chunking-utils.js';
-import { put } from '@netlify/blobs';
+// Temporarily disable Netlify Blobs import to test if it's causing issues
+// import { put } from '@netlify/blobs';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -78,8 +79,13 @@ function parseMultipartFormData(body, contentType) {
   return { files, fileCount, uploadType };
 }
 
-// Helper function to save file to Netlify Blob storage
+// Helper function to save file to Netlify Blob storage (temporarily disabled)
 async function saveFileToBlob(fileBuffer, fileName, mimeType) {
+  console.log(`Blob storage disabled for testing: ${fileName}`);
+  return null;
+  
+  // Original implementation commented out for testing
+  /*
   try {
     // Generate a unique filename to avoid conflicts
     const timestamp = Date.now();
@@ -107,6 +113,7 @@ async function saveFileToBlob(fileBuffer, fileName, mimeType) {
     console.error('Error saving file to blob storage:', error);
     throw error;
   }
+  */
 }
 
 // Helper function to extract text from different file types
@@ -439,17 +446,56 @@ export const handler = async (event) => {
   console.log('=== DOCUMENT UPLOAD STARTED ===');
   console.log('Processing file upload...', {
     timestamp: new Date().toISOString(),
-    contentType: event.headers['content-type']
+    contentType: event.headers['content-type'],
+    method: event.httpMethod,
+    bodyLength: event.body?.length || 0
   });
+
+  // Handle OPTIONS request for CORS
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      },
+      body: ''
+    };
+  }
+
+  // Handle non-POST requests
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: JSON.stringify({
+        error: 'Method not allowed',
+        allowedMethods: ['POST', 'OPTIONS']
+      })
+    };
+  }
 
   try {
     // Parse multipart form data
+    console.log('Parsing multipart form data...');
+    const parseStartTime = Date.now();
+    
     const { files, fileCount, uploadType } = parseMultipartFormData(
       event.body, 
       event.headers['content-type']
     );
 
-    console.log(`Received ${files.length} files for upload`);
+    const parseDuration = Date.now() - parseStartTime;
+    console.log(`Multipart parsing completed in ${parseDuration}ms`);
+    console.log(`Received ${files.length} files for upload:`, {
+      fileCount,
+      uploadType,
+      fileNames: files.map(f => f.fileName)
+    });
 
     if (files.length === 0) {
       return {
@@ -470,9 +516,23 @@ export const handler = async (event) => {
     const results = [];
     let totalChunksCreated = 0;
     let totalErrors = 0;
+    const processingStartTime = Date.now();
+    const MAX_PROCESSING_TIME = 8000; // 8 seconds to leave buffer for response
 
     // Process each file
     for (const file of files) {
+      // Check if we're approaching timeout
+      const elapsedTime = Date.now() - processingStartTime;
+      if (elapsedTime > MAX_PROCESSING_TIME) {
+        console.warn(`Processing timeout warning: ${elapsedTime}ms elapsed`);
+        results.push({
+          fileName: file.fileName,
+          success: false,
+          error: 'Processing timeout - function approaching time limit'
+        });
+        totalErrors++;
+        continue;
+      }
       console.log(`Processing file: ${file.fileName} (${file.size} bytes)`);
       
       try {
@@ -493,9 +553,14 @@ export const handler = async (event) => {
           };
           mimeType = mimeTypeMap[fileExtension] || 'application/octet-stream';
           
-          console.log(`Attempting to save file to blob storage: ${file.fileName} (${mimeType})`);
-          blobUrl = await saveFileToBlob(file.buffer, file.fileName, mimeType);
-          console.log(`✅ File saved to blob storage: ${blobUrl}`);
+          // Temporarily disable blob storage to test if it's causing the 502 error
+          console.log(`Blob storage temporarily disabled for testing: ${file.fileName} (${mimeType})`);
+          blobUrl = null; // Disable blob storage temporarily
+          
+          // Uncomment the lines below to re-enable blob storage after testing
+          // console.log(`Attempting to save file to blob storage: ${file.fileName} (${mimeType})`);
+          // blobUrl = await saveFileToBlob(file.buffer, file.fileName, mimeType);
+          // console.log(`✅ File saved to blob storage: ${blobUrl}`);
         } catch (blobError) {
           console.error(`❌ Failed to save file to blob storage:`, {
             fileName: file.fileName,
@@ -513,9 +578,15 @@ export const handler = async (event) => {
         );
 
         // Generate AI summary
+        console.log(`Generating AI summary for: ${file.fileName}`);
+        const summaryStartTime = Date.now();
         const summary = await generateSummary(extractedText, file.fileName);
+        const summaryDuration = Date.now() - summaryStartTime;
+        console.log(`AI summary generated in ${summaryDuration}ms for: ${file.fileName}`);
 
         // Store document in database
+        console.log(`Storing document in database: ${file.fileName}`);
+        const storeStartTime = Date.now();
         const documentId = await storeDocument(
           file.fileName,
           extractedText,
@@ -526,13 +597,19 @@ export const handler = async (event) => {
           file.fileName,
           mimeType
         );
+        const storeDuration = Date.now() - storeStartTime;
+        console.log(`Document stored in database in ${storeDuration}ms with ID: ${documentId}`);
 
         // Chunk and embed document
+        console.log(`Chunking and embedding document: ${file.fileName}`);
+        const chunkStartTime = Date.now();
         const { chunksCreated, error: chunkError } = await chunkAndEmbedDocument(
           extractedText,
           documentId,
           file.fileName
         );
+        const chunkDuration = Date.now() - chunkStartTime;
+        console.log(`Chunking and embedding completed in ${chunkDuration}ms for: ${file.fileName}`);
 
         if (chunkError) {
           totalErrors++;
