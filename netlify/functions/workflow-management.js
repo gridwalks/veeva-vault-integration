@@ -112,21 +112,28 @@ export const handler = async (event) => {
     await createWorkflowTables(pool);
 
     const pathParts = event.path.split('/').filter(part => part);
-    const resource = pathParts[pathParts.length - 1];
-    const resourceId = pathParts[pathParts.length - 2] && !isNaN(pathParts[pathParts.length - 2]) ? pathParts[pathParts.length - 2] : null;
+    const lastPart = pathParts[pathParts.length - 1];
+    const secondLastPart = pathParts[pathParts.length - 2];
+    
+    // Check if last part is a number (ID)
+    const isIdInPath = !isNaN(lastPart) && lastPart !== '';
+    const templateId = isIdInPath ? lastPart : null;
+    const resource = isIdInPath ? secondLastPart : lastPart;
 
-    console.log('Resource path:', { resource, resourceId, pathParts });
+    console.log('Resource path:', { resource, templateId, pathParts, isIdInPath });
 
     switch (event.httpMethod) {
       case 'GET':
         if (resource === 'workflow-templates') {
           return await getWorkflowTemplates(pool);
-        } else if (resource === 'workflow-steps' && resourceId) {
-          return await getWorkflowSteps(pool, resourceId);
+        } else if (resource === 'workflow-steps' && templateId) {
+          return await getWorkflowSteps(pool, templateId);
         } else if (resource === 'workflow-instances') {
           return await getWorkflowInstances(pool, event.queryStringParameters);
-        } else if (resource === 'workflow-management' && resourceId) {
-          return await getWorkflowTemplate(pool, resourceId);
+        } else if (resource === 'workflow-management' && templateId) {
+          return await getWorkflowTemplate(pool, templateId);
+        } else if (resource === 'workflow-management') {
+          return await getWorkflowTemplates(pool);
         } else {
           return await getWorkflowTemplates(pool);
         }
@@ -143,18 +150,20 @@ export const handler = async (event) => {
         }
 
       case 'PUT':
-        if (resource === 'workflow-management' && resourceId) {
-          return await updateWorkflowTemplate(pool, resourceId, event.body);
-        } else if (resource === 'workflow-steps' && resourceId) {
-          return await updateWorkflowStep(pool, resourceId, event.body);
+        if (resource === 'workflow-management' && templateId) {
+          return await updateWorkflowTemplate(pool, templateId, event.body);
+        } else if (resource === 'workflow-steps' && templateId) {
+          return await updateWorkflowStep(pool, templateId, event.body);
         }
+        break;
 
       case 'DELETE':
-        if (resource === 'workflow-management' && resourceId) {
-          return await deleteWorkflowTemplate(pool, resourceId);
-        } else if (resource === 'workflow-steps' && resourceId) {
-          return await deleteWorkflowStep(pool, resourceId);
+        if (resource === 'workflow-management' && templateId) {
+          return await deleteWorkflowTemplate(pool, templateId);
+        } else if (resource === 'workflow-steps' && templateId) {
+          return await deleteWorkflowStep(pool, templateId);
         }
+        break;
 
       default:
         return {

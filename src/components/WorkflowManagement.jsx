@@ -77,23 +77,35 @@ export default function WorkflowManagement() {
   const loadTemplateDetails = async (templateId) => {
     setLoading(true);
     try {
+      console.log('Loading template details for ID:', templateId);
       const response = await fetch(`/api/workflow-management/${templateId}`);
+      
       if (response.ok) {
         const data = await response.json();
-        setSelectedTemplate(data.template);
-        setSteps(data.template.steps || []);
+        console.log('Template details loaded:', data);
         
-        // Update step form with the selected template ID
-        setStepForm(prev => ({
-          ...prev,
-          workflowTemplateId: data.template.id,
-          stepOrder: (data.template.steps || []).length + 1
-        }));
+        if (data.success && data.template) {
+          setSelectedTemplate(data.template);
+          setSteps(data.template.steps || []);
+          
+          // Update step form with the selected template ID
+          setStepForm(prev => ({
+            ...prev,
+            workflowTemplateId: data.template.id,
+            stepOrder: (data.template.steps || []).length + 1
+          }));
+        } else {
+          console.error('Invalid response structure:', data);
+          alert('Failed to load template details. Please try again.');
+        }
       } else {
-        console.error('Failed to load template details');
+        const errorText = await response.text();
+        console.error('Failed to load template details:', response.status, errorText);
+        alert(`Failed to load template details: ${response.status}`);
       }
     } catch (error) {
       console.error('Error loading template details:', error);
+      alert('Error loading template details. Please check the console for details.');
     } finally {
       setLoading(false);
     }
