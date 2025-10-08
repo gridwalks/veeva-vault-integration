@@ -426,12 +426,18 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
           responses: {}
         });
 
-        // Show completion message with generated document
+        // Show completion message with generated document and export option
         setConversationHistory(prev => [
           ...prev,
           { 
             role: 'assistant', 
-            content: `🎉 **${workflowState.template.name}** completed successfully!\n\n**Generated Document:**\n\n\`\`\`\n${data.generatedDocument}\n\`\`\`\n\nYou can copy this document or ask me to help you format it further.` 
+            content: `🎉 **${workflowState.template.name}** completed successfully!\n\n**Generated Document:**\n\n\`\`\`\n${data.generatedDocument}\n\`\`\`\n\nYou can:\n- Copy this document\n- Click the button below to export to Word\n- Ask me to help you format it further`,
+            metadata: {
+              showExportButton: true,
+              generatedDocument: data.generatedDocument,
+              workflowName: workflowState.template.name,
+              instanceId: workflowState.instanceId
+            }
           }
         ]);
       } else {
