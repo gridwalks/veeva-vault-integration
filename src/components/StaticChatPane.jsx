@@ -371,14 +371,40 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
           responses: {}
         });
 
+        // Search for relevant SOPs and documents to help with the workflow
+        const relevantDocs = await findRelevantDocuments(template.name, template.category);
+
+        // Build workflow start message
+        let startMessage = `🚀 **${template.name}** workflow started!\n\n`;
+        
+        // Add helpful resources section if found
+        if (relevantDocs.length > 0) {
+          startMessage += `📚 **Helpful Resources:**\n`;
+          startMessage += `I found ${relevantDocs.length} document${relevantDocs.length > 1 ? 's' : ''} that might help you complete this workflow:\n\n`;
+          relevantDocs.forEach((doc, index) => {
+            startMessage += `${index + 1}. **${doc.document_name}** (${doc.document_type})\n`;
+          });
+          startMessage += `\n*Click on any document in the references below to view it.*\n\n---\n\n`;
+        }
+        
+        startMessage += `**${data.currentStep.questionText}**\n\n${data.currentStep.helpText ? `*${data.currentStep.helpText}*` : ''}\n\nType "exit workflow" at any time to cancel.`;
+
         // Add workflow start message to conversation
         setConversationHistory(prev => [
           ...prev,
           { 
             role: 'assistant', 
-            content: `🚀 **${template.name}** workflow started!\n\n**${data.currentStep.questionText}**\n\n${data.currentStep.helpText ? `*${data.currentStep.helpText}*` : ''}\n\nType "exit workflow" at any time to cancel.` 
+            content: startMessage,
+            metadata: {
+              relevantDocuments: relevantDocs
+            }
           }
         ]);
+        
+        // Update used documents to show the SOPs
+        if (relevantDocs.length > 0) {
+          setUsedDocuments(relevantDocs);
+        }
       } else {
         const error = await response.json();
         console.error('Failed to start workflow:', error);
@@ -401,6 +427,41 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       ]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const findRelevantDocuments = async (workflowName, category) => {
+    try {
+      // Search for relevant SOPs and procedures
+      const keywords = [
+        workflowName.toLowerCase(),
+        category?.toLowerCase(),
+        'sop',
+        'procedure',
+        'guideline'
+      ].filter(Boolean);
+
+      const response = await fetch('/api/chat-with-documents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: `Find relevant SOPs and procedures for ${workflowName}`,
+          documentIds: [],
+          conversationHistory: []
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.documents || [];
+      } else {
+        return [];
+      }
+    } catch (error) {
+      console.error('Error finding relevant documents:', error);
+      return [];
     }
   };
 
