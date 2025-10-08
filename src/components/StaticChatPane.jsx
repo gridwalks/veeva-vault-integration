@@ -325,6 +325,20 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
 
   const handleWorkflowStepSubmission = async (response) => {
     try {
+      // Validate workflow state
+      if (!workflowState.instanceId || !workflowState.currentStep || !workflowState.currentStep.id) {
+        console.error('Invalid workflow state:', workflowState);
+        setConversationHistory(prev => [
+          ...prev,
+          { 
+            role: 'assistant', 
+            content: `Sorry, there was an issue with the workflow state. Please restart the workflow.` 
+          }
+        ]);
+        setIsLoading(false);
+        return;
+      }
+
       const submitResponse = await fetch('/api/workflow-execution/submit-step', {
         method: 'POST',
         headers: {
@@ -341,12 +355,13 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
 
       if (submitResponse.ok) {
         const data = await submitResponse.json();
+        console.log('Step submission response:', data);
         
-        // Update workflow state
+        // Update workflow state with new step and save response
         setWorkflowState(prev => ({
           ...prev,
           currentStep: data.nextStep,
-          responses: { ...prev.responses, [data.currentStep.id]: response }
+          responses: { ...prev.responses, [workflowState.currentStep.id]: response }
         }));
 
         if (data.isComplete) {
