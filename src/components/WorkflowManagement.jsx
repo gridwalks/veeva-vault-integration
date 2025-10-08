@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import WorkflowImport from './WorkflowImport.jsx';
 
 export default function WorkflowManagement() {
   const [templates, setTemplates] = useState([]);
@@ -396,6 +397,23 @@ export default function WorkflowManagement() {
           }}
         >
           Workflow Templates
+        </button>
+        <button
+          onClick={() => setActiveTab('import')}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: activeTab === 'import' ? '#4338ca' : '#f3f4f6',
+            color: activeTab === 'import' ? 'white' : '#374151',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          Import from Spreadsheet
         </button>
         {selectedTemplate && (
           <button
@@ -1119,6 +1137,19 @@ export default function WorkflowManagement() {
             </div>
           )}
         </>
+      )}
+
+      {/* Import Tab */}
+      {activeTab === 'import' && (
+        <WorkflowImport 
+          onImportComplete={(result) => {
+            console.log('Workflow import completed:', result);
+            // Refresh templates list
+            loadTemplates();
+            // Switch to templates tab
+            setActiveTab('templates');
+          }}
+        />
       )}
 
       {/* Steps List */}
