@@ -270,35 +270,6 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
           }}>
             Selected Documents
           </h3>
-              <p style={{
-                margin: '3px 0 0 0',
-                fontSize: '11px',
-                color: '#6b7280',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
-                {selectedDocuments.length} document{selectedDocuments.length !== 1 ? 's' : ''} selected for chat
-              </p>
-              {selectedDocuments.length > 0 && (
-                <button
-                  onClick={() => {
-                    console.log('Test: Opening first document for testing');
-                    handleOpenDocument(selectedDocuments[0]);
-                  }}
-                  style={{
-                    marginTop: '8px',
-                    padding: '4px 8px',
-                    backgroundColor: '#10b981',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '10px',
-                    cursor: 'pointer',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                  }}
-                >
-                  Test Open First Doc
-                </button>
-              )}
         </div>
 
         {/* Content */}
