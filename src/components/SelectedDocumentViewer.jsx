@@ -486,14 +486,6 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
               }}>
                 No documents selected
               </h4>
-              <p style={{
-                margin: 0,
-                fontSize: '14px',
-                lineHeight: '1.5',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
-                Go to the Admin Panel to select documents for chat. You can select multiple documents to use in your conversations.
-              </p>
             </div>
           ) : (
             /* Document List View */
