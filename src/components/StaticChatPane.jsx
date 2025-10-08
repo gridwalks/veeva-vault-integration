@@ -484,6 +484,80 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     setIsLoading(false);
   };
 
+  const exportToWord = (documentContent, workflowName) => {
+    try {
+      // Create a simple HTML structure for Word
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${workflowName}</title>
+          <style>
+            body {
+              font-family: 'Calibri', 'Arial', sans-serif;
+              font-size: 11pt;
+              line-height: 1.5;
+              margin: 1in;
+            }
+            h1 {
+              font-size: 16pt;
+              font-weight: bold;
+              margin-bottom: 12pt;
+              border-bottom: 2px solid #000;
+              padding-bottom: 6pt;
+            }
+            h2 {
+              font-size: 14pt;
+              font-weight: bold;
+              margin-top: 12pt;
+              margin-bottom: 6pt;
+            }
+            p {
+              margin-bottom: 6pt;
+            }
+            pre {
+              white-space: pre-wrap;
+              font-family: 'Calibri', 'Arial', sans-serif;
+            }
+          </style>
+        </head>
+        <body>
+          <pre>${documentContent}</pre>
+        </body>
+        </html>
+      `;
+
+      // Create a Blob with the HTML content
+      const blob = new Blob([htmlContent], { 
+        type: 'application/msword' 
+      });
+
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const filename = `${workflowName.replace(/\s+/g, '_')}_${timestamp}.doc`;
+      link.download = filename;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      console.log('Document exported successfully:', filename);
+    } catch (error) {
+      console.error('Error exporting to Word:', error);
+      alert('Failed to export document. Please try copying the text instead.');
+    }
+  };
+
   const renderMessage = (message, index) => {
     console.log(`Rendering message ${index}:`, { role: message.role, contentLength: message.content?.length });
     const isUser = message.role === 'user';
@@ -518,6 +592,50 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
             message.content
           )}
         </div>
+
+        {/* Export to Word button for completed workflows */}
+        {isAssistant && message.metadata && message.metadata.showExportButton && (
+          <div style={{
+            maxWidth: '80%',
+            marginTop: '8px',
+            padding: '12px',
+            backgroundColor: '#dcfce7',
+            borderRadius: '8px',
+            border: '1px solid #86efac'
+          }}>
+            <button
+              onClick={() => exportToWord(message.metadata.generatedDocument, message.metadata.workflowName)}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#16a34a',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#15803d'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = '#16a34a'}
+            >
+              <span>📄</span>
+              Export to Word Document
+            </button>
+            <p style={{
+              margin: '8px 0 0 0',
+              fontSize: '12px',
+              color: '#166534',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            }}>
+              Downloads as: {message.metadata.workflowName.replace(/\s+/g, '_')}_{new Date().toISOString().slice(0, 10)}.doc
+            </p>
+          </div>
+        )}
 
         {/* Document opening options for the last assistant message */}
         {isLastAssistantMessage && usedDocuments && usedDocuments.length > 0 && (
