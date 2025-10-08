@@ -120,26 +120,26 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '16px',
-        padding: '12px',
+        marginBottom: '12px',
+        padding: '8px',
         backgroundColor: '#f8f9fa',
-        borderRadius: '8px',
+        borderRadius: '6px',
         border: '1px solid #e9ecef'
       }}>
-        <div style={{ fontSize: '14px', color: '#666' }}>
+        <div style={{ fontSize: '12px', color: '#666' }}>
           {selectedDocs.size} of {items.length} documents selected
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={handleSelectAll}
             style={{
-              padding: '6px 12px',
+              padding: '5px 10px',
               backgroundColor: selectedDocs.size === items.length ? '#6c757d' : '#007bff',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '12px'
+              fontSize: '11px'
             }}
           >
             {selectedDocs.size === items.length ? 'Deselect All' : 'Select All'}
@@ -147,34 +147,34 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
         </div>
       </div>
 
-      <div style={{display: 'grid', gap: '16px', marginTop: '16px'}}>
+      <div style={{display: 'grid', gap: '12px', marginTop: '12px'}}>
         {items.map((doc) => (
           <div key={doc.id} style={{
             border: '2px solid',
             borderColor: selectedDocs.has(doc.id) ? '#007bff' : '#ddd',
-            borderRadius: '8px',
-            padding: '16px',
+            borderRadius: '6px',
+            padding: '12px',
             backgroundColor: selectedDocs.has(doc.id) ? '#f0f8ff' : '#f9f9f9',
             transition: 'all 0.2s ease'
           }}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px'}}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px'}}>
               <div style={{flex: 1}}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                   <input
                     type="checkbox"
                     checked={selectedDocs.has(doc.id)}
                     onChange={() => handleSelectDocument(doc.id)}
                     style={{
-                      width: '16px',
-                      height: '16px',
+                      width: '14px',
+                      height: '14px',
                       cursor: 'pointer'
                     }}
                   />
-                  <h3 style={{margin: '0', fontSize: '16px', fontWeight: '600'}}>
+                  <h3 style={{margin: '0', fontSize: '13px', fontWeight: '600'}}>
                     {doc.document_name}
                   </h3>
                 </div>
-                <div style={{display: 'flex', gap: '16px', fontSize: '14px', color: '#666', marginBottom: '8px', flexWrap: 'wrap', alignItems: 'center'}}>
+                <div style={{display: 'flex', gap: '12px', fontSize: '11px', color: '#666', marginBottom: '6px', flexWrap: 'wrap', alignItems: 'center'}}>
                   <span><strong>Number:</strong> {doc.document_number || 'N/A'}</span>
                   <span><strong>Version:</strong> {doc.major_version}.{doc.minor_version}</span>
                   <span><strong>Type:</strong> {doc.document_type}</span>
@@ -183,9 +183,9 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
                     <span style={{
                       backgroundColor: '#17a2b8',
                       color: 'white',
-                      padding: '2px 6px',
-                      borderRadius: '12px',
-                      fontSize: '10px',
+                      padding: '2px 5px',
+                      borderRadius: '10px',
+                      fontSize: '9px',
                       fontWeight: '600'
                     }}>
                       UPLOADED
@@ -193,22 +193,22 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
                   )}
                 </div>
                 {doc.original_filename && doc.original_filename !== doc.document_name && (
-                  <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '10px', color: '#888', marginBottom: '6px' }}>
                     <strong>Original filename:</strong> {doc.original_filename}
                   </div>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <button
                   onClick={() => handleViewDocument(doc)}
                   style={{
-                    padding: '8px 12px',
+                    padding: '6px 10px',
                     backgroundColor: '#007bff',
                     color: 'white',
                     border: 'none',
                     borderRadius: '4px',
                     cursor: 'pointer',
-                    fontSize: '14px'
+                    fontSize: '11px'
                   }}
                 >
                   View
@@ -217,12 +217,12 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
                   <a
                     href={downloadUploadedDocumentUrl({ documentId: doc.id })}
                     style={{
-                      padding: '8px 12px',
+                      padding: '6px 10px',
                       backgroundColor: '#28a745',
                       color: 'white',
                       textDecoration: 'none',
                       borderRadius: '4px',
-                      fontSize: '14px'
+                      fontSize: '11px'
                     }}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -233,12 +233,12 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
                   <a
                     href={downloadUrl({ id: doc.veeva_document_id, major: doc.major_version, minor: doc.minor_version })}
                     style={{
-                      padding: '8px 12px',
+                      padding: '6px 10px',
                       backgroundColor: '#28a745',
                       color: 'white',
                       textDecoration: 'none',
                       borderRadius: '4px',
-                      fontSize: '14px'
+                      fontSize: '11px'
                     }}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -253,17 +253,17 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
           {doc.summary && (
             <div style={{
               backgroundColor: 'white',
-              padding: '12px',
+              padding: '8px',
               borderRadius: '4px',
               border: '1px solid #e0e0e0',
-              marginBottom: '12px'
+              marginBottom: '8px'
             }}>
-              <h4 style={{margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#333'}}>
+              <h4 style={{margin: '0 0 6px 0', fontSize: '12px', fontWeight: '600', color: '#333'}}>
                 AI Summary:
               </h4>
               <div style={{
-                fontSize: '14px',
-                lineHeight: '1.5',
+                fontSize: '12px',
+                lineHeight: '1.4',
                 color: '#555',
                 textAlign: 'left'
               }}>
@@ -292,12 +292,12 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
           {/* Manual Summary */}
           <div style={{
             backgroundColor: '#f8f9fa',
-            padding: '12px',
+            padding: '8px',
             borderRadius: '4px',
             border: '1px solid #dee2e6'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h4 style={{margin: '0', fontSize: '14px', fontWeight: '600', color: '#333'}}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <h4 style={{margin: '0', fontSize: '12px', fontWeight: '600', color: '#333'}}>
                 Manual Summary:
               </h4>
               {editingSummary !== doc.id && (
@@ -407,7 +407,7 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
             )}
           </div>
           
-          <div style={{fontSize: '12px', color: '#999', marginTop: '12px'}}>
+          <div style={{fontSize: '10px', color: '#999', marginTop: '8px'}}>
             Indexed: {new Date(doc.indexed_at).toLocaleString()} | 
             Updated: {new Date(doc.updated_at).toLocaleString()}
           </div>

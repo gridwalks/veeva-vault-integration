@@ -13,7 +13,7 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout }
       padding: '0 16px',
       backgroundColor: '#f8fafc',
       borderBottom: '1px solid #e5e7eb',
-      height: '64px'
+      height: '48px'
     }}>
       {/* Left Section - Logo and App Name */}
       <div style={{
@@ -26,7 +26,7 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout }
           src={acceleraqaLogo} 
           alt="AcceleraQA Logo" 
           style={{ 
-            height: '32px', 
+            height: '24px', 
             width: 'auto',
             objectFit: 'contain'
           }} 
@@ -34,7 +34,7 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout }
         
         {/* Beta badge */}
         <span style={{
-          fontSize: '12px',
+          fontSize: '10px',
           fontWeight: '600',
           color: '#6b7280',
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -62,14 +62,14 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout }
           }}>
             {/* User Icon */}
             <div style={{
-              width: '32px',
-              height: '32px',
+              width: '28px',
+              height: '28px',
               borderRadius: '50%',
               backgroundColor: '#4338ca',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '14px',
+              fontSize: '12px',
               color: '#ffffff',
               fontWeight: '600'
             }}>
@@ -79,7 +79,7 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout }
             {/* User Details */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
               <span style={{
-                fontSize: '14px',
+                fontSize: '12px',
                 color: '#374151',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 fontWeight: '500'
@@ -87,7 +87,7 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout }
                 {user.email}
               </span>
               <span style={{
-                fontSize: '12px',
+                fontSize: '10px',
                 color: '#6b7280',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>

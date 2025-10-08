@@ -735,12 +735,12 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         <div
           style={{
             maxWidth: '80%',
-            padding: '12px 16px',
-            borderRadius: '18px',
+            padding: '8px 12px',
+            borderRadius: '12px',
             backgroundColor: isUser ? '#007bff' : '#f1f3f4',
             color: isUser ? 'white' : '#333',
-            fontSize: '14px',
-            lineHeight: '1.5',
+            fontSize: '13px',
+            lineHeight: '1.4',
             wordWrap: 'break-word'
           }}
         >
@@ -1050,7 +1050,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       }}>
         {/* Header */}
         <div style={{
-          padding: '16px 20px',
+          padding: '10px 14px',
           borderBottom: '1px solid #e5e7eb',
           backgroundColor: '#f8fafc',
           borderTopLeftRadius: '8px',
@@ -1065,7 +1065,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               <div>
                 <h3 style={{ 
                   margin: 0, 
-                  fontSize: '18px',
+                  fontSize: '14px',
                   color: '#374151',
                   fontWeight: '600',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -1075,11 +1075,11 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                 {workflowState.isActive && workflowState.template && (
                   <div style={{
                     marginTop: '4px',
-                    padding: '4px 8px',
+                    padding: '3px 6px',
                     backgroundColor: '#4338ca',
                     color: '#ffffff',
-                    borderRadius: '4px',
-                    fontSize: '12px',
+                    borderRadius: '3px',
+                    fontSize: '10px',
                     fontWeight: '500',
                     display: 'inline-block',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -1090,8 +1090,8 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               </div>
               {selectedDocuments.length > 0 && (
                 <p style={{ 
-                  margin: '4px 0 0 0', 
-                  fontSize: '12px', 
+                  margin: '3px 0 0 0', 
+                  fontSize: '11px', 
                   color: '#6b7280',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
@@ -1103,13 +1103,13 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               <button
                 onClick={clearConversation}
                 style={{
-                  padding: '6px 12px',
+                  padding: '4px 10px',
                   backgroundColor: '#6b7280',
                   color: '#ffffff',
                   border: 'none',
-                  borderRadius: '6px',
+                  borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '12px',
+                  fontSize: '11px',
                   fontWeight: '500',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   transition: 'background-color 0.2s ease'
@@ -1127,28 +1127,28 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         {/* Used Documents */}
         {usedDocuments.length > 0 && (
           <div style={{
-            padding: '12px 20px',
+            padding: '8px 14px',
             backgroundColor: '#2a2a2a',
             borderBottom: '1px solid #2a2a2a',
-            fontSize: '12px'
+            fontSize: '11px'
           }}>
             <div style={{
               color: '#ffffff',
               fontWeight: '600',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               Using {usedDocuments.length} document{usedDocuments.length !== 1 ? 's' : ''}:
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {usedDocuments.map((doc, index) => (
                 <span
                   key={index}
                   style={{
                     backgroundColor: '#007bff',
                     color: 'white',
-                    padding: '4px 12px',
-                    borderRadius: '12px',
-                    fontSize: '11px',
+                    padding: '3px 8px',
+                    borderRadius: '10px',
+                    fontSize: '10px',
                     fontWeight: '500'
                   }}
                   title={`${doc.name} (${doc.number})`}
@@ -1208,7 +1208,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         <div style={{
           flex: 1,
           overflow: 'auto',
-          padding: '20px',
+          padding: '12px',
           backgroundColor: '#ffffff'
         }}>
           {conversationHistory.length === 0 ? (
@@ -1304,13 +1304,13 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
 
         {/* Input */}
         <div style={{
-          padding: '16px 20px',
+          padding: '10px 14px',
           borderTop: '1px solid #e5e7eb',
           backgroundColor: '#f8fafc',
           borderBottomLeftRadius: '8px',
           borderBottomRightRadius: '8px'
         }}>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
             <textarea
               ref={inputRef}
               value={currentMessage}
@@ -1318,7 +1318,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               onKeyPress={handleKeyPress}
               onFocus={(e) => {
                 e.target.style.borderColor = '#4338ca';
-                e.target.style.boxShadow = '0 0 0 3px rgba(67, 56, 202, 0.1)';
+                e.target.style.boxShadow = '0 0 0 2px rgba(67, 56, 202, 0.1)';
               }}
               onBlur={(e) => {
                 e.target.style.borderColor = '#d1d5db';
@@ -1328,14 +1328,14 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               disabled={isLoading}
               style={{
                 flex: 1,
-                padding: '12px',
+                padding: '8px 10px',
                 border: '1px solid #d1d5db',
-                borderRadius: '8px',
+                borderRadius: '6px',
                 resize: 'none',
-                fontSize: '14px',
+                fontSize: '13px',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                minHeight: '44px',
-                maxHeight: '120px',
+                minHeight: '36px',
+                maxHeight: '100px',
                 backgroundColor: '#ffffff',
                 color: '#374151',
                 outline: 'none',
@@ -1347,16 +1347,16 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               onClick={sendMessage}
               disabled={!currentMessage.trim() || isLoading}
               style={{
-                padding: '12px 20px',
+                padding: '8px 16px',
                 backgroundColor: (!currentMessage.trim() || isLoading) ? '#9ca3af' : '#4338ca',
                 color: 'white',
                 border: 'none',
-                borderRadius: '8px',
+                borderRadius: '6px',
                 cursor: (!currentMessage.trim() || isLoading) ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
+                fontSize: '13px',
                 fontWeight: '500',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                minWidth: '80px',
+                minWidth: '70px',
                 transition: 'background-color 0.2s ease'
               }}
               onMouseEnter={(e) => {
@@ -1374,8 +1374,8 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
             </button>
           </div>
           <div style={{
-            marginTop: '8px',
-            fontSize: '12px',
+            marginTop: '4px',
+            fontSize: '10px',
             color: '#6b7280',
             textAlign: 'center',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'

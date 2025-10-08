@@ -185,7 +185,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
       }}>
         {/* Header */}
         <div style={{
-          padding: '16px 20px',
+          padding: '10px 14px',
           borderBottom: '1px solid #e5e7eb',
           backgroundColor: '#f8fafc',
           borderTopLeftRadius: '8px',
@@ -193,7 +193,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
         }}>
           <h3 style={{
             margin: 0,
-            fontSize: '18px',
+            fontSize: '14px',
             fontWeight: '600',
             color: '#374151',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -201,8 +201,8 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
             Selected Documents
           </h3>
               <p style={{
-                margin: '4px 0 0 0',
-                fontSize: '12px',
+                margin: '3px 0 0 0',
+                fontSize: '11px',
                 color: '#6b7280',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
@@ -235,7 +235,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
         <div style={{
           flex: 1,
           overflow: 'auto',
-          padding: '20px'
+          padding: '12px'
         }}>
           {activeDocument ? (
             /* Document Content View */
@@ -477,8 +477,8 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                   }}>
                     <div style={{ flex: 1 }}>
                       <h4 style={{
-                        margin: '0 0 4px 0',
-                        fontSize: '16px',
+                        margin: '0 0 3px 0',
+                        fontSize: '13px',
                         fontWeight: '600',
                         color: '#374151',
                         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -486,19 +486,19 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                         {doc.document_name}
                       </h4>
                       <div style={{
-                        fontSize: '12px',
+                        fontSize: '11px',
                         color: '#6b7280',
                         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                        marginBottom: '8px'
+                        marginBottom: '6px'
                       }}>
                         {doc.document_type} • Version {doc.version} • {doc.document_number}
                       </div>
                       {doc.summary && (
                         <p style={{
                           margin: 0,
-                          fontSize: '13px',
+                          fontSize: '12px',
                           color: '#6b7280',
-                          lineHeight: '1.4',
+                          lineHeight: '1.3',
                           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}>
                           {doc.summary.length > 150 ? `${doc.summary.substring(0, 150)}...` : doc.summary}

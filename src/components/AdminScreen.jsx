@@ -152,9 +152,9 @@ export default function AdminScreen() {
 
   return (
     <div style={{
-      height: 'calc(100vh - 120px)',
-      margin: '0 90px 0 90px',
-      padding: '24px',
+      height: 'calc(100vh - 60px)',
+      margin: '0 40px 0 40px',
+      padding: '16px',
       backgroundColor: '#ffffff',
       border: '1px solid #e5e7eb',
       borderRadius: '8px',
@@ -162,10 +162,10 @@ export default function AdminScreen() {
       boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
     }}>
       <h1 style={{ 
-        margin: '0 0 24px 0', 
+        margin: '0 0 12px 0', 
         textAlign: 'center', 
         color: '#374151',
-        fontSize: '24px',
+        fontSize: '18px',
         fontWeight: '600',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
       }}>
@@ -173,20 +173,20 @@ export default function AdminScreen() {
       </h1>
 
       {/* Tab Navigation */}
-      <div style={{display: 'flex', gap: '8px', marginBottom: '20px', justifyContent: 'center', flexWrap: 'wrap'}}>
+      <div style={{display: 'flex', gap: '6px', marginBottom: '12px', justifyContent: 'center', flexWrap: 'wrap'}}>
         <button
           onClick={() => {
             console.log('Switching to documents tab');
             setActiveTab("documents");
           }}
           style={{
-            padding: '8px 16px',
+            padding: '6px 12px',
             backgroundColor: activeTab === "documents" ? '#4338ca' : '#f3f4f6',
             color: activeTab === "documents" ? 'white' : '#374151',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '4px',
             cursor: 'pointer',
-            fontSize: '14px',
+            fontSize: '12px',
             fontWeight: '500',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             transition: 'all 0.2s ease'
@@ -200,13 +200,13 @@ export default function AdminScreen() {
             setActiveTab("indexed");
           }}
           style={{
-            padding: '8px 16px',
+            padding: '6px 12px',
             backgroundColor: activeTab === "indexed" ? '#4338ca' : '#f3f4f6',
             color: activeTab === "indexed" ? 'white' : '#374151',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '4px',
             cursor: 'pointer',
-            fontSize: '14px',
+            fontSize: '12px',
             fontWeight: '500',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             transition: 'all 0.2s ease'
@@ -220,13 +220,13 @@ export default function AdminScreen() {
             setActiveTab("upload");
           }}
           style={{
-            padding: '8px 16px',
+            padding: '6px 12px',
             backgroundColor: activeTab === "upload" ? '#4338ca' : '#f3f4f6',
             color: activeTab === "upload" ? 'white' : '#374151',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '4px',
             cursor: 'pointer',
-            fontSize: '14px',
+            fontSize: '12px',
             fontWeight: '500',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             transition: 'all 0.2s ease'
@@ -240,13 +240,13 @@ export default function AdminScreen() {
             setActiveTab("external");
           }}
           style={{
-            padding: '8px 16px',
+            padding: '6px 12px',
             backgroundColor: activeTab === "external" ? '#4338ca' : '#f3f4f6',
             color: activeTab === "external" ? 'white' : '#374151',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '4px',
             cursor: 'pointer',
-            fontSize: '14px',
+            fontSize: '12px',
             fontWeight: '500',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             transition: 'all 0.2s ease'
@@ -260,13 +260,13 @@ export default function AdminScreen() {
             setActiveTab("qa");
           }}
           style={{
-            padding: '8px 16px',
+            padding: '6px 12px',
             backgroundColor: activeTab === "qa" ? '#4338ca' : '#f3f4f6',
             color: activeTab === "qa" ? 'white' : '#374151',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '4px',
             cursor: 'pointer',
-            fontSize: '14px',
+            fontSize: '12px',
             fontWeight: '500',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             transition: 'all 0.2s ease'
@@ -280,13 +280,13 @@ export default function AdminScreen() {
             setActiveTab("workflow");
           }}
           style={{
-            padding: '8px 16px',
+            padding: '6px 12px',
             backgroundColor: activeTab === "workflow" ? '#4338ca' : '#f3f4f6',
             color: activeTab === "workflow" ? 'white' : '#374151',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '4px',
             cursor: 'pointer',
-            fontSize: '14px',
+            fontSize: '12px',
             fontWeight: '500',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             transition: 'all 0.2s ease'
@@ -303,14 +303,14 @@ export default function AdminScreen() {
           console.log('Search form submitted:', { query: q, activeTab });
           if (activeTab === "documents") load(0);
           else loadIndexed(0);
-        }} style={{display:'flex', gap:8, margin:'0 0 20px 0'}}>
+        }} style={{display:'flex', gap:6, margin:'0 0 12px 0'}}>
           <input
             value={q}
             onChange={e => setQ(e.target.value)}
             placeholder="Filter by name…"
-            style={{flex:1, padding:'8px 10px', border: '1px solid #ddd', borderRadius: '4px'}}
+            style={{flex:1, padding:'6px 10px', border: '1px solid #ddd', borderRadius: '4px', fontSize:'12px'}}
           />
-          <button style={{padding:'8px 12px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer'}}>Search</button>
+          <button style={{padding:'6px 12px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize:'12px'}}>Search</button>
           {activeTab === "documents" && (
             <>
               <button
@@ -318,12 +318,13 @@ export default function AdminScreen() {
                 onClick={() => handleIndexDocuments(false)}
                 disabled={isIndexing}
                 style={{
-                  padding:'8px 12px',
+                  padding:'6px 12px',
                   backgroundColor: isIndexing ? '#ccc' : '#28a745',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
-                  cursor: isIndexing ? 'not-allowed' : 'pointer'
+                  cursor: isIndexing ? 'not-allowed' : 'pointer',
+                  fontSize:'12px'
                 }}
               >
                 {isIndexing ? 'Indexing...' : 'Index Documents'}
@@ -333,12 +334,13 @@ export default function AdminScreen() {
                 onClick={() => handleIndexDocuments(true)}
                 disabled={isIndexing}
                 style={{
-                  padding:'8px 12px',
+                  padding:'6px 12px',
                   backgroundColor: isIndexing ? '#ccc' : '#ff6b35',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
-                  cursor: isIndexing ? 'not-allowed' : 'pointer'
+                  cursor: isIndexing ? 'not-allowed' : 'pointer',
+                  fontSize:'12px'
                 }}
               >
                 {isIndexing ? 'Regenerating...' : 'Regenerate Summaries'}
@@ -353,19 +355,20 @@ export default function AdminScreen() {
         <div style={{
           backgroundColor: indexResult.error ? '#f8d7da' : '#d4edda',
           color: indexResult.error ? '#721c24' : '#155724',
-          padding: '12px',
+          padding: '10px',
           borderRadius: '4px',
-          marginBottom: '16px',
-          textAlign: 'left'
+          marginBottom: '12px',
+          textAlign: 'left',
+          fontSize: '12px'
         }}>
           {indexResult.error ? (
-            <p><strong>Error:</strong> {indexResult.error}</p>
+            <p style={{margin:0}}><strong>Error:</strong> {indexResult.error}</p>
           ) : (
             <div>
-              <p><strong>Indexing Complete!</strong></p>
-              <p>Total documents: {indexResult.total}</p>
-              <p>Processed: {indexResult.processed}</p>
-              <p>
+              <p style={{margin:'0 0 4px 0'}}><strong>Indexing Complete!</strong></p>
+              <p style={{margin:'4px 0'}}>Total documents: {indexResult.total}</p>
+              <p style={{margin:'4px 0'}}>Processed: {indexResult.processed}</p>
+              <p style={{margin:'4px 0 0 0'}}>
                 Created: {indexResult.results?.filter(r => r.action === 'created').length || 0} | 
                 Updated: {indexResult.results?.filter(r => r.action === 'updated').length || 0} | 
                 Unchanged: {indexResult.results?.filter(r => r.action === 'unchanged').length || 0}
@@ -382,7 +385,7 @@ export default function AdminScreen() {
       {activeTab === "documents" ? (
         <>
           <DocumentList items={data.items} />
-          <div className="pager" style={{display:'flex', gap:12, alignItems:'center', marginTop:12}}>
+          <div className="pager" style={{display:'flex', gap:8, alignItems:'center', marginTop:10}}>
             <button 
               disabled={data.pageOffset <= 0} 
               onClick={() => {
@@ -390,10 +393,11 @@ export default function AdminScreen() {
                 console.log('Previous page clicked:', { newOffset, currentOffset: data.pageOffset });
                 load(newOffset);
               }}
+              style={{padding:'5px 10px', fontSize:'11px', borderRadius:'4px', cursor:'pointer', border:'1px solid #ddd', backgroundColor:'#fff'}}
             >
               Prev
             </button>
-            <span>{data.pageOffset + 1}–{data.pageOffset + (data.items?.length || 0)} of {data.total}</span>
+            <span style={{fontSize:'11px', color:'#666'}}>{data.pageOffset + 1}–{data.pageOffset + (data.items?.length || 0)} of {data.total}</span>
             <button 
               disabled={data.pageOffset + data.pageSize >= data.total} 
               onClick={() => {
@@ -401,6 +405,7 @@ export default function AdminScreen() {
                 console.log('Next page clicked:', { newOffset, currentOffset: data.pageOffset });
                 load(newOffset);
               }}
+              style={{padding:'5px 10px', fontSize:'11px', borderRadius:'4px', cursor:'pointer', border:'1px solid #ddd', backgroundColor:'#fff'}}
             >
               Next
             </button>
@@ -412,7 +417,7 @@ export default function AdminScreen() {
             items={indexedData.items} 
             onDocumentsSelected={setSelectedDocuments}
           />
-          <div className="pager" style={{display:'flex', gap:12, alignItems:'center', marginTop:12}}>
+          <div className="pager" style={{display:'flex', gap:8, alignItems:'center', marginTop:10}}>
             <button 
               disabled={indexedData.pageOffset <= 0} 
               onClick={() => {
@@ -420,10 +425,11 @@ export default function AdminScreen() {
                 console.log('Previous indexed page clicked:', { newOffset, currentOffset: indexedData.pageOffset });
                 loadIndexed(newOffset);
               }}
+              style={{padding:'5px 10px', fontSize:'11px', borderRadius:'4px', cursor:'pointer', border:'1px solid #ddd', backgroundColor:'#fff'}}
             >
               Prev
             </button>
-            <span>{indexedData.pageOffset + 1}–{indexedData.pageOffset + (indexedData.items?.length || 0)} of {indexedData.total}</span>
+            <span style={{fontSize:'11px', color:'#666'}}>{indexedData.pageOffset + 1}–{indexedData.pageOffset + (indexedData.items?.length || 0)} of {indexedData.total}</span>
             <button 
               disabled={indexedData.pageOffset + indexedData.pageSize >= indexedData.total} 
               onClick={() => {
@@ -431,6 +437,7 @@ export default function AdminScreen() {
                 console.log('Next indexed page clicked:', { newOffset, currentOffset: indexedData.pageOffset });
                 loadIndexed(newOffset);
               }}
+              style={{padding:'5px 10px', fontSize:'11px', borderRadius:'4px', cursor:'pointer', border:'1px solid #ddd', backgroundColor:'#fff'}}
             >
               Next
             </button>
@@ -456,15 +463,15 @@ export default function AdminScreen() {
 
       {/* Selected Documents for Chat */}
       <div style={{
-        marginTop: '24px',
-        padding: '20px',
+        marginTop: '16px',
+        padding: '12px',
         backgroundColor: '#f8fafc',
         border: '1px solid #e5e7eb',
-        borderRadius: '8px'
+        borderRadius: '6px'
       }}>
         <h3 style={{
-          margin: '0 0 16px 0',
-          fontSize: '18px',
+          margin: '0 0 8px 0',
+          fontSize: '14px',
           fontWeight: '600',
           color: '#374151',
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -472,8 +479,8 @@ export default function AdminScreen() {
           Selected Documents for Chat
         </h3>
         <p style={{
-          margin: '0 0 16px 0',
-          fontSize: '14px',
+          margin: '0 0 12px 0',
+          fontSize: '12px',
           color: '#6b7280',
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
         }}>
@@ -488,17 +495,17 @@ export default function AdminScreen() {
           }}>
             {selectedDocuments.map((doc, index) => (
               <div key={index} style={{
-                padding: '12px',
+                padding: '8px',
                 backgroundColor: '#ffffff',
                 border: '1px solid #e5e7eb',
-                borderRadius: '6px',
+                borderRadius: '4px',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center'
               }}>
                 <div>
                   <div style={{
-                    fontSize: '14px',
+                    fontSize: '12px',
                     fontWeight: '500',
                     color: '#374151',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -506,7 +513,7 @@ export default function AdminScreen() {
                     {doc.document_name}
                   </div>
                   <div style={{
-                    fontSize: '12px',
+                    fontSize: '11px',
                     color: '#6b7280',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                   }}>
@@ -522,8 +529,8 @@ export default function AdminScreen() {
                     backgroundColor: '#dc2626',
                     color: '#ffffff',
                     border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '12px',
+                    borderRadius: '3px',
+                    fontSize: '11px',
                     cursor: 'pointer',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                   }}
@@ -535,13 +542,13 @@ export default function AdminScreen() {
           </div>
         ) : (
           <div style={{
-            padding: '24px',
+            padding: '16px',
             textAlign: 'center',
             color: '#6b7280',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}>
-            <div style={{ fontSize: '32px', marginBottom: '8px' }}>📄</div>
-            <p style={{ margin: 0, fontSize: '14px' }}>No documents selected for chat</p>
+            <div style={{ fontSize: '24px', marginBottom: '6px' }}>📄</div>
+            <p style={{ margin: 0, fontSize: '12px' }}>No documents selected for chat</p>
           </div>
         )}
       </div>

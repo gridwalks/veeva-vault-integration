@@ -25,22 +25,22 @@ export default function DocumentList({ items = [] }) {
     <>
       <ul className="doc-list" style={{paddingLeft:0, listStyle:'none'}}>
         {items.map(d => (
-          <li key={d.id} className="doc-row" style={{display:'flex', justifyContent:'space-between', borderBottom:'1px solid #eee', padding:'10px 0'}}>
+          <li key={d.id} className="doc-row" style={{display:'flex', justifyContent:'space-between', borderBottom:'1px solid #eee', padding:'8px 0'}}>
             <div>
-              <strong>{d.name}</strong>
-              <div className="sub" style={{fontSize:12, color:'#555'}}>#{d.number ?? d.id} · {d.status} · v{d.major}.{d.minor}</div>
+              <strong style={{fontSize:'13px'}}>{d.name}</strong>
+              <div className="sub" style={{fontSize:11, color:'#555'}}>#{d.number ?? d.id} · {d.status} · v{d.major}.{d.minor}</div>
             </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <button
                 onClick={() => handleViewDocument(d)}
                 style={{
-                  padding: '6px 12px',
+                  padding: '5px 10px',
                   backgroundColor: '#007bff',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '14px'
+                  fontSize: '11px'
                 }}
               >
                 View
@@ -48,12 +48,12 @@ export default function DocumentList({ items = [] }) {
               <a 
                 href={downloadUrl({ id: d.id, major: d.major, minor: d.minor })}
                 style={{
-                  padding: '6px 12px',
+                  padding: '5px 10px',
                   backgroundColor: '#28a745',
                   color: 'white',
                   textDecoration: 'none',
                   borderRadius: '4px',
-                  fontSize: '14px'
+                  fontSize: '11px'
                 }}
               >
                 Download

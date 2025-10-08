@@ -50,9 +50,9 @@ export default function App() {
         /* Main Chat Interface */
         <div style={{
           display: 'flex',
-          height: 'calc(100vh - 120px)',
-          margin: '0 16px',
-          gap: '16px'
+          height: 'calc(100vh - 60px)',
+          margin: '8px 12px',
+          gap: '12px'
         }}>
           {/* Left Panel - Chat */}
           <div style={{
