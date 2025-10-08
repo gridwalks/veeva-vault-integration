@@ -426,15 +426,31 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
           responses: {}
         });
 
-        // Show completion message with generated document and export option
+        // Show completion message with both original and AI-improved versions
+        let completionMessage = `🎉 **${workflowState.template.name}** completed successfully!\n\n`;
+        
+        if (data.hasAiImprovements && data.polishedDocument) {
+          completionMessage += `✨ **AI has reviewed and improved your document!**\n\n`;
+          completionMessage += `**Improvements Made:**\n${data.aiSuggestions}\n\n`;
+          completionMessage += `**AI-Improved Version:**\n\n\`\`\`\n${data.polishedDocument}\n\`\`\`\n\n`;
+          completionMessage += `**Original Version:**\n\n\`\`\`\n${data.generatedDocument}\n\`\`\`\n\n`;
+          completionMessage += `You can export either version using the buttons below.`;
+        } else {
+          completionMessage += `**Generated Document:**\n\n\`\`\`\n${data.generatedDocument}\n\`\`\`\n\n`;
+          completionMessage += `You can:\n- Copy this document\n- Click the button below to export to Word\n- Ask me to help you format it further`;
+        }
+
         setConversationHistory(prev => [
           ...prev,
           { 
             role: 'assistant', 
-            content: `🎉 **${workflowState.template.name}** completed successfully!\n\n**Generated Document:**\n\n\`\`\`\n${data.generatedDocument}\n\`\`\`\n\nYou can:\n- Copy this document\n- Click the button below to export to Word\n- Ask me to help you format it further`,
+            content: completionMessage,
             metadata: {
               showExportButton: true,
               generatedDocument: data.generatedDocument,
+              polishedDocument: data.polishedDocument,
+              hasAiImprovements: data.hasAiImprovements,
+              aiSuggestions: data.aiSuggestions,
               workflowName: workflowState.template.name,
               instanceId: workflowState.instanceId
             }
@@ -603,37 +619,115 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
             borderRadius: '8px',
             border: '1px solid #86efac'
           }}>
-            <button
-              onClick={() => exportToWord(message.metadata.generatedDocument, message.metadata.workflowName)}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#16a34a',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                transition: 'background-color 0.2s ease'
-              }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#15803d'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#16a34a'}
-            >
-              <span>📄</span>
-              Export to Word Document
-            </button>
-            <p style={{
-              margin: '8px 0 0 0',
-              fontSize: '12px',
-              color: '#166534',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-            }}>
-              Downloads as: {message.metadata.workflowName.replace(/\s+/g, '_')}_{new Date().toISOString().slice(0, 10)}.doc
-            </p>
+            {message.metadata.hasAiImprovements ? (
+              // Show both export options when AI improvements are available
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <button
+                    onClick={() => exportToWord(message.metadata.polishedDocument, `${message.metadata.workflowName}_AI_Improved`)}
+                    style={{
+                      padding: '10px 20px',
+                      backgroundColor: '#16a34a',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      transition: 'background-color 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#15803d'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#16a34a'}
+                  >
+                    <span>✨</span>
+                    Export AI-Improved Version
+                  </button>
+                  <p style={{
+                    margin: '4px 0 0 0',
+                    fontSize: '11px',
+                    color: '#166534',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    Recommended: Grammar, spelling, and clarity improvements applied
+                  </p>
+                </div>
+                
+                <div>
+                  <button
+                    onClick={() => exportToWord(message.metadata.generatedDocument, `${message.metadata.workflowName}_Original`)}
+                    style={{
+                      padding: '10px 20px',
+                      backgroundColor: '#6b7280',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      transition: 'background-color 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#4b5563'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#6b7280'}
+                  >
+                    <span>📄</span>
+                    Export Original Version
+                  </button>
+                  <p style={{
+                    margin: '4px 0 0 0',
+                    fontSize: '11px',
+                    color: '#166534',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    Your original responses without AI modifications
+                  </p>
+                </div>
+              </div>
+            ) : (
+              // Show single export option when no AI improvements
+              <div>
+                <button
+                  onClick={() => exportToWord(message.metadata.generatedDocument, message.metadata.workflowName)}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#16a34a',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    transition: 'background-color 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#15803d'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#16a34a'}
+                >
+                  <span>📄</span>
+                  Export to Word Document
+                </button>
+                <p style={{
+                  margin: '8px 0 0 0',
+                  fontSize: '12px',
+                  color: '#166534',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  Downloads as: {message.metadata.workflowName.replace(/\s+/g, '_')}_{new Date().toISOString().slice(0, 10)}.doc
+                </p>
+              </div>
+            )}
           </div>
         )}
 
