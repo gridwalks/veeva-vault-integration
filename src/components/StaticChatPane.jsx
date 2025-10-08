@@ -61,15 +61,38 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       return;
     }
 
+    // Check if user is responding to a workflow offer
+    const lastMessage = conversationHistory[conversationHistory.length - 1];
+    if (lastMessage && lastMessage.metadata && lastMessage.metadata.isWorkflowOffer) {
+      const affirmativeResponses = ['yes', 'yeah', 'yep', 'sure', 'ok', 'okay', 'start', 'start workflow', 'begin', 'let\'s do it', 'proceed'];
+      const negativeResponses = ['no', 'nope', 'not now', 'cancel', 'skip', 'maybe later'];
+      
+      const userResponseLower = userMessage.toLowerCase().trim();
+      
+      if (affirmativeResponses.some(resp => userResponseLower.includes(resp))) {
+        // User accepted the workflow offer
+        await startWorkflow(lastMessage.metadata.workflowTemplate, lastMessage.metadata.workflowFirstStep);
+        return;
+      } else if (negativeResponses.some(resp => userResponseLower.includes(resp))) {
+        // User declined the workflow offer
+        setConversationHistory(prev => [
+          ...prev,
+          { 
+            role: 'assistant', 
+            content: `No problem! Let me know if you need anything else.` 
+          }
+        ]);
+        setIsLoading(false);
+        return;
+      }
+      // If unclear response, let it fall through to normal chat
+    }
+
     try {
-      // First, check if this message should trigger a workflow
+      // Check if this message should trigger a workflow (but don't start yet)
       const workflowDetection = await detectWorkflow(userMessage);
       
-      if (workflowDetection.shouldStartWorkflow && !workflowDetection.hasActiveWorkflow) {
-        // Start the workflow
-        await startWorkflow(workflowDetection.template, workflowDetection.firstStep);
-        return;
-      } else if (workflowDetection.hasActiveWorkflow) {
+      if (workflowDetection.hasActiveWorkflow) {
         // User has an active workflow, show appropriate message
         setConversationHistory(prev => [
           ...prev,
@@ -82,7 +105,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         return;
       }
 
-      // Proceed with normal chat if no workflow detected
+      // Proceed with normal chat (will offer workflow after answering)
       const requestBody = {
         message: userMessage,
         documentIds: selectedDocuments.map(doc => doc.veeva_document_id),
@@ -178,6 +201,27 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         hasConversationHistory: !!data.conversationHistory,
         hasResponse: !!data.response
       });
+
+      // After answering, check if we should offer a workflow
+      if (workflowDetection.shouldStartWorkflow && workflowDetection.template) {
+        // Add workflow offer to the conversation history
+        const currentHistory = data.conversationHistory || [...newHistory, { role: 'assistant', content: data.response }];
+        
+        setConversationHistory([
+          ...currentHistory,
+          {
+            role: 'assistant',
+            content: `\n\n---\n\n💡 **Would you like help creating a ${workflowDetection.template.name}?**\n\nI can guide you through a step-by-step process to create a professional ${workflowDetection.template.name} document.\n\nWould you like to start the workflow? (Type "yes" or "start workflow" to begin)`,
+            metadata: {
+              isWorkflowOffer: true,
+              workflowTemplate: workflowDetection.template,
+              workflowFirstStep: workflowDetection.firstStep
+            }
+          }
+        ]);
+        setIsLoading(false);
+        return;
+      }
 
     } catch (err) {
       console.error('Chat error:', err);
@@ -765,6 +809,87 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Workflow offer buttons */}
+        {isAssistant && message.metadata && message.metadata.isWorkflowOffer && (
+          <div style={{
+            maxWidth: '80%',
+            marginTop: '8px',
+            padding: '12px',
+            backgroundColor: '#eff6ff',
+            borderRadius: '8px',
+            border: '1px solid #bfdbfe'
+          }}>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                onClick={() => {
+                  // Simulate user typing "yes"
+                  setCurrentMessage('yes');
+                  // Trigger send immediately
+                  setTimeout(() => {
+                    const sendBtn = document.querySelector('button[type="button"]');
+                    if (sendBtn && sendBtn.textContent === 'Send') {
+                      sendBtn.click();
+                    }
+                  }, 100);
+                }}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#16a34a',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  transition: 'background-color 0.2s ease'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#15803d'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#16a34a'}
+              >
+                <span>✅</span>
+                Yes, Start Workflow
+              </button>
+              <button
+                onClick={() => {
+                  // Simulate user typing "no"
+                  setCurrentMessage('no');
+                  // Trigger send immediately
+                  setTimeout(() => {
+                    const sendBtn = document.querySelector('button[type="button"]');
+                    if (sendBtn && sendBtn.textContent === 'Send') {
+                      sendBtn.click();
+                    }
+                  }, 100);
+                }}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#6b7280',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  transition: 'background-color 0.2s ease'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#4b5563'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#6b7280'}
+              >
+                <span>❌</span>
+                No Thanks
+              </button>
+            </div>
           </div>
         )}
 
