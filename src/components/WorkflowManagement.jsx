@@ -82,6 +82,13 @@ export default function WorkflowManagement() {
         const data = await response.json();
         setSelectedTemplate(data.template);
         setSteps(data.template.steps || []);
+        
+        // Update step form with the selected template ID
+        setStepForm(prev => ({
+          ...prev,
+          workflowTemplateId: data.template.id,
+          stepOrder: (data.template.steps || []).length + 1
+        }));
       } else {
         console.error('Failed to load template details');
       }
@@ -1025,8 +1032,8 @@ export default function WorkflowManagement() {
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button
-                        onClick={() => {
-                          loadTemplateDetails(template.id);
+                        onClick={async () => {
+                          await loadTemplateDetails(template.id);
                           setActiveTab('steps');
                         }}
                         style={{

@@ -34,9 +34,48 @@ The Workflow Management system allows administrators to create guided, step-by-s
 1. Log into the application
 2. Click on the **Admin** tab in the header
 3. Select the **Workflow Management** tab
-4. You'll see two sub-tabs:
+4. You'll see the **Workflow Templates** tab initially
+5. After selecting a template (by clicking "View Steps"), you'll see:
    - **Workflow Templates** - View and manage workflow templates
-   - **Steps** - Configure questions for a selected workflow
+   - **Steps: [Template Name]** - Configure questions for the selected workflow
+
+**Note:** The Steps tab only appears after you select a workflow template to edit.
+
+### Quick Start Visual Guide
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Step 1: Create a Workflow Template                         │
+│ ┌─────────────────────────────────────────────────────┐   │
+│ │ Workflow Templates Tab                              │   │
+│ │ [+ New Workflow]                                    │   │
+│ │                                                     │   │
+│ │ Fill in template details, add keywords, save       │   │
+│ └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ Step 2: View Your Template and Access Steps                │
+│ ┌─────────────────────────────────────────────────────┐   │
+│ │ Your Template                                       │   │
+│ │ CAPA Workflow                                       │   │
+│ │ [View Steps] [Edit] [Delete]                       │   │
+│ │                                                     │   │
+│ │ Click "View Steps" →                               │   │
+│ └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ Step 3: Steps Tab Appears - Add Questions                  │
+│ ┌─────────────────────────────────────────────────────┐   │
+│ │ [Workflow Templates] [Steps: CAPA Workflow] ←      │   │
+│ │                                                     │   │
+│ │ Steps: CAPA Workflow            [+ Add Step]       │   │
+│ │                                                     │   │
+│ │ Configure questions, validation, help text          │   │
+│ └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ### Understanding Workflow Components
 
@@ -119,7 +158,8 @@ Effectiveness Measures: {{effectiveness_measures}}
 
 1. Click **Create Template**
 2. The template will appear in the templates list
-3. Click **View Steps** to begin adding questions
+3. Click **View Steps** button on your template to begin adding questions
+4. The **Steps** tab will now appear, showing the selected template name
 
 ---
 
@@ -127,9 +167,9 @@ Effectiveness Measures: {{effectiveness_measures}}
 
 ### Adding a New Step
 
-1. Select your workflow template
-2. Click the **Steps** tab
-3. Click **+ Add Step**
+1. From the **Workflow Templates** tab, click **View Steps** on your template
+2. The **Steps** tab will appear showing your template name
+3. Click **+ Add Step** to create a new question
 
 ### Step Configuration Fields
 
@@ -554,6 +594,18 @@ Before activating your workflow, verify:
 ---
 
 ## Troubleshooting
+
+### Steps Tab Not Visible
+
+**Problem**: Can't see the Steps tab to add questions
+
+**Solutions**:
+1. Make sure you've created a workflow template first
+2. Click the **View Steps** button on your template (not Edit)
+3. The Steps tab will appear showing "Steps: [Your Template Name]"
+4. If still not visible, try refreshing the page and clicking View Steps again
+
+**Note**: The Steps tab is contextual - it only appears when you're viewing/editing steps for a specific template.
 
 ### Workflow Not Starting
 
