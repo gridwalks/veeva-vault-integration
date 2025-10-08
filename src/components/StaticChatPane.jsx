@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import DocumentViewer from './DocumentViewer.jsx';
+import { createQAInteraction } from '../api';
 
 export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane }) {
   const [conversationHistory, setConversationHistory] = useState([]);
@@ -164,6 +165,11 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       setUsedDocuments(data.documents || []);
       setUsedExternalResources(data.externalResources || []);
 
+      // Capture Q&A interaction for storage
+      if (data.response && (data.documents || []).length > 0) {
+        await captureQAInteraction(userMessage, data.response, data.documents || []);
+      }
+
       console.log('Chat response received:', {
         responseLength: data.response?.length || 0,
         documentsUsed: (data.documents || []).length,
@@ -235,6 +241,37 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
   const handleCloseViewer = () => {
     setViewerOpen(false);
     setSelectedDocument(null);
+  };
+
+  const captureQAInteraction = async (question, answer, documents) => {
+    try {
+      console.log('Capturing Q&A interaction:', {
+        question: question.substring(0, 100) + '...',
+        answer: answer.substring(0, 100) + '...',
+        documentsCount: documents.length,
+        documents: documents.map(doc => ({
+          id: doc.id || doc.veeva_document_id,
+          name: doc.name || doc.document_name
+        }))
+      });
+
+      const documentIds = documents.map(doc => doc.id || doc.veeva_document_id).filter(Boolean);
+      const documentNames = documents.map(doc => doc.name || doc.document_name).filter(Boolean);
+      
+      const result = await createQAInteraction({
+        question,
+        answer,
+        document_ids: documentIds,
+        document_names: documentNames,
+        user_id: null, // Could be enhanced to capture user info
+        session_id: Date.now().toString() // Simple session identifier
+      });
+
+      console.log('Q&A interaction captured successfully:', result);
+    } catch (error) {
+      console.warn('Error capturing Q&A interaction:', error);
+      // Don't throw error as this shouldn't break the chat functionality
+    }
   };
 
   // Workflow handling functions

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import DocumentViewer from './DocumentViewer.jsx';
-import { chatWithDocuments } from '../api';
+import { chatWithDocuments, createQAInteraction } from '../api';
 
 export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], onOpenDocumentInPane }) {
   const [conversationHistory, setConversationHistory] = useState([]);
@@ -133,32 +133,16 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       const documentIds = documents.map(doc => doc.id || doc.veeva_document_id).filter(Boolean);
       const documentNames = documents.map(doc => doc.name || doc.document_name).filter(Boolean);
       
-      const response = await fetch('/api/qa-interactions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          question,
-          answer,
-          document_ids: documentIds,
-          document_names: documentNames,
-          user_id: null, // Could be enhanced to capture user info
-          session_id: Date.now().toString() // Simple session identifier
-        })
+      const result = await createQAInteraction({
+        question,
+        answer,
+        document_ids: documentIds,
+        document_names: documentNames,
+        user_id: null, // Could be enhanced to capture user info
+        session_id: Date.now().toString() // Simple session identifier
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.warn('Failed to capture Q&A interaction:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorText
-        });
-      } else {
-        const result = await response.json();
-        console.log('Q&A interaction captured successfully:', result);
-      }
+      console.log('Q&A interaction captured successfully:', result);
     } catch (error) {
       console.warn('Error capturing Q&A interaction:', error);
       // Don't throw error as this shouldn't break the chat functionality
