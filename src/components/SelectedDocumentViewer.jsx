@@ -4,6 +4,9 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
   const [activeDocument, setActiveDocument] = React.useState(null);
   const [documentContent, setDocumentContent] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
+  const [isEditMode, setIsEditMode] = React.useState(false);
+  const [editableContent, setEditableContent] = React.useState('');
+  const [originalContent, setOriginalContent] = React.useState('');
 
   const handleOpenDocument = React.useCallback(async (document) => {
     console.log('handleOpenDocument called with:', document);
@@ -20,6 +23,11 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
       // Check if this is a workflow-generated document with text content
       if (document.isWorkflowDocument && document.content) {
         console.log('Displaying workflow-generated document with text content');
+        
+        // Store the content for editing
+        setEditableContent(document.content);
+        setOriginalContent(document.content);
+        setIsEditMode(false); // Start in view mode
         
         // Create a simple HTML document to display the text
         const htmlContent = `
@@ -216,6 +224,66 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
     }
     setActiveDocument(null);
     setDocumentContent('');
+    setIsEditMode(false);
+    setEditableContent('');
+    setOriginalContent('');
+  };
+
+  const exportToWord = (documentContent, workflowName) => {
+    try {
+      // Create HTML structure for Word
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${workflowName}</title>
+          <style>
+            body {
+              font-family: 'Calibri', 'Arial', sans-serif;
+              font-size: 11pt;
+              line-height: 1.5;
+              margin: 1in;
+            }
+            pre {
+              white-space: pre-wrap;
+              font-family: 'Calibri', 'Arial', sans-serif;
+            }
+          </style>
+        </head>
+        <body>
+          <pre>${documentContent}</pre>
+        </body>
+        </html>
+      `;
+
+      // Create Blob and download
+      const blob = new Blob([htmlContent], { 
+        type: 'application/msword' 
+      });
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const filename = `${workflowName.replace(/\s+/g, '_')}_${timestamp}.doc`;
+      link.download = filename;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      console.log('Document exported successfully:', filename);
+    } catch (error) {
+      console.error('Error exporting to Word:', error);
+      alert('Failed to export document. Please try copying the text instead.');
+    }
   };
 
   const handleRemoveDocument = (documentToRemove) => {
@@ -315,30 +383,106 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => {
-                      const url = `/api/download-file?docId=${activeDocument.veeva_document_id}&major=${activeDocument.version?.split('.')[0] || 1}&minor=${activeDocument.version?.split('.')[1] || 0}`;
-                      const link = document.createElement('a');
-                      link.href = url;
-                      link.download = activeDocument.document_name;
-                      link.click();
-                    }}
-                    style={{
-                      padding: '8px 16px',
-                      backgroundColor: '#10b981',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      cursor: 'pointer',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                      transition: 'background-color 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
-                  >
-                    📥 Download
-                  </button>
+                  {activeDocument.isWorkflowDocument && (
+                    <>
+                      <button
+                        onClick={() => {
+                          if (isEditMode) {
+                            // Save changes
+                            setIsEditMode(false);
+                          } else {
+                            // Enter edit mode
+                            setIsEditMode(true);
+                          }
+                        }}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: isEditMode ? '#16a34a' : '#3b82f6',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          cursor: 'pointer',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                          transition: 'background-color 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = isEditMode ? '#15803d' : '#2563eb'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = isEditMode ? '#16a34a' : '#3b82f6'}
+                      >
+                        {isEditMode ? '💾 Save Edits' : '✏️ Edit Document'}
+                      </button>
+                      {isEditMode && editableContent !== originalContent && (
+                        <button
+                          onClick={() => {
+                            setEditableContent(originalContent);
+                            setIsEditMode(false);
+                          }}
+                          style={{
+                            padding: '8px 16px',
+                            backgroundColor: '#dc2626',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '14px',
+                            cursor: 'pointer',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                            transition: 'background-color 0.2s ease'
+                          }}
+                          onMouseEnter={(e) => e.target.style.backgroundColor = '#b91c1c'}
+                          onMouseLeave={(e) => e.target.style.backgroundColor = '#dc2626'}
+                        >
+                          ↺ Revert Changes
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          const exportContent = isEditMode ? editableContent : (activeDocument.content || editableContent);
+                          exportToWord(exportContent, activeDocument.document_name);
+                        }}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#16a34a',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          cursor: 'pointer',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                          transition: 'background-color 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = '#15803d'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = '#16a34a'}
+                      >
+                        📄 Export to Word
+                      </button>
+                    </>
+                  )}
+                  {!activeDocument.isWorkflowDocument && (
+                    <button
+                      onClick={() => {
+                        const url = `/api/download-file?docId=${activeDocument.veeva_document_id}&major=${activeDocument.version?.split('.')[0] || 1}&minor=${activeDocument.version?.split('.')[1] || 0}`;
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = activeDocument.document_name;
+                        link.click();
+                      }}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#10b981',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                        transition: 'background-color 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
+                    >
+                      📥 Download
+                    </button>
+                  )}
                   <button
                     onClick={handleCloseDocument}
                     style={{
@@ -366,10 +510,65 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                 backgroundColor: '#ffffff',
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px',
-                padding: '20px',
-                overflow: 'auto'
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column'
               }}>
-                {isLoading ? (
+                {activeDocument.isWorkflowDocument && isEditMode ? (
+                  /* Rich Text Editor for Workflow Documents */
+                  <div style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      padding: '12px 16px',
+                      backgroundColor: '#fffbeb',
+                      border: '1px solid #fef3c7',
+                      fontSize: '13px',
+                      color: '#92400e',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}>
+                      ✏️ <strong>Edit Mode:</strong> Make your changes below. Click "Save Edits" when done.
+                    </div>
+                    <textarea
+                      value={editableContent}
+                      onChange={(e) => setEditableContent(e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '20px',
+                        border: 'none',
+                        resize: 'none',
+                        fontSize: '13px',
+                        fontFamily: '"Calibri", "Arial", sans-serif',
+                        lineHeight: '1.6',
+                        outline: 'none',
+                        backgroundColor: '#ffffff'
+                      }}
+                    />
+                  </div>
+                ) : activeDocument.isWorkflowDocument ? (
+                  /* Read-only View for Workflow Documents */
+                  <div style={{
+                    flex: 1,
+                    padding: '20px',
+                    overflow: 'auto',
+                    backgroundColor: '#ffffff'
+                  }}>
+                    <pre style={{
+                      whiteSpace: 'pre-wrap',
+                      wordWrap: 'break-word',
+                      fontFamily: '"Calibri", "Arial", sans-serif',
+                      fontSize: '13px',
+                      lineHeight: '1.6',
+                      margin: 0,
+                      color: '#000000'
+                    }}>
+                      {editableContent}
+                    </pre>
+                  </div>
+                ) : isLoading ? (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
