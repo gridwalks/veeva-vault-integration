@@ -17,6 +17,76 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
     setActiveDocument(document);
     
     try {
+      // Check if this is a workflow-generated document with text content
+      if (document.isWorkflowDocument && document.content) {
+        console.log('Displaying workflow-generated document with text content');
+        
+        // Create a simple HTML document to display the text
+        const htmlContent = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body {
+                font-family: 'Calibri', 'Arial', sans-serif;
+                font-size: 11pt;
+                line-height: 1.6;
+                padding: 40px;
+                max-width: 800px;
+                margin: 0 auto;
+                background-color: #ffffff;
+                color: #000000;
+              }
+              pre {
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                font-family: 'Calibri', 'Arial', sans-serif;
+                margin: 0;
+                padding: 0;
+              }
+              h1 {
+                font-size: 16pt;
+                font-weight: bold;
+                margin-bottom: 12pt;
+                border-bottom: 2px solid #000;
+                padding-bottom: 6pt;
+              }
+              .header {
+                background-color: #f8fafc;
+                padding: 16px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+                border: 1px solid #e5e7eb;
+              }
+              .badge {
+                display: inline-block;
+                padding: 4px 8px;
+                background-color: #4338ca;
+                color: white;
+                border-radius: 4px;
+                font-size: 10pt;
+                margin-right: 8px;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>${document.document_name}</h1>
+              <span class="badge">${document.document_type}</span>
+              <span class="badge">Version ${document.version}</span>
+            </div>
+            <pre>${document.content}</pre>
+          </body>
+          </html>
+        `;
+        
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        setDocumentContent(url);
+        setIsLoading(false);
+        return;
+      }
       // First, convert document to PDF
       const versionParts = document.version ? document.version.split('.') : ['1', '0'];
       const major = versionParts[0] || 1;

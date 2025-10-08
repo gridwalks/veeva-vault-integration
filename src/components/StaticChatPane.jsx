@@ -502,18 +502,17 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
           responses: {}
         });
 
-        // Show completion message with both original and AI-improved versions
+        // Build completion message (shorter - document shown in right pane)
         let completionMessage = `🎉 **${workflowState.template.name}** completed successfully!\n\n`;
         
         if (data.hasAiImprovements && data.polishedDocument) {
           completionMessage += `✨ **AI has reviewed and improved your document!**\n\n`;
           completionMessage += `**Improvements Made:**\n${data.aiSuggestions}\n\n`;
-          completionMessage += `**AI-Improved Version:**\n\n\`\`\`\n${data.polishedDocument}\n\`\`\`\n\n`;
-          completionMessage += `**Original Version:**\n\n\`\`\`\n${data.generatedDocument}\n\`\`\`\n\n`;
-          completionMessage += `You can export either version using the buttons below.`;
+          completionMessage += `📄 Your completed document is now displayed in the right panel.\n\n`;
+          completionMessage += `You can export either the AI-improved or original version using the buttons below.`;
         } else {
-          completionMessage += `**Generated Document:**\n\n\`\`\`\n${data.generatedDocument}\n\`\`\`\n\n`;
-          completionMessage += `You can:\n- Copy this document\n- Click the button below to export to Word\n- Ask me to help you format it further`;
+          completionMessage += `📄 Your completed document is now displayed in the right panel.\n\n`;
+          completionMessage += `You can export it to Word using the button below.`;
         }
 
         setConversationHistory(prev => [
@@ -532,6 +531,25 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
             }
           }
         ]);
+
+        // Display the completed document in the right pane
+        if (onOpenDocumentInPane) {
+          const documentToDisplay = data.hasAiImprovements ? data.polishedDocument : data.generatedDocument;
+          
+          // Create a pseudo-document object for the viewer
+          onOpenDocumentInPane({
+            veeva_document_id: `workflow_${data.instance.id}`,
+            document_name: `${workflowState.template.name} - Completed`,
+            document_type: 'Generated Workflow Document',
+            version: '1.0',
+            document_number: `WF-${data.instance.id}`,
+            content: documentToDisplay,
+            isWorkflowDocument: true,
+            hasAiVersion: data.hasAiImprovements,
+            originalContent: data.generatedDocument,
+            aiContent: data.polishedDocument
+          });
+        }
       } else {
         const error = await response.json();
         console.error('Failed to complete workflow:', error);
