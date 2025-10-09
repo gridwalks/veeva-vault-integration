@@ -83,12 +83,13 @@ export default function WorkflowImport({ onImportComplete }) {
   };
 
   const downloadTemplate = () => {
-    const templateContent = `workflow_name,workflow_description,workflow_category,trigger_keywords,step_order,question_text,input_type,required,placeholder,help_text,options,validation_rules
-"Sample CAPA Workflow","Corrective and Preventive Action workflow","Quality","capa;corrective action;preventive action",1,"What type of CAPA are you creating?","select","true","","Select the type of action","Corrective Action;Preventive Action;Both",""
-"Sample CAPA Workflow","","","",2,"Please provide a brief title for this CAPA","text","true","e.g., Equipment Calibration Deviation","A concise title that describes the issue","","{""minLength"": 10, ""maxLength"": 200}"
-"Sample CAPA Workflow","","","",3,"Describe the problem or nonconformity in detail","textarea","true","Provide details about what happened","Include all relevant facts and observations","","{""minLength"": 50, ""maxLength"": 2000}"
-"Sample CAPA Workflow","","","",4,"What was the root cause of this issue?","textarea","true","Describe the underlying cause","Focus on the fundamental reason, not just symptoms","","{""minLength"": 20, ""maxLength"": 1000}"
-"Sample CAPA Workflow","","","",5,"Who or what was impacted by this issue?","checkbox","true","","Select all that apply","Patients;Processes;Products;Regulatory;Staff;Equipment;Other",""`;
+    const templateContent = `workflow_name,workflow_description,workflow_category,trigger_keywords,step_order,question_text,input_type,required,placeholder,help_text,options,validation_rules,group_id,group_order,is_last_in_group,group_synthesis_prompt,group_output_variable
+"Sample CAPA Workflow","Corrective and Preventive Action workflow","Quality","capa;corrective action;preventive action",1,"What type of CAPA are you creating?","select","true","","Select the type of action","Corrective Action;Preventive Action;Both","","","","",""
+"Sample CAPA Workflow","","","",2,"Please provide a brief title for this CAPA","text","true","e.g., Equipment Calibration Deviation","A concise title that describes the issue","","{""minLength"": 10, ""maxLength"": 200}","","","","",""
+"Sample CAPA Workflow","","","",3,"What was the immediate cause of this issue?","textarea","true","Describe what directly caused the problem","Focus on the immediate trigger","","{""minLength"": 20, ""maxLength"": 500}","root_cause_group","1","false","",""
+"Sample CAPA Workflow","","","",4,"What contributing factors existed?","textarea","true","What conditions enabled this to happen?","Consider training, procedures, equipment, workload","","{""minLength"": 20, ""maxLength"": 500}","root_cause_group","2","false","",""
+"Sample CAPA Workflow","","","",5,"What systemic issues enabled this problem?","textarea","true","Identify any underlying systemic problems","Think about processes, management systems, culture","","{""minLength"": 20, ""maxLength"": 500}","root_cause_group","3","true","Synthesize these root cause analysis responses into a comprehensive paragraph that integrates the immediate cause, contributing factors, and systemic issues. Write in a professional tone suitable for regulatory documentation. Ensure logical flow and clear connections between all three elements.","root_cause_analysis"
+"Sample CAPA Workflow","","","",6,"Who or what was impacted by this issue?","checkbox","true","","Select all that apply","Patients;Processes;Products;Regulatory;Staff;Equipment;Other","","","","","",""`;
 
     const blob = new Blob([templateContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -193,6 +194,29 @@ export default function WorkflowImport({ onImportComplete }) {
               <li><code>question_text</code> - The question to ask</li>
               <li><code>input_type</code> - text, textarea, select, radio, checkbox, date, file</li>
             </ul>
+            
+            <strong style={{ fontSize: '13px', color: '#1e40af', marginTop: '8px', display: 'block' }}>Optional - Question Grouping:</strong>
+            <ul style={{
+              margin: '4px 0 0 20px',
+              fontSize: '12px',
+              color: '#1e40af',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            }}>
+              <li><code>group_id</code> - Identifier for grouped questions (e.g., "root_cause_group")</li>
+              <li><code>group_order</code> - Order within the group (1, 2, 3...)</li>
+              <li><code>is_last_in_group</code> - true/false - marks the last question in group</li>
+              <li><code>group_synthesis_prompt</code> - AI instructions for combining responses (only for last question)</li>
+              <li><code>group_output_variable</code> - Template variable name (only for last question, e.g., "root_cause_analysis")</li>
+            </ul>
+            <p style={{
+              margin: '8px 0 0 0',
+              fontSize: '11px',
+              color: '#6366f1',
+              fontStyle: 'italic',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            }}>
+              💡 Group related questions together for AI-powered synthesis. See the template example for root cause analysis grouping.
+            </p>
           </div>
         </div>
       )}

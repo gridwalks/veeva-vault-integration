@@ -238,7 +238,13 @@ export const handler = async (event) => {
         placeholder_text: row.placeholder || row.placeholder_text || '',
         help_text: row.help_text || row.help || '',
         options: row.options ? { choices: row.options.split(';').map(o => o.trim()) } : null,
-        validation_rules: null
+        validation_rules: null,
+        // Group configuration fields
+        group_id: row.group_id || null,
+        group_order: row.group_order ? parseInt(row.group_order) : null,
+        is_last_in_group: (row.is_last_in_group || 'false').toLowerCase() === 'true',
+        group_synthesis_prompt: row.group_synthesis_prompt || null,
+        group_output_variable: row.group_output_variable || null
       };
 
       // Parse validation rules if provided
@@ -257,12 +263,34 @@ export const handler = async (event) => {
         continue;
       }
 
+      // Validate group configuration
+      if (stepData.group_id) {
+        if (!stepData.group_order) {
+          stepErrors.push(`Step ${i + 1}: group_order is required when group_id is specified`);
+        }
+        if (stepData.is_last_in_group) {
+          if (!stepData.group_synthesis_prompt || stepData.group_synthesis_prompt.trim() === '') {
+            stepErrors.push(`Step ${i + 1}: group_synthesis_prompt is required for the last step in a group`);
+          }
+          if (!stepData.group_output_variable || stepData.group_output_variable.trim() === '') {
+            stepErrors.push(`Step ${i + 1}: group_output_variable is required for the last step in a group`);
+          }
+        }
+      } else {
+        // Warn if grouping fields are used without group_id
+        if (stepData.group_order || stepData.is_last_in_group || stepData.group_synthesis_prompt || stepData.group_output_variable) {
+          stepErrors.push(`Step ${i + 1}: Warning - group configuration fields present but group_id is missing`);
+        }
+      }
+
       try {
         await pool.query(`
           INSERT INTO qms_chat_workflow_steps 
           (workflow_template_id, step_order, question_text, input_type, options, validation_rules, 
-           conditional_logic, is_required, placeholder_text, help_text, created_at, updated_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+           conditional_logic, is_required, placeholder_text, help_text,
+           group_id, group_order, is_last_in_group, group_synthesis_prompt, group_output_variable,
+           created_at, updated_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         `, [
           templateId,
           stepData.step_order,
@@ -273,7 +301,12 @@ export const handler = async (event) => {
           null, // conditional_logic
           stepData.is_required,
           stepData.placeholder_text,
-          stepData.help_text
+          stepData.help_text,
+          stepData.group_id,
+          stepData.group_order,
+          stepData.is_last_in_group,
+          stepData.group_synthesis_prompt,
+          stepData.group_output_variable
         ]);
 
         steps.push(stepData);
