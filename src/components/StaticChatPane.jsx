@@ -187,26 +187,27 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       });
 
       // After answering, check if we should offer a workflow
-      const workflowDetection = await detectWorkflow(userMessage);
-      
-      if (workflowDetection.shouldStartWorkflow && workflowDetection.template && !workflowDetection.hasActiveWorkflow) {
-        // Add workflow offer to the conversation history
-        const currentHistory = data.conversationHistory || [...newHistory, { role: 'assistant', content: data.response }];
+      try {
+        const workflowDetection = await detectWorkflow(userMessage);
         
-        setConversationHistory([
-          ...currentHistory,
-          {
-            role: 'assistant',
-            content: `\n\n---\n\n💡 **Would you like help creating a ${workflowDetection.template.name}?**\n\nI can guide you through a step-by-step process to create a professional ${workflowDetection.template.name} document.\n\nWould you like to start the workflow? (Type "yes" or "start workflow" to begin)`,
-            metadata: {
-              isWorkflowOffer: true,
-              workflowTemplate: workflowDetection.template,
-              workflowFirstStep: workflowDetection.firstStep
+        if (workflowDetection.shouldStartWorkflow && workflowDetection.template && !workflowDetection.hasActiveWorkflow) {
+          // Get the current conversation history (already set by the chat response above)
+          setConversationHistory(prev => [
+            ...prev,
+            {
+              role: 'assistant',
+              content: `\n\n---\n\n💡 **Would you like help creating a ${workflowDetection.template.name}?**\n\nI can guide you through a step-by-step process to create a professional ${workflowDetection.template.name} document.\n\nWould you like to start the workflow? (Type "yes" or "start workflow" to begin)`,
+              metadata: {
+                isWorkflowOffer: true,
+                workflowTemplate: workflowDetection.template,
+                workflowFirstStep: workflowDetection.firstStep
+              }
             }
-          }
-        ]);
-        setIsLoading(false);
-        return;
+          ]);
+        }
+      } catch (workflowError) {
+        console.error('Workflow detection error:', workflowError);
+        // Don't let workflow detection errors break the chat
       }
       
       setIsLoading(false);
@@ -324,7 +325,8 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         const data = await response.json();
         return data;
       } else {
-        console.error('Failed to detect workflow');
+        const errorText = await response.text();
+        console.error('Failed to detect workflow:', response.status, errorText);
         return { shouldStartWorkflow: false, hasActiveWorkflow: false };
       }
     } catch (error) {

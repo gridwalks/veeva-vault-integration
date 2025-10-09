@@ -15,6 +15,80 @@ function setCorsHeaders() {
   };
 }
 
+// Ensure workflow tables exist
+async function ensureWorkflowTables(pool) {
+  try {
+    // Check if workflow templates table exists
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'qms_chat_workflow_templates'
+      );
+    `);
+    
+    if (!tableCheck.rows[0].exists) {
+      console.log('Workflow tables do not exist, creating them...');
+      
+      // Create workflow templates table
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS qms_chat_workflow_templates (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          description TEXT,
+          category VARCHAR(100) DEFAULT 'Quality',
+          is_active BOOLEAN DEFAULT true,
+          trigger_keywords TEXT[],
+          document_template TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      // Create workflow steps table
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS qms_chat_workflow_steps (
+          id SERIAL PRIMARY KEY,
+          workflow_template_id INTEGER NOT NULL REFERENCES qms_chat_workflow_templates(id) ON DELETE CASCADE,
+          step_order INTEGER NOT NULL,
+          question_text TEXT NOT NULL,
+          input_type VARCHAR(50) NOT NULL,
+          options JSONB,
+          validation_rules JSONB,
+          conditional_logic JSONB,
+          is_required BOOLEAN DEFAULT false,
+          placeholder_text TEXT,
+          help_text TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      // Create workflow instances table
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS qms_chat_workflow_instances (
+          id SERIAL PRIMARY KEY,
+          workflow_template_id INTEGER NOT NULL REFERENCES qms_chat_workflow_templates(id),
+          user_id VARCHAR(255),
+          session_id VARCHAR(255),
+          status VARCHAR(50) DEFAULT 'in_progress',
+          current_step INTEGER DEFAULT 1,
+          responses JSONB,
+          generated_document TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          completed_at TIMESTAMP
+        );
+      `);
+
+      console.log('Workflow tables created successfully');
+    }
+  } catch (error) {
+    console.error('Error ensuring workflow tables:', error);
+    // Don't throw - allow the API to continue even if table check fails
+  }
+}
+
 export const handler = async (event) => {
   console.log('=== WORKFLOW EXECUTION API ===');
   console.log('Request:', {
@@ -36,6 +110,9 @@ export const handler = async (event) => {
     // Initialize database
     await initDatabase();
     const pool = getPool();
+    
+    // Ensure workflow tables exist
+    await ensureWorkflowTables(pool);
 
     const pathParts = event.path.split('/').filter(part => part);
     const action = pathParts[pathParts.length - 1];
