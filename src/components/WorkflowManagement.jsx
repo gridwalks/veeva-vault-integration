@@ -31,7 +31,13 @@ export default function WorkflowManagement() {
     conditionalLogic: {},
     isRequired: false,
     placeholderText: '',
-    helpText: ''
+    helpText: '',
+    // Group configuration fields
+    groupId: '',
+    groupOrder: null,
+    isLastInGroup: false,
+    groupSynthesisPrompt: '',
+    groupOutputVariable: ''
   });
 
   const inputTypes = [
@@ -312,7 +318,12 @@ export default function WorkflowManagement() {
       conditionalLogic: step.conditionalLogic || {},
       isRequired: step.isRequired,
       placeholderText: step.placeholderText || '',
-      helpText: step.helpText || ''
+      helpText: step.helpText || '',
+      groupId: step.groupId || '',
+      groupOrder: step.groupOrder || null,
+      isLastInGroup: step.isLastInGroup || false,
+      groupSynthesisPrompt: step.groupSynthesisPrompt || '',
+      groupOutputVariable: step.groupOutputVariable || ''
     });
     setShowStepForm(true);
   };
@@ -341,7 +352,12 @@ export default function WorkflowManagement() {
       conditionalLogic: {},
       isRequired: false,
       placeholderText: '',
-      helpText: ''
+      helpText: '',
+      groupId: '',
+      groupOrder: null,
+      isLastInGroup: false,
+      groupSynthesisPrompt: '',
+      groupOutputVariable: ''
     });
     setEditingStep(null);
     setShowStepForm(false);
@@ -980,6 +996,212 @@ export default function WorkflowManagement() {
               />
             </div>
 
+            {/* Group Configuration Section */}
+            <div style={{
+              marginBottom: '16px',
+              padding: '16px',
+              backgroundColor: '#f0f9ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: '6px'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '12px'
+              }}>
+                <h5 style={{
+                  margin: 0,
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#1e40af',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  🔗 Question Grouping (Advanced)
+                </h5>
+                <div style={{
+                  fontSize: '11px',
+                  color: '#6b7280',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  Group questions for AI synthesis
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '4px',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: '#374151',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    Group ID
+                  </label>
+                  <input
+                    type="text"
+                    value={stepForm.groupId}
+                    onChange={(e) => setStepForm(prev => ({ ...prev, groupId: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '6px 10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      fontSize: '13px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}
+                    placeholder="e.g., root_cause_group"
+                  />
+                  <div style={{
+                    fontSize: '11px',
+                    color: '#6b7280',
+                    marginTop: '2px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    Leave empty for ungrouped questions
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '4px',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: '#374151',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    Order in Group
+                  </label>
+                  <input
+                    type="number"
+                    value={stepForm.groupOrder || ''}
+                    onChange={(e) => setStepForm(prev => ({ ...prev, groupOrder: e.target.value ? parseInt(e.target.value) : null }))}
+                    style={{
+                      width: '100%',
+                      padding: '6px 10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      fontSize: '13px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}
+                    placeholder="1, 2, 3..."
+                    min="1"
+                    disabled={!stepForm.groupId}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  color: '#374151',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  cursor: stepForm.groupId ? 'pointer' : 'not-allowed',
+                  opacity: stepForm.groupId ? 1 : 0.5
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={stepForm.isLastInGroup}
+                    onChange={(e) => setStepForm(prev => ({ ...prev, isLastInGroup: e.target.checked }))}
+                    disabled={!stepForm.groupId}
+                  />
+                  This is the last question in the group
+                </label>
+                <div style={{
+                  fontSize: '11px',
+                  color: '#6b7280',
+                  marginLeft: '24px',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  When checked, AI will synthesize all group responses
+                </div>
+              </div>
+
+              {stepForm.isLastInGroup && stepForm.groupId && (
+                <>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '4px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: '#374151',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}>
+                      AI Synthesis Prompt *
+                    </label>
+                    <textarea
+                      value={stepForm.groupSynthesisPrompt}
+                      onChange={(e) => setStepForm(prev => ({ ...prev, groupSynthesisPrompt: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        fontSize: '13px',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                        minHeight: '80px',
+                        resize: 'vertical'
+                      }}
+                      placeholder="e.g., Synthesize these answers into a cohesive root cause analysis paragraph, maintaining technical accuracy and professional tone."
+                      required={stepForm.isLastInGroup}
+                    />
+                    <div style={{
+                      fontSize: '11px',
+                      color: '#6b7280',
+                      marginTop: '2px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}>
+                      Instructions for AI on how to combine the grouped answers
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '4px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: '#374151',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}>
+                      Template Variable Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={stepForm.groupOutputVariable}
+                      onChange={(e) => setStepForm(prev => ({ ...prev, groupOutputVariable: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '6px 10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        fontSize: '13px',
+                        fontFamily: 'monospace'
+                      }}
+                      placeholder="e.g., root_cause_analysis"
+                      required={stepForm.isLastInGroup}
+                    />
+                    <div style={{
+                      fontSize: '11px',
+                      color: '#6b7280',
+                      marginTop: '2px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}>
+                      Use in template as: {stepForm.groupOutputVariable ? `{{${stepForm.groupOutputVariable}}}` : '{{variable_name}}'}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
                 type="submit"
@@ -1291,6 +1513,21 @@ export default function WorkflowManagement() {
                         }}>
                           {step.inputType}
                         </span>
+                        {step.groupId && (
+                          <span style={{
+                            padding: '2px 6px',
+                            backgroundColor: '#f0f9ff',
+                            color: '#0369a1',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                            border: '1px solid #bae6fd'
+                          }}>
+                            🔗 {step.groupId}
+                            {step.isLastInGroup && ' (Last)'}
+                          </span>
+                        )}
                         {step.isRequired && (
                           <span style={{
                             padding: '2px 6px',

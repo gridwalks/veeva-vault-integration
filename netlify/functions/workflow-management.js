@@ -280,6 +280,11 @@ async function getWorkflowTemplate(pool, templateId) {
         is_required,
         placeholder_text,
         help_text,
+        group_id,
+        group_order,
+        is_last_in_group,
+        group_synthesis_prompt,
+        group_output_variable,
         created_at,
         updated_at
       FROM qms_chat_workflow_steps 
@@ -299,6 +304,11 @@ async function getWorkflowTemplate(pool, templateId) {
       isRequired: step.is_required,
       placeholderText: step.placeholder_text,
       helpText: step.help_text,
+      groupId: step.group_id,
+      groupOrder: step.group_order,
+      isLastInGroup: step.is_last_in_group,
+      groupSynthesisPrompt: step.group_synthesis_prompt,
+      groupOutputVariable: step.group_output_variable,
       createdAt: step.created_at,
       updatedAt: step.updated_at
     }));
@@ -345,6 +355,11 @@ async function getWorkflowSteps(pool, templateId) {
         is_required,
         placeholder_text,
         help_text,
+        group_id,
+        group_order,
+        is_last_in_group,
+        group_synthesis_prompt,
+        group_output_variable,
         created_at,
         updated_at
       FROM qms_chat_workflow_steps 
@@ -368,6 +383,11 @@ async function getWorkflowSteps(pool, templateId) {
           isRequired: step.is_required,
           placeholderText: step.placeholder_text,
           helpText: step.help_text,
+          groupId: step.group_id,
+          groupOrder: step.group_order,
+          isLastInGroup: step.is_last_in_group,
+          groupSynthesisPrompt: step.group_synthesis_prompt,
+          groupOutputVariable: step.group_output_variable,
           createdAt: step.created_at,
           updatedAt: step.updated_at
         }))
@@ -604,10 +624,14 @@ async function createWorkflowStep(pool, requestBody) {
     const result = await pool.query(`
       INSERT INTO qms_chat_workflow_steps 
       (workflow_template_id, step_order, question_text, input_type, options, validation_rules, 
-       conditional_logic, is_required, placeholder_text, help_text, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       conditional_logic, is_required, placeholder_text, help_text, 
+       group_id, group_order, is_last_in_group, group_synthesis_prompt, group_output_variable,
+       created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING id, step_order, question_text, input_type, options, validation_rules, 
-                conditional_logic, is_required, placeholder_text, help_text, created_at, updated_at
+                conditional_logic, is_required, placeholder_text, help_text,
+                group_id, group_order, is_last_in_group, group_synthesis_prompt, group_output_variable,
+                created_at, updated_at
     `, [
       data.workflowTemplateId,
       data.stepOrder || 1,
@@ -618,7 +642,12 @@ async function createWorkflowStep(pool, requestBody) {
       data.conditionalLogic ? JSON.stringify(data.conditionalLogic) : null,
       data.isRequired || false,
       data.placeholderText || null,
-      data.helpText || null
+      data.helpText || null,
+      data.groupId || null,
+      data.groupOrder || null,
+      data.isLastInGroup || false,
+      data.groupSynthesisPrompt || null,
+      data.groupOutputVariable || null
     ]);
 
     const newStep = result.rows[0];
@@ -642,6 +671,11 @@ async function createWorkflowStep(pool, requestBody) {
           isRequired: newStep.is_required,
           placeholderText: newStep.placeholder_text,
           helpText: newStep.help_text,
+          groupId: newStep.group_id,
+          groupOrder: newStep.group_order,
+          isLastInGroup: newStep.is_last_in_group,
+          groupSynthesisPrompt: newStep.group_synthesis_prompt,
+          groupOutputVariable: newStep.group_output_variable,
           createdAt: newStep.created_at,
           updatedAt: newStep.updated_at
         }
@@ -690,10 +724,17 @@ async function updateWorkflowStep(pool, stepId, requestBody) {
         is_required = $7,
         placeholder_text = $8,
         help_text = $9,
+        group_id = $10,
+        group_order = $11,
+        is_last_in_group = $12,
+        group_synthesis_prompt = $13,
+        group_output_variable = $14,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $10
+      WHERE id = $15
       RETURNING id, step_order, question_text, input_type, options, validation_rules, 
-                conditional_logic, is_required, placeholder_text, help_text, created_at, updated_at
+                conditional_logic, is_required, placeholder_text, help_text,
+                group_id, group_order, is_last_in_group, group_synthesis_prompt, group_output_variable,
+                created_at, updated_at
     `, [
       data.stepOrder || null,
       data.questionText ? data.questionText.trim() : null,
@@ -704,6 +745,11 @@ async function updateWorkflowStep(pool, stepId, requestBody) {
       data.isRequired !== undefined ? data.isRequired : null,
       data.placeholderText || null,
       data.helpText || null,
+      data.groupId !== undefined ? data.groupId : null,
+      data.groupOrder !== undefined ? data.groupOrder : null,
+      data.isLastInGroup !== undefined ? data.isLastInGroup : null,
+      data.groupSynthesisPrompt !== undefined ? data.groupSynthesisPrompt : null,
+      data.groupOutputVariable !== undefined ? data.groupOutputVariable : null,
       stepId
     ]);
 
@@ -728,6 +774,11 @@ async function updateWorkflowStep(pool, stepId, requestBody) {
           isRequired: updatedStep.is_required,
           placeholderText: updatedStep.placeholder_text,
           helpText: updatedStep.help_text,
+          groupId: updatedStep.group_id,
+          groupOrder: updatedStep.group_order,
+          isLastInGroup: updatedStep.is_last_in_group,
+          groupSynthesisPrompt: updatedStep.group_synthesis_prompt,
+          groupOutputVariable: updatedStep.group_output_variable,
           createdAt: updatedStep.created_at,
           updatedAt: updatedStep.updated_at
         }

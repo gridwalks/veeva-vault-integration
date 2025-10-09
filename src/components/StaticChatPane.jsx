@@ -456,12 +456,25 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
           // Workflow completed, generate final document
           await completeWorkflow();
         } else if (data.nextStep) {
+          // Build response message
+          let responseMessage = '✅ Response recorded!';
+          
+          // If a group was completed with AI synthesis, show feedback
+          if (data.groupCompleted && data.synthesizedOutput) {
+            responseMessage += '\n\n✨ **AI Synthesis Complete!**\n\n';
+            responseMessage += '_Your responses have been combined into a cohesive section:_\n\n';
+            responseMessage += `> ${data.synthesizedOutput.substring(0, 200)}${data.synthesizedOutput.length > 200 ? '...' : ''}\n\n`;
+            responseMessage += '_The full synthesized text will appear in your final document._';
+          }
+          
           // Show next step
+          responseMessage += `\n\n**${data.nextStep.questionText}**\n\n${data.nextStep.helpText ? `*${data.nextStep.helpText}*` : ''}`;
+          
           setConversationHistory(prev => [
             ...prev,
             { 
               role: 'assistant', 
-              content: `✅ Response recorded!\n\n**${data.nextStep.questionText}**\n\n${data.nextStep.helpText ? `*${data.nextStep.helpText}*` : ''}` 
+              content: responseMessage
             }
           ]);
         }

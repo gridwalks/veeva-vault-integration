@@ -223,6 +223,12 @@ CREATE TABLE IF NOT EXISTS qms_chat_workflow_steps (
   is_required BOOLEAN DEFAULT false,
   placeholder_text TEXT,
   help_text TEXT,
+  -- Question grouping fields for AI synthesis
+  group_id VARCHAR(100) DEFAULT NULL, -- Optional identifier linking steps into a group
+  group_order INTEGER DEFAULT NULL, -- Order within the group
+  is_last_in_group BOOLEAN DEFAULT false, -- Flag indicating this is the final question in the group
+  group_synthesis_prompt TEXT DEFAULT NULL, -- AI prompt for synthesizing grouped responses
+  group_output_variable VARCHAR(100) DEFAULT NULL, -- Template variable name for synthesized output
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -233,6 +239,14 @@ ON qms_chat_workflow_steps(workflow_template_id);
 
 CREATE INDEX IF NOT EXISTS idx_qms_chat_workflow_steps_order 
 ON qms_chat_workflow_steps(workflow_template_id, step_order);
+
+-- Indexes for workflow question grouping
+CREATE INDEX IF NOT EXISTS idx_qms_chat_workflow_steps_group_id 
+ON qms_chat_workflow_steps(group_id) WHERE group_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_qms_chat_workflow_steps_last_in_group 
+ON qms_chat_workflow_steps(workflow_template_id, group_id, is_last_in_group) 
+WHERE is_last_in_group = true;
 
 -- Table for storing workflow instances (user sessions)
 CREATE TABLE IF NOT EXISTS qms_chat_workflow_instances (

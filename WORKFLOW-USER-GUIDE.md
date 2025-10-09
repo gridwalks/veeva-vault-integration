@@ -11,6 +11,7 @@
 8. [Testing Your Workflow](#testing-your-workflow)
 9. [Best Practices](#best-practices)
 10. [Troubleshooting](#troubleshooting)
+11. [Advanced: Question Grouping with AI Synthesis](#advanced-question-grouping-with-ai-synthesis)
 
 ---
 
@@ -755,6 +756,200 @@ Before activating your workflow, verify:
    - Options: Acceptable, Needs Review, Unacceptable
 
 ---
+
+## Advanced: Question Grouping with AI Synthesis
+
+### Overview
+
+Question grouping allows you to collect answers to multiple related questions and have AI synthesize them into a single, cohesive response. This is perfect for scenarios where you want to gather detailed information through multiple questions but need a polished, integrated output in the final document.
+
+### When to Use Question Grouping
+
+Use question grouping when:
+- **Multiple perspectives are needed**: Gather different angles on a topic (e.g., immediate cause, contributing factors, systemic issues)
+- **Breaking down complexity**: Split a complex analysis into manageable questions
+- **Ensuring completeness**: Ask specific questions to ensure all aspects are covered
+- **Improving quality**: Let AI combine responses into professional, flowing prose
+
+### How It Works
+
+1. **User answers questions one-by-one**: Questions are still presented sequentially
+2. **AI synthesis triggers**: When the last question in a group is answered, AI processes all responses
+3. **Cohesive output generated**: AI creates a synthesized paragraph/section
+4. **Document uses synthesis**: The template uses the synthesized output instead of individual answers
+
+### Setting Up a Question Group
+
+#### Step 1: Identify Related Questions
+
+Group questions that address the same topic from different angles. For example, for root cause analysis:
+- Question 1: "What was the immediate cause of the problem?"
+- Question 2: "What contributing factors led to this situation?"
+- Question 3: "Are there any systemic issues that enabled this problem?"
+
+#### Step 2: Configure Group Settings
+
+For each question in the group:
+
+1. **Group ID**: Give the group a unique identifier (e.g., `root_cause_group`)
+   - Use the same Group ID for all questions in the group
+   - Use descriptive names: `root_cause_group`, `impact_assessment_group`
+
+2. **Order in Group**: Number the questions within the group (1, 2, 3...)
+   - Determines the sequence when collecting responses
+
+3. **Mark the Last Question**: Check "This is the last question in the group" for the final question
+   - This triggers AI synthesis
+
+#### Step 3: Configure AI Synthesis (Last Question Only)
+
+For the last question in the group, provide:
+
+**AI Synthesis Prompt**: Instructions for how AI should combine the responses
+
+Example prompts:
+```
+Synthesize these root cause analysis responses into a cohesive paragraph that:
+1. Identifies the immediate cause
+2. Explains contributing factors
+3. Addresses systemic issues
+4. Uses professional, technical language appropriate for regulatory documentation
+```
+
+**Template Variable Name**: The variable to use in your document template (e.g., `root_cause_analysis`)
+- This is what you'll reference in your template: `{{root_cause_analysis}}`
+- Individual step responses are still available as `{{step_3}}`, `{{step_4}}`, etc.
+
+### Example: Root Cause Analysis Group
+
+**Configuration:**
+
+| Step | Question | Group ID | Group Order | Last in Group? |
+|------|----------|----------|-------------|----------------|
+| 3 | What was the immediate cause? | root_cause_group | 1 | No |
+| 4 | What contributing factors existed? | root_cause_group | 2 | No |
+| 5 | What systemic issues enabled this? | root_cause_group | 3 | Yes |
+
+**Step 5 AI Synthesis Prompt:**
+```
+Create a comprehensive root cause analysis paragraph that integrates all three answers:
+the immediate cause, contributing factors, and systemic issues. Write in a professional
+tone suitable for regulatory documentation. Ensure logical flow and clear connections
+between the immediate cause, contributing factors, and systemic issues.
+```
+
+**Template Variable:** `root_cause_analysis`
+
+**User Experience:**
+1. User answers: "Equipment calibration was 2 months overdue"
+2. User answers: "Training gaps and workload pressure"
+3. User answers: "No automated reminders for calibration schedules"
+4. AI synthesizes into: "The immediate cause was equipment calibration being 2 months overdue. Contributing factors included training gaps among operators and workload pressure that led to oversight of scheduled maintenance. This incident revealed a systemic issue in our calibration management process: the absence of automated reminders for calibration schedules, which allowed critical equipment to remain uncalibrated without detection."
+
+### Writing Effective Synthesis Prompts
+
+#### Good Synthesis Prompts Include:
+
+1. **Output format**: "Create a single paragraph..." / "Generate bullet points..."
+2. **Tone guidance**: "Professional tone suitable for regulatory documentation"
+3. **Key requirements**: What must be included or emphasized
+4. **Structure hints**: "Start with immediate causes, then discuss contributing factors..."
+
+#### Examples by Use Case:
+
+**Impact Assessment:**
+```
+Synthesize the impact assessment responses into a comprehensive paragraph that covers
+all affected areas (patients, processes, products, etc.). Organize by severity, starting
+with the most critical impacts. Use clear, factual language appropriate for quality
+management documentation.
+```
+
+**Corrective Actions:**
+```
+Combine these corrective action responses into a cohesive action plan. Structure the
+output to clearly distinguish between immediate containment actions and longer-term
+corrective measures. Include timelines and responsibilities where mentioned. Maintain
+a professional, actionable tone.
+```
+
+**Risk Analysis:**
+```
+Create an integrated risk analysis paragraph from these responses. Address the likelihood
+and severity of risks, potential consequences, and existing controls. Ensure logical flow
+and emphasize regulatory compliance considerations. Use technical language appropriate
+for pharmaceutical quality systems.
+```
+
+### Template Integration
+
+**Without Grouping:**
+```
+Root Cause: {{step_3}}
+
+Contributing Factors: {{step_4}}
+
+Systemic Issues: {{step_5}}
+```
+
+**With Grouping:**
+```
+Root Cause Analysis:
+{{root_cause_analysis}}
+```
+
+The synthesized output appears as a single, polished section instead of separate answers.
+
+### Best Practices
+
+#### DO:
+- ✅ Group 2-5 related questions for best results
+- ✅ Use clear, specific synthesis prompts
+- ✅ Test the grouping with realistic answers
+- ✅ Use descriptive group IDs and variable names
+- ✅ Keep individual steps focused on specific aspects
+
+#### DON'T:
+- ❌ Group unrelated questions together
+- ❌ Create groups with only 1 question
+- ❌ Use vague synthesis prompts like "combine these"
+- ❌ Group more than 7-8 questions (too much for AI to synthesize well)
+- ❌ Forget to test with various response types
+
+### Troubleshooting
+
+**Synthesis output is too generic:**
+- Make your synthesis prompt more specific
+- Include examples of desired tone and structure
+- Add requirements for what must be included
+
+**Synthesis misses important details:**
+- Review the questions - are they specific enough?
+- Update synthesis prompt to emphasize key information
+- Consider breaking into smaller groups
+
+**Output doesn't match desired format:**
+- Be explicit in the synthesis prompt about format
+- Provide structure guidance (paragraphs vs. bullets)
+- Test with different response lengths
+
+### Advanced Tips
+
+**1. Multiple Groups in One Workflow:**
+You can have several independent groups in a single workflow:
+- `root_cause_group` (steps 3-5)
+- `corrective_actions_group` (steps 8-10)
+- `impact_assessment_group` (steps 12-14)
+
+**2. Combining Groups with Regular Questions:**
+Mix grouped and ungrouped questions:
+- Steps 1-2: Regular questions
+- Steps 3-5: Root cause group
+- Step 6: Regular question
+- Steps 7-9: Impact group
+
+**3. Progressive Disclosure:**
+Use grouping to gather detailed information without overwhelming users with one massive question.
 
 ## Support and Resources
 

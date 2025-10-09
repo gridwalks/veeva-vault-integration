@@ -297,7 +297,12 @@ Examples:
           conditional_logic,
           is_required,
           placeholder_text,
-          help_text
+          help_text,
+          group_id,
+          group_order,
+          is_last_in_group,
+          group_synthesis_prompt,
+          group_output_variable
         FROM qms_chat_workflow_steps 
         WHERE workflow_template_id = $1
         ORDER BY step_order
@@ -390,7 +395,12 @@ async function startWorkflow(pool, requestBody) {
         conditional_logic,
         is_required,
         placeholder_text,
-        help_text
+        help_text,
+        group_id,
+        group_order,
+        is_last_in_group,
+        group_synthesis_prompt,
+        group_output_variable
       FROM qms_chat_workflow_steps 
       WHERE workflow_template_id = $1
       ORDER BY step_order
@@ -434,6 +444,82 @@ async function startWorkflow(pool, requestBody) {
   } catch (error) {
     console.error('Error starting workflow:', error);
     throw error;
+  }
+}
+
+// Synthesize grouped responses using AI
+async function synthesizeGroupedResponses(groupResponses, synthesisPrompt, outputVariableName) {
+  try {
+    console.log(`Synthesizing ${groupResponses.length} grouped responses...`);
+    
+    // Build context with all Q&A pairs
+    let qaContext = '';
+    groupResponses.forEach((qa, index) => {
+      qaContext += `Question ${index + 1}: ${qa.question}\n`;
+      qaContext += `Answer ${index + 1}: ${qa.answer}\n\n`;
+    });
+    
+    // Prepare the AI prompt with the admin's synthesis instructions
+    const systemPrompt = `You are an expert document writer for pharmaceutical quality management. Your task is to synthesize multiple question-and-answer pairs into a cohesive, professional response.
+
+${synthesisPrompt || 'Generate a cohesive, professional response that integrates all the provided information.'}
+
+Guidelines:
+- Write in a clear, professional tone appropriate for regulatory documentation
+- Integrate all relevant information from the answers
+- Create smooth transitions between ideas
+- Remove redundancy while preserving all important details
+- Maintain technical accuracy
+- Use proper paragraph structure
+- Do not add information that wasn't provided in the answers
+
+Output ONLY the synthesized text, without any preamble or meta-commentary.`;
+
+    const userPrompt = `Please synthesize the following question-and-answer pairs:\n\n${qaContext}`;
+
+    console.log('Sending to OpenAI for synthesis...');
+    console.log('System prompt length:', systemPrompt.length);
+    console.log('User prompt length:', userPrompt.length);
+
+    // Call OpenAI API
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt
+        },
+        {
+          role: "user",
+          content: userPrompt
+        }
+      ],
+      max_tokens: 1500,
+      temperature: 0.3 // Lower temperature for more consistent, factual output
+    });
+
+    const synthesizedText = completion.choices[0]?.message?.content?.trim();
+    
+    if (!synthesizedText) {
+      console.error('AI synthesis returned empty response');
+      return null;
+    }
+
+    console.log(`AI synthesis completed. Output length: ${synthesizedText.length} characters`);
+    console.log(`Output preview: ${synthesizedText.substring(0, 200)}...`);
+    
+    return synthesizedText;
+
+  } catch (error) {
+    console.error('Error synthesizing grouped responses:', error);
+    console.error('Error details:', {
+      message: error.message,
+      type: error.type,
+      code: error.code
+    });
+    
+    // Return null on error - workflow can continue with individual responses
+    return null;
   }
 }
 
@@ -484,6 +570,68 @@ async function submitWorkflowStep(pool, requestBody) {
     // Add the new response
     currentResponses[`step_${stepId}`] = response;
 
+    // Get current step details to check if it's part of a group
+    const currentStepResult = await pool.query(`
+      SELECT 
+        id,
+        step_order,
+        question_text,
+        group_id,
+        group_order,
+        is_last_in_group,
+        group_synthesis_prompt,
+        group_output_variable
+      FROM qms_chat_workflow_steps 
+      WHERE id = $1
+    `, [stepId]);
+
+    const currentStep = currentStepResult.rows[0];
+    
+    // Check if we need to synthesize grouped responses
+    let synthesizedOutput = null;
+    if (currentStep && currentStep.is_last_in_group && currentStep.group_id) {
+      console.log(`Step ${stepId} is the last in group "${currentStep.group_id}". Triggering AI synthesis...`);
+      
+      // Get all steps in this group
+      const groupStepsResult = await pool.query(`
+        SELECT 
+          id,
+          step_order,
+          question_text,
+          group_order
+        FROM qms_chat_workflow_steps 
+        WHERE workflow_template_id = $1 AND group_id = $2
+        ORDER BY group_order, step_order
+      `, [instance.workflow_template_id, currentStep.group_id]);
+      
+      const groupSteps = groupStepsResult.rows;
+      
+      // Collect responses for all steps in the group
+      const groupResponses = [];
+      for (const groupStep of groupSteps) {
+        const responseKey = `step_${groupStep.id}`;
+        if (currentResponses[responseKey]) {
+          groupResponses.push({
+            question: groupStep.question_text,
+            answer: currentResponses[responseKey]
+          });
+        }
+      }
+      
+      // Synthesize grouped responses using AI
+      synthesizedOutput = await synthesizeGroupedResponses(
+        groupResponses,
+        currentStep.group_synthesis_prompt,
+        currentStep.group_output_variable
+      );
+      
+      // Store the synthesized output with the group output variable
+      if (synthesizedOutput) {
+        currentResponses[currentStep.group_output_variable] = synthesizedOutput;
+        console.log(`Synthesized group output stored as "${currentStep.group_output_variable}"`);
+      }
+    }
+
     // Get next step
     const nextStep = await pool.query(`
       SELECT 
@@ -496,7 +644,12 @@ async function submitWorkflowStep(pool, requestBody) {
         conditional_logic,
         is_required,
         placeholder_text,
-        help_text
+        help_text,
+        group_id,
+        group_order,
+        is_last_in_group,
+        group_synthesis_prompt,
+        group_output_variable
       FROM qms_chat_workflow_steps 
       WHERE workflow_template_id = $1 AND step_order > $2
       ORDER BY step_order
@@ -552,9 +705,16 @@ async function submitWorkflowStep(pool, requestBody) {
           conditionalLogic: nextStep.rows[0].conditional_logic,
           isRequired: nextStep.rows[0].is_required,
           placeholderText: nextStep.rows[0].placeholder_text,
-          helpText: nextStep.rows[0].help_text
+          helpText: nextStep.rows[0].help_text,
+          groupId: nextStep.rows[0].group_id,
+          groupOrder: nextStep.rows[0].group_order,
+          isLastInGroup: nextStep.rows[0].is_last_in_group,
+          groupSynthesisPrompt: nextStep.rows[0].group_synthesis_prompt,
+          groupOutputVariable: nextStep.rows[0].group_output_variable
         } : null,
-        isComplete: isComplete
+        isComplete: isComplete,
+        synthesizedOutput: synthesizedOutput, // Include synthesized output if generated
+        groupCompleted: synthesizedOutput !== null // Flag to indicate a group was completed
       })
     };
 
@@ -616,25 +776,40 @@ async function completeWorkflow(pool, requestBody) {
       generatedDocument = instance.document_template;
       const responses = instance.responses || {};
       
-      // Replace common variables
+      // First, replace group output variables (these take priority)
+      // Group output variables don't have the 'step_' prefix
       Object.keys(responses).forEach(key => {
         const value = responses[key];
-        const variableName = key.replace('step_', '');
-        generatedDocument = generatedDocument.replace(new RegExp(`{{${variableName}}}`, 'g'), value);
+        // If key doesn't start with 'step_', it's likely a group output variable
+        if (!key.startsWith('step_')) {
+          generatedDocument = generatedDocument.replace(new RegExp(`{{${key}}}`, 'g'), value);
+          console.log(`Replaced group variable {{${key}}} in template`);
+        }
+      });
+      
+      // Then replace individual step variables
+      Object.keys(responses).forEach(key => {
+        const value = responses[key];
+        if (key.startsWith('step_')) {
+          const variableName = key.replace('step_', '');
+          generatedDocument = generatedDocument.replace(new RegExp(`{{${variableName}}}`, 'g'), value);
+        }
       });
 
-      // Replace specific CAPA variables if this is a CAPA workflow
+      // Replace specific CAPA variables if this is a CAPA workflow (for backward compatibility)
       if (instance.template_name.toLowerCase().includes('capa')) {
         generatedDocument = generatedDocument
           .replace(/{{title}}/g, responses.step_2 || 'CAPA Title')
           .replace(/{{problem_description}}/g, responses.step_3 || 'Problem Description')
-          .replace(/{{root_cause}}/g, responses.step_4 || 'Root Cause')
+          .replace(/{{root_cause}}/g, responses.step_4 || responses.root_cause_analysis || 'Root Cause')
           .replace(/{{corrective_actions}}/g, responses.step_6 || 'Corrective Actions')
           .replace(/{{preventive_actions}}/g, responses.step_7 || 'Preventive Actions')
           .replace(/{{responsible_person}}/g, responses.step_8 || 'Responsible Person')
           .replace(/{{target_date}}/g, responses.step_9 || 'Target Date')
           .replace(/{{effectiveness_measures}}/g, responses.step_10 || 'Effectiveness Measures');
       }
+      
+      console.log('Document template variables replaced. Generated document length:', generatedDocument.length);
     }
 
     // Update instance with generated document
