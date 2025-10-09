@@ -210,13 +210,58 @@ export default function WorkflowManagement() {
           setSelectedTemplate(null);
           setSteps([]);
         }
+        alert('Workflow template deleted successfully!');
       } else {
         const error = await response.json();
-        alert(`Error: ${error.error || 'Failed to delete template'}`);
+        
+        // Check if deletion failed due to existing instances
+        if (error.canDeactivate && error.instanceCount) {
+          const deactivate = confirm(
+            `${error.error}\n\nWould you like to deactivate this workflow instead? ` +
+            `This will prevent new workflows from starting while preserving existing data.`
+          );
+          
+          if (deactivate) {
+            // Deactivate the workflow
+            await handleDeactivateTemplate(id);
+          }
+        } else {
+          alert(`Error: ${error.error || 'Failed to delete template'}`);
+        }
       }
     } catch (error) {
       console.error('Error deleting template:', error);
       alert('Error deleting template. Please try again.');
+    }
+  };
+
+  const handleDeactivateTemplate = async (id) => {
+    try {
+      const template = templates.find(t => t.id === id);
+      if (!template) return;
+
+      const response = await fetch(`/api/workflow-management/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ...template,
+          isActive: false
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setTemplates(prev => prev.map(t => t.id === id ? result.template : t));
+        alert('Workflow template deactivated successfully! It will no longer be offered to users.');
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.error || 'Failed to deactivate template'}`);
+      }
+    } catch (error) {
+      console.error('Error deactivating template:', error);
+      alert('Error deactivating template. Please try again.');
     }
   };
 

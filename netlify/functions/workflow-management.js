@@ -540,6 +540,28 @@ async function deleteWorkflowTemplate(pool, templateId) {
       };
     }
 
+    // Check if there are any workflow instances using this template
+    const instancesResult = await pool.query(
+      'SELECT COUNT(*) as count FROM qms_chat_workflow_instances WHERE workflow_template_id = $1',
+      [templateId]
+    );
+
+    const instanceCount = parseInt(instancesResult.rows[0].count);
+
+    if (instanceCount > 0) {
+      // Don't delete, but offer to deactivate instead
+      return {
+        statusCode: 409,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: `Cannot delete workflow template because ${instanceCount} workflow instance(s) are using it. You can deactivate the workflow instead to prevent new instances.`,
+          instanceCount: instanceCount,
+          canDeactivate: true
+        })
+      };
+    }
+
     // Delete template (steps will be deleted by CASCADE)
     await pool.query('DELETE FROM qms_chat_workflow_templates WHERE id = $1', [templateId]);
 
