@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { listApproved, indexDocuments, getIndexedDocuments } from "../api";
-import DocumentList from "./DocumentList.jsx";
+import { indexDocuments, getIndexedDocuments } from "../api";
 import IndexedDocumentList from "./IndexedDocumentList.jsx";
 import DocumentUpload from "./DocumentUpload.jsx";
 import ExternalResources from "./ExternalResources.jsx";
@@ -9,32 +8,11 @@ import WorkflowManagement from "./WorkflowManagement.jsx";
 
 export default function AdminScreen() {
   const [q, setQ] = useState("");
-  const [data, setData] = useState({ items: [], total: 0, pageOffset: 0, pageSize: 50 });
   const [indexedData, setIndexedData] = useState({ items: [], total: 0, pageOffset: 0, pageSize: 50 });
-  const [activeTab, setActiveTab] = useState("documents");
+  const [activeTab, setActiveTab] = useState("indexed");
   const [isIndexing, setIsIndexing] = useState(false);
   const [indexResult, setIndexResult] = useState(null);
   const [selectedDocuments, setSelectedDocuments] = useState([]);
-
-  async function load(offset = 0) {
-    console.log('Loading approved documents...', { query: q, offset });
-    try {
-      const res = await listApproved({ name: q, limit: 50, offset });
-      console.log('Approved documents loaded successfully:', {
-        total: res.total,
-        items: res.items?.length || 0
-      });
-      setData(res);
-    } catch (err) {
-      console.error('Error loading approved documents:', {
-        message: err.message,
-        stack: err.stack,
-        query: q,
-        offset
-      });
-      setData({ items: [], total: 0, pageOffset: 0, pageSize: 50, error: err.message });
-    }
-  }
 
   async function loadIndexed(offset = 0) {
     console.log('Loading indexed documents...', { query: q, offset });
@@ -146,7 +124,6 @@ export default function AdminScreen() {
 
   useEffect(() => {
     console.log('Admin screen mounted, loading initial data...');
-    load(0);
     loadIndexed(0);
   }, []);
 
@@ -174,26 +151,6 @@ export default function AdminScreen() {
 
       {/* Tab Navigation */}
       <div style={{display: 'flex', gap: '6px', marginBottom: '12px', justifyContent: 'center', flexWrap: 'wrap'}}>
-        <button
-          onClick={() => {
-            console.log('Switching to documents tab');
-            setActiveTab("documents");
-          }}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: activeTab === "documents" ? '#4338ca' : '#f3f4f6',
-            color: activeTab === "documents" ? 'white' : '#374151',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: '500',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          Veeva Documents
-        </button>
         <button
           onClick={() => {
             console.log('Switching to indexed documents tab');
@@ -296,13 +253,12 @@ export default function AdminScreen() {
         </button>
       </div>
 
-      {/* Search form - only show for documents and indexed tabs */}
-      {(activeTab === "documents" || activeTab === "indexed") && (
+      {/* Search form - only show for indexed tab */}
+      {activeTab === "indexed" && (
         <form onSubmit={(e) => { 
           e.preventDefault(); 
           console.log('Search form submitted:', { query: q, activeTab });
-          if (activeTab === "documents") load(0);
-          else loadIndexed(0);
+          loadIndexed(0);
         }} style={{display:'flex', gap:6, margin:'0 0 12px 0'}}>
           <input
             value={q}
@@ -311,42 +267,38 @@ export default function AdminScreen() {
             style={{flex:1, padding:'6px 10px', border: '1px solid #ddd', borderRadius: '4px', fontSize:'12px'}}
           />
           <button style={{padding:'6px 12px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize:'12px'}}>Search</button>
-          {activeTab === "documents" && (
-            <>
-              <button
-                type="button"
-                onClick={() => handleIndexDocuments(false)}
-                disabled={isIndexing}
-                style={{
-                  padding:'6px 12px',
-                  backgroundColor: isIndexing ? '#ccc' : '#28a745',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: isIndexing ? 'not-allowed' : 'pointer',
-                  fontSize:'12px'
-                }}
-              >
-                {isIndexing ? 'Indexing...' : 'Index Documents'}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleIndexDocuments(true)}
-                disabled={isIndexing}
-                style={{
-                  padding:'6px 12px',
-                  backgroundColor: isIndexing ? '#ccc' : '#ff6b35',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: isIndexing ? 'not-allowed' : 'pointer',
-                  fontSize:'12px'
-                }}
-              >
-                {isIndexing ? 'Regenerating...' : 'Regenerate Summaries'}
-              </button>
-            </>
-          )}
+          <button
+            type="button"
+            onClick={() => handleIndexDocuments(false)}
+            disabled={isIndexing}
+            style={{
+              padding:'6px 12px',
+              backgroundColor: isIndexing ? '#ccc' : '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: isIndexing ? 'not-allowed' : 'pointer',
+              fontSize:'12px'
+            }}
+          >
+            {isIndexing ? 'Indexing...' : 'Index Documents'}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleIndexDocuments(true)}
+            disabled={isIndexing}
+            style={{
+              padding:'6px 12px',
+              backgroundColor: isIndexing ? '#ccc' : '#ff6b35',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: isIndexing ? 'not-allowed' : 'pointer',
+              fontSize:'12px'
+            }}
+          >
+            {isIndexing ? 'Regenerating...' : 'Regenerate Summaries'}
+          </button>
         </form>
       )}
 
@@ -378,40 +330,10 @@ export default function AdminScreen() {
         </div>
       )}
 
-      {data.error && <p style={{color:'#b00020'}}>Error: {data.error}</p>}
       {indexedData.error && <p style={{color:'#b00020'}}>Error: {indexedData.error}</p>}
 
       {/* Content based on active tab */}
-      {activeTab === "documents" ? (
-        <>
-          <DocumentList items={data.items} />
-          <div className="pager" style={{display:'flex', gap:8, alignItems:'center', marginTop:10}}>
-            <button 
-              disabled={data.pageOffset <= 0} 
-              onClick={() => {
-                const newOffset = Math.max(0, data.pageOffset - data.pageSize);
-                console.log('Previous page clicked:', { newOffset, currentOffset: data.pageOffset });
-                load(newOffset);
-              }}
-              style={{padding:'5px 10px', fontSize:'11px', borderRadius:'4px', cursor:'pointer', border:'1px solid #ddd', backgroundColor:'#fff'}}
-            >
-              Prev
-            </button>
-            <span style={{fontSize:'11px', color:'#666'}}>{data.pageOffset + 1}–{data.pageOffset + (data.items?.length || 0)} of {data.total}</span>
-            <button 
-              disabled={data.pageOffset + data.pageSize >= data.total} 
-              onClick={() => {
-                const newOffset = data.pageOffset + data.pageSize;
-                console.log('Next page clicked:', { newOffset, currentOffset: data.pageOffset });
-                load(newOffset);
-              }}
-              style={{padding:'5px 10px', fontSize:'11px', borderRadius:'4px', cursor:'pointer', border:'1px solid #ddd', backgroundColor:'#fff'}}
-            >
-              Next
-            </button>
-          </div>
-        </>
-      ) : activeTab === "indexed" ? (
+      {activeTab === "indexed" ? (
         <>
           <IndexedDocumentList 
             items={indexedData.items} 
