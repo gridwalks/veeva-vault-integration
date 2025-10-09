@@ -567,7 +567,7 @@ async function submitWorkflowStep(pool, requestBody) {
 // Complete workflow and generate final document
 async function completeWorkflow(pool, requestBody) {
   try {
-    const { instanceId } = JSON.parse(requestBody);
+    const { instanceId, skipAI = false } = JSON.parse(requestBody);
     
     if (!instanceId) {
       return {
@@ -580,7 +580,7 @@ async function completeWorkflow(pool, requestBody) {
       };
     }
 
-    console.log(`Completing workflow instance ${instanceId}`);
+    console.log(`Completing workflow instance ${instanceId}${skipAI ? ' (skipping AI)' : ''}`);
 
     // Get instance with template
     const instanceResult = await pool.query(`
@@ -657,11 +657,13 @@ async function completeWorkflow(pool, requestBody) {
     let polishedDocument = generatedDocument;
     let aiSuggestions = null;
     
-    try {
-      console.log('Sending document to AI for grammar and clarity improvements...');
-      
-      // Run both AI calls in parallel to reduce execution time
-      const [aiResponse, summaryResponse] = await Promise.all([
+    // Only run AI enhancement if not explicitly skipped
+    if (!skipAI) {
+      try {
+        console.log('Sending document to AI for grammar and clarity improvements...');
+        
+        // Run both AI calls in parallel to reduce execution time
+        const [aiResponse, summaryResponse] = await Promise.all([
         // First call: Polish the document
         openai.chat.completions.create({
           model: "gpt-3.5-turbo",
@@ -706,14 +708,17 @@ Return ONLY the improved document text, without any explanations or comments.`
         })
       ]);
 
-      polishedDocument = aiResponse.choices[0]?.message?.content || generatedDocument;
-      aiSuggestions = summaryResponse.choices[0]?.message?.content || 'Document improved for grammar, spelling, and clarity.';
-      
-      console.log('AI document polish completed successfully');
-    } catch (aiError) {
-      console.error('AI document polish failed:', aiError);
-      // Continue with original document if AI fails
-      polishedDocument = generatedDocument;
+        polishedDocument = aiResponse.choices[0]?.message?.content || generatedDocument;
+        aiSuggestions = summaryResponse.choices[0]?.message?.content || 'Document improved for grammar, spelling, and clarity.';
+        
+        console.log('AI document polish completed successfully');
+      } catch (aiError) {
+        console.error('AI document polish failed:', aiError);
+        // Continue with original document if AI fails
+        polishedDocument = generatedDocument;
+      }
+    } else {
+      console.log('Skipping AI enhancement as requested');
     }
 
     return {

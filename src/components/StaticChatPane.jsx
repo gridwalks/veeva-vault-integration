@@ -503,6 +503,10 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     ]);
     
     try {
+      // Create an AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
       const response = await fetch('/api/workflow-execution/complete-workflow', {
         method: 'POST',
         headers: {
@@ -510,8 +514,11 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         },
         body: JSON.stringify({
           instanceId: workflowState.instanceId
-        })
+        }),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -601,7 +608,9 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       // Provide user-friendly error messages
       let errorMessage = `Sorry, I encountered an error completing the workflow. `;
       
-      if (error.name === 'SyntaxError' && error.message.includes('JSON')) {
+      if (error.name === 'AbortError') {
+        errorMessage += `The request took too long to complete (timeout after 30 seconds). This usually means the AI processing is taking longer than expected. Your workflow responses have been saved. Please try again or contact support if this persists.`;
+      } else if (error.name === 'SyntaxError' && error.message.includes('JSON')) {
         errorMessage += `The server response was incomplete (likely due to a timeout). Your workflow data has been saved, but the AI enhancement couldn't complete. Please try again.`;
       } else if (error.message.includes('timeout') || error.message.includes('network')) {
         errorMessage += `There was a network issue. Please check your connection and try again.`;
