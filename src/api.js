@@ -591,3 +591,42 @@ export async function exportQAInteractions({ search = '', user_id, session_id, s
     throw error;
   }
 }
+
+// Workflow Instances API functions
+export async function getWorkflowInstances({ status, limit = 50, offset = 0, userId } = {}) {
+  const startTime = Date.now();
+  console.log('Fetching workflow instances...', { status, limit, offset, userId });
+  
+  try {
+    const params = new URLSearchParams({ limit, offset });
+    if (status) params.set('status', status);
+    if (userId) params.set('userId', userId);
+    
+    const res = await fetch(`/api/workflow-management/workflow-instances?${params}`);
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to load workflow instances:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText
+      });
+      throw new Error(`Failed to load workflow instances: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Workflow instances fetched in ${duration}ms:`, {
+      count: data.instances?.length || 0
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error fetching workflow instances after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
