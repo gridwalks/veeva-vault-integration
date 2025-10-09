@@ -239,9 +239,14 @@ export const handler = async (event) => {
         .slice(0, 5); // Take first 5 keywords
       
       if (keywords.length > 0) {
-        const keywordConditions = keywords.map((_, index) => 
-          `(LOWER(title) LIKE $${index + 1} OR LOWER(description) LIKE $${index + 1} OR $${index + 1} = ANY(LOWER(unnest(tags))::text))`
-        ).join(' OR ');
+        // Build a condition that checks title, description, and tags properly
+        const keywordConditions = keywords.map((_, index) => {
+          const paramIndex = index * 2 + 1;
+          return `(LOWER(title) LIKE $${paramIndex} OR LOWER(description) LIKE $${paramIndex} OR EXISTS (
+            SELECT 1 FROM unnest(tags) AS tag 
+            WHERE LOWER(tag) LIKE $${paramIndex + 1}
+          ))`;
+        }).join(' OR ');
         
         const externalResourceQuery = `
           SELECT id, title, url, description, category, tags, created_at
@@ -251,7 +256,13 @@ export const handler = async (event) => {
           LIMIT 5
         `;
         
-        const keywordParams = keywords.map(keyword => `%${keyword}%`);
+        // Flatten parameters: for each keyword, add both the pattern for LIKE and the pattern for tag matching
+        const keywordParams = [];
+        keywords.forEach(keyword => {
+          keywordParams.push(`%${keyword}%`); // For title/description LIKE
+          keywordParams.push(`%${keyword}%`); // For tag LIKE
+        });
+        
         const externalResult = await pool.query(externalResourceQuery, keywordParams);
         relevantExternalResources = externalResult.rows;
         
@@ -259,7 +270,12 @@ export const handler = async (event) => {
       }
     } catch (externalError) {
       console.error('Error searching external resources:', externalError);
+      console.error('Error details:', {
+        message: externalError.message,
+        stack: externalError.stack
+      });
       // Continue without external resources if search fails
+      relevantExternalResources = [];
     }
 
     if (relevantDocuments.length === 0 && relevantChunks.length === 0 && relevantExternalResources.length === 0) {
