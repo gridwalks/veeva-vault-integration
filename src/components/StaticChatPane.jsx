@@ -491,6 +491,17 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
   };
 
   const completeWorkflow = async () => {
+    setIsLoading(true);
+    
+    // Show progress message to user
+    setConversationHistory(prev => [
+      ...prev,
+      { 
+        role: 'assistant', 
+        content: `Processing your workflow completion...\n\n⏳ **Generating document from your responses**\n✨ **Enhancing with AI for grammar and clarity**\n\nThis may take a few moments...` 
+      }
+    ]);
+    
     try {
       const response = await fetch('/api/workflow-execution/complete-workflow', {
         method: 'POST',
@@ -559,23 +570,50 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
           });
         }
       } else {
-        const error = await response.json();
-        console.error('Failed to complete workflow:', error);
+        // Handle specific HTTP error codes
+        let errorMessage = `Sorry, I couldn't complete the workflow. `;
+        
+        if (response.status === 504) {
+          errorMessage += `The request timed out while processing your document with AI. This can happen with longer documents. Please try again, or contact support if the issue persists.`;
+        } else if (response.status === 500) {
+          try {
+            const error = await response.json();
+            console.error('Failed to complete workflow:', error);
+            errorMessage += `Server error: ${error.error || 'Unknown error'}. Please try again.`;
+          } catch {
+            errorMessage += `There was a server error. Please try again in a moment.`;
+          }
+        } else {
+          errorMessage += `Please try again. (Error: ${response.status})`;
+        }
+        
         setConversationHistory(prev => [
           ...prev,
           { 
             role: 'assistant', 
-            content: `Sorry, I couldn't complete the workflow. Please try again.` 
+            content: errorMessage
           }
         ]);
       }
     } catch (error) {
       console.error('Error completing workflow:', error);
+      
+      // Provide user-friendly error messages
+      let errorMessage = `Sorry, I encountered an error completing the workflow. `;
+      
+      if (error.name === 'SyntaxError' && error.message.includes('JSON')) {
+        errorMessage += `The server response was incomplete (likely due to a timeout). Your workflow data has been saved, but the AI enhancement couldn't complete. Please try again.`;
+      } else if (error.message.includes('timeout') || error.message.includes('network')) {
+        errorMessage += `There was a network issue. Please check your connection and try again.`;
+      } else {
+        errorMessage += `Please try again. If the problem persists, contact support.`;
+      }
+      
       setConversationHistory(prev => [
         ...prev,
         { 
           role: 'assistant', 
-          content: `Sorry, I encountered an error completing the workflow. Please try again.` 
+          content: errorMessage
         }
       ]);
     } finally {

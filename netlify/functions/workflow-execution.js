@@ -659,12 +659,16 @@ async function completeWorkflow(pool, requestBody) {
     
     try {
       console.log('Sending document to AI for grammar and clarity improvements...');
-      const aiResponse = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content: `You are a professional document editor specializing in pharmaceutical quality documents. Review the following document and improve it for:
+      
+      // Run both AI calls in parallel to reduce execution time
+      const [aiResponse, summaryResponse] = await Promise.all([
+        // First call: Polish the document
+        openai.chat.completions.create({
+          model: "gpt-3.5-turbo",
+          messages: [
+            {
+              role: "system",
+              content: `You are a professional document editor specializing in pharmaceutical quality documents. Review the following document and improve it for:
 - Grammar and spelling
 - Clarity and professionalism
 - Completeness and detail
@@ -674,35 +678,35 @@ async function completeWorkflow(pool, requestBody) {
 Maintain the original structure and all key information. Only improve the writing quality. Do not add new information that wasn't provided by the user.
 
 Return ONLY the improved document text, without any explanations or comments.`
-          },
-          {
-            role: "user",
-            content: generatedDocument
-          }
-        ],
-        max_tokens: 2000,
-        temperature: 0.3
-      });
+            },
+            {
+              role: "user",
+              content: generatedDocument
+            }
+          ],
+          max_tokens: 2000,
+          temperature: 0.3
+        }),
+        
+        // Second call: Generate improvement suggestions (based on original document structure)
+        openai.chat.completions.create({
+          model: "gpt-3.5-turbo",
+          messages: [
+            {
+              role: "system",
+              content: "Review this pharmaceutical quality document and suggest 3-5 specific improvements for grammar, clarity, and professionalism. Be brief and specific."
+            },
+            {
+              role: "user",
+              content: generatedDocument
+            }
+          ],
+          max_tokens: 300,
+          temperature: 0.3
+        })
+      ]);
 
       polishedDocument = aiResponse.choices[0]?.message?.content || generatedDocument;
-      
-      // Generate a brief summary of improvements
-      const summaryResponse = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content: "Compare the original and improved documents. List 3-5 key improvements made in a brief, bulleted format. Be specific about what was improved."
-          },
-          {
-            role: "user",
-            content: `Original:\n${generatedDocument}\n\nImproved:\n${polishedDocument}`
-          }
-        ],
-        max_tokens: 300,
-        temperature: 0.3
-      });
-
       aiSuggestions = summaryResponse.choices[0]?.message?.content || 'Document improved for grammar, spelling, and clarity.';
       
       console.log('AI document polish completed successfully');
