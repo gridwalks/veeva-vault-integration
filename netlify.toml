@@ -4,9 +4,6 @@
 
 [functions]
   node_bundler = "esbuild"
-  # Increase timeout for AI-heavy operations (max 26s on Pro, 10s on free tier)
-  # If on Pro plan, you can set this to 26
-  timeout = 26
 
 [[redirects]]
   from = "/api/*"
