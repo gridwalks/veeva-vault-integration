@@ -2,14 +2,32 @@ import React from 'react';
 import acceleraqaLogo from '../../assets/AceleraQA_logo.png';
 
 export default function AuthScreen({ onLogin }) {
+  // Reset body styles to eliminate white borders
+  React.useEffect(() => {
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
   return (
     <div style={{
-      minHeight: '100vh',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      width: '100vw',
+      height: '100vh',
       background: 'linear-gradient(to bottom right, #111827 0%, #1f2937 50%, #000000 100%)',
       color: '#ffffff',
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'center'
+      justifyContent: 'center',
+      margin: 0,
+      padding: 0
     }}>
       <div style={{
         textAlign: 'center',
@@ -20,9 +38,9 @@ export default function AuthScreen({ onLogin }) {
         <img
           src={acceleraqaLogo}
           alt="AcceleraQA logo"
-          width="200"
-          height="40"
           style={{
+            width: '200px',
+            height: 'auto',
             margin: '0 auto'
           }}
         />
