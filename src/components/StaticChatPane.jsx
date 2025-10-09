@@ -929,17 +929,14 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               textAlign: 'center',
               color: '#6b7280'
             }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>💬</div>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🚀</div>
               <h4 style={{ 
                 margin: '0 0 8px 0', 
                 color: '#374151',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
-                Chat with your documents
+                What can I help you with today?
               </h4>
-              <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5' }}>
-                Ask questions about your indexed documents. I'll help you find relevant information and answer your questions based on the document content.
-              </p>
               {selectedDocuments.length > 0 && (
                 <div style={{ 
                   marginTop: '16px', 
