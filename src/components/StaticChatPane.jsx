@@ -868,42 +868,6 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
           </div>
         </div>
 
-        {/* Used Documents */}
-        {usedDocuments.length > 0 && (
-          <div style={{
-            padding: '8px 14px',
-            backgroundColor: '#2a2a2a',
-            borderBottom: '1px solid #2a2a2a',
-            fontSize: '11px'
-          }}>
-            <div style={{
-              color: '#ffffff',
-              fontWeight: '600',
-              marginBottom: '6px'
-            }}>
-              Using {usedDocuments.length} document{usedDocuments.length !== 1 ? 's' : ''}:
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {usedDocuments.map((doc, index) => (
-                <span
-                  key={index}
-                  style={{
-                    backgroundColor: '#007bff',
-                    color: 'white',
-                    padding: '3px 8px',
-                    borderRadius: '10px',
-                    fontSize: '10px',
-                    fontWeight: '500'
-                  }}
-                  title={`${doc.name} (${doc.number})`}
-                >
-                  {doc.name.length > 30 ? doc.name.substring(0, 30) + '...' : doc.name}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Used External Resources */}
         {usedExternalResources.length > 0 && (
           <div style={{
