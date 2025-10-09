@@ -189,9 +189,12 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
 
       // After answering, check if we should offer a workflow
       try {
+        console.log('Detecting workflow for message:', userMessage);
         const workflowDetection = await detectWorkflow(userMessage);
+        console.log('Workflow detection result:', workflowDetection);
         
         if (workflowDetection.shouldStartWorkflow && workflowDetection.template && !workflowDetection.hasActiveWorkflow) {
+          console.log('Offering workflow:', workflowDetection.template.name);
           // Get the current conversation history (already set by the chat response above)
           setConversationHistory(prev => [
             ...prev,
@@ -205,6 +208,12 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               }
             }
           ]);
+        } else {
+          console.log('Workflow not offered:', {
+            shouldStart: workflowDetection.shouldStartWorkflow,
+            hasTemplate: !!workflowDetection.template,
+            hasActive: workflowDetection.hasActiveWorkflow
+          });
         }
       } catch (workflowError) {
         console.error('Workflow detection error:', workflowError);
