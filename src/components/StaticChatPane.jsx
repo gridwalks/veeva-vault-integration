@@ -807,6 +807,91 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
             </div>
           </div>
         )}
+
+        {/* External resources for the last assistant message */}
+        {isLastAssistantMessage && usedExternalResources && usedExternalResources.length > 0 && (
+          <div style={{
+            maxWidth: '80%',
+            marginTop: '8px',
+            padding: '12px',
+            backgroundColor: '#eff6ff',
+            borderRadius: '8px',
+            border: '1px solid #bfdbfe'
+          }}>
+            <div style={{
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#1e40af',
+              marginBottom: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              🔗 Related external resources:
+            </div>
+            
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px'
+            }}>
+              {usedExternalResources.map((resource, resIndex) => (
+                <div key={resIndex} style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '8px',
+                  backgroundColor: 'white',
+                  borderRadius: '6px',
+                  border: '1px solid #e0e0e0'
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: '#333',
+                      marginBottom: '2px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {resource.title}
+                    </div>
+                    {resource.description && (
+                      <div style={{
+                        fontSize: '11px',
+                        color: '#666'
+                      }}>
+                        {resource.description}
+                      </div>
+                    )}
+                  </div>
+                  <a
+                    href={resource.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: '#1e40af',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '11px',
+                      fontWeight: '500',
+                      whiteSpace: 'nowrap',
+                      marginLeft: '8px',
+                      textDecoration: 'none',
+                      display: 'inline-block'
+                    }}
+                  >
+                    Open
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -888,50 +973,6 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
             )}
           </div>
         </div>
-
-        {/* Used External Resources */}
-        {usedExternalResources.length > 0 && (
-          <div style={{
-            padding: '12px 20px',
-            backgroundColor: '#1e3a8a',
-            borderBottom: '1px solid #1e3a8a',
-            fontSize: '12px'
-          }}>
-            <div style={{
-              color: '#ffffff',
-              fontWeight: '600',
-              marginBottom: '8px'
-            }}>
-              Related external resources ({usedExternalResources.length}):
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {usedExternalResources.map((resource, index) => (
-                <a
-                  key={index}
-                  href={resource.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    backgroundColor: '#0ea5e9',
-                    color: 'white',
-                    padding: '4px 12px',
-                    borderRadius: '12px',
-                    fontSize: '11px',
-                    fontWeight: '500',
-                    textDecoration: 'none',
-                    display: 'inline-block',
-                    transition: 'background-color 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#0284c7'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#0ea5e9'}
-                  title={`${resource.title} - ${resource.description || 'No description'}`}
-                >
-                  {resource.title.length > 25 ? resource.title.substring(0, 25) + '...' : resource.title}
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Messages */}
         <div style={{
