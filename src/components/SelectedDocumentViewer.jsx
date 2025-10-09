@@ -436,8 +436,8 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                       )}
                       <button
                         onClick={() => {
-                          const exportContent = isEditMode ? editableContent : (activeDocument.content || editableContent);
-                          exportToWord(exportContent, activeDocument.document_name);
+                          // Always export the editableContent (which contains saved edits)
+                          exportToWord(editableContent, activeDocument.document_name);
                         }}
                         style={{
                           padding: '8px 16px',
