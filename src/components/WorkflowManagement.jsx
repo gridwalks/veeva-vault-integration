@@ -307,6 +307,11 @@ export default function WorkflowManagement() {
   };
 
   const handleEditStep = (step) => {
+    console.log('Editing step:', step);
+    
+    // Ensure we're on the steps tab
+    setActiveTab('steps');
+    
     setEditingStep(step);
     setStepForm({
       workflowTemplateId: selectedTemplate?.id,
@@ -326,6 +331,11 @@ export default function WorkflowManagement() {
       groupOutputVariable: step.groupOutputVariable || ''
     });
     setShowStepForm(true);
+    
+    // Scroll to the top after a brief delay to ensure the form is rendered
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
   };
 
   const resetTemplateForm = () => {
@@ -750,8 +760,8 @@ export default function WorkflowManagement() {
         </div>
       )}
 
-      {/* Step Form */}
-      {showStepForm && selectedTemplate && (
+      {/* Step Form - Only show in steps tab */}
+      {showStepForm && selectedTemplate && activeTab === 'steps' && (
         <div style={{
           marginBottom: '24px',
           padding: '20px',
