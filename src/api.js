@@ -630,3 +630,48 @@ export async function getWorkflowInstances({ status, limit = 50, offset = 0, use
     throw error;
   }
 }
+
+export async function repolishWorkflowDocument({ instanceId, editedDocument }) {
+  const startTime = Date.now();
+  console.log('Re-polishing workflow document...', { instanceId, contentLength: editedDocument?.length });
+  
+  try {
+    const res = await fetch('/api/workflow-execution/repolish-document', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        instanceId,
+        editedDocument
+      })
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to re-polish document:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error
+      });
+      throw new Error(errorData.error || `Failed to re-polish document: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Document re-polished in ${duration}ms:`, {
+      versions: data.versions?.length || 0,
+      currentVersion: data.currentVersion,
+      hasImprovements: data.hasAiImprovements
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error re-polishing document after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}

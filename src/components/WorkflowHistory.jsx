@@ -847,20 +847,37 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: '16px'
+                marginBottom: '16px',
+                flexWrap: 'wrap',
+                gap: '12px'
               }}>
-                <h4 style={{
-                  margin: 0,
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  📄 Generated Document
-                </h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h4 style={{
+                    margin: 0,
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    color: '#374151',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    📄 Generated Document
+                  </h4>
+                  {instance.documentVersions && instance.documentVersions.length > 1 && (
+                    <span style={{
+                      padding: '4px 8px',
+                      backgroundColor: '#f0f9ff',
+                      color: '#0369a1',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: '500',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}>
+                      {instance.documentVersions.length} versions
+                    </span>
+                  )}
+                </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
                     onClick={() => onCopyToClipboard(instance.generatedDocument)}

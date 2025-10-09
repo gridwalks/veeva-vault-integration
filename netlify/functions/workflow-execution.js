@@ -127,6 +127,8 @@ export const handler = async (event) => {
           return await submitWorkflowStep(pool, event.body);
         } else if (action === 'complete-workflow') {
           return await completeWorkflow(pool, event.body);
+        } else if (action === 'repolish-document') {
+          return await repolishWorkflowDocument(pool, event.body);
         }
 
       case 'GET':
@@ -812,17 +814,29 @@ async function completeWorkflow(pool, requestBody) {
       console.log('Document template variables replaced. Generated document length:', generatedDocument.length);
     }
 
-    // Update instance with generated document
+    // Create initial version history
+    const initialVersions = [
+      {
+        version: 1,
+        content: generatedDocument,
+        polished: false,
+        type: 'original',
+        created_at: new Date().toISOString()
+      }
+    ];
+
+    // Update instance with generated document and initial version history
     const updateResult = await pool.query(`
       UPDATE qms_chat_workflow_instances 
       SET 
         generated_document = $1,
+        document_versions = $2,
         status = 'completed',
         completed_at = CURRENT_TIMESTAMP,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
-      RETURNING id, generated_document, status, completed_at
-    `, [generatedDocument, instanceId]);
+      WHERE id = $3
+      RETURNING id, generated_document, document_versions, status, completed_at
+    `, [generatedDocument, JSON.stringify(initialVersions), instanceId]);
 
     const updatedInstance = updateResult.rows[0];
 
@@ -887,6 +901,32 @@ Return ONLY the improved document text, without any explanations or comments.`
         aiSuggestions = summaryResponse.choices[0]?.message?.content || 'Document improved for grammar, spelling, and clarity.';
         
         console.log('AI document polish completed successfully');
+        
+        // Add polished version to version history
+        if (polishedDocument !== generatedDocument) {
+          const currentVersions = updatedInstance.document_versions || [];
+          const newVersion = {
+            version: currentVersions.length + 1,
+            content: polishedDocument,
+            polished: true,
+            type: 'ai_polished',
+            created_at: new Date().toISOString()
+          };
+          
+          currentVersions.push(newVersion);
+          
+          // Update instance with new version and set polished document as current
+          await pool.query(`
+            UPDATE qms_chat_workflow_instances 
+            SET 
+              generated_document = $1,
+              document_versions = $2,
+              updated_at = CURRENT_TIMESTAMP
+            WHERE id = $3
+          `, [polishedDocument, JSON.stringify(currentVersions), instanceId]);
+          
+          console.log(`Added AI polished version (v${newVersion.version}) to workflow instance ${instanceId}`);
+        }
       } catch (aiError) {
         console.error('AI document polish failed:', aiError);
         // Continue with original document if AI fails
@@ -895,6 +935,13 @@ Return ONLY the improved document text, without any explanations or comments.`
     } else {
       console.log('Skipping AI enhancement as requested');
     }
+
+    // Fetch the updated versions array for the response
+    const finalInstanceResult = await pool.query(`
+      SELECT document_versions FROM qms_chat_workflow_instances WHERE id = $1
+    `, [instanceId]);
+    
+    const finalVersions = finalInstanceResult.rows[0]?.document_versions || [];
 
     return {
       statusCode: 200,
@@ -910,12 +957,184 @@ Return ONLY the improved document text, without any explanations or comments.`
         generatedDocument: updatedInstance.generated_document,
         polishedDocument: polishedDocument,
         aiSuggestions: aiSuggestions,
-        hasAiImprovements: polishedDocument !== generatedDocument
+        hasAiImprovements: polishedDocument !== generatedDocument,
+        documentVersions: finalVersions
       })
     };
 
   } catch (error) {
     console.error('Error completing workflow:', error);
+    throw error;
+  }
+}
+
+// Re-polish an edited workflow document
+async function repolishWorkflowDocument(pool, requestBody) {
+  try {
+    const { instanceId, editedDocument } = JSON.parse(requestBody);
+    
+    if (!instanceId || !editedDocument) {
+      return {
+        statusCode: 400,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'Instance ID and edited document are required'
+        })
+      };
+    }
+
+    console.log(`Re-polishing workflow document for instance ${instanceId}`);
+
+    // Get current instance
+    const instanceResult = await pool.query(`
+      SELECT 
+        id,
+        workflow_template_id,
+        generated_document,
+        document_versions,
+        status
+      FROM qms_chat_workflow_instances 
+      WHERE id = $1
+    `, [instanceId]);
+
+    if (instanceResult.rows.length === 0) {
+      return {
+        statusCode: 404,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'Workflow instance not found'
+        })
+      };
+    }
+
+    const instance = instanceResult.rows[0];
+    
+    // Get current versions array or initialize if empty
+    let versions = instance.document_versions || [];
+    
+    // Add user's edited version to history
+    const userEditedVersion = {
+      version: versions.length + 1,
+      content: editedDocument,
+      polished: false,
+      type: 'user_edited',
+      created_at: new Date().toISOString()
+    };
+    
+    versions.push(userEditedVersion);
+    console.log(`Added user edited version (v${userEditedVersion.version})`);
+
+    // Run AI polish on the edited document
+    let polishedDocument = editedDocument;
+    let aiSuggestions = null;
+    
+    try {
+      console.log('Sending edited document to AI for polish...');
+      
+      const [aiResponse, summaryResponse] = await Promise.all([
+        // Polish the edited document
+        openai.chat.completions.create({
+          model: "gpt-3.5-turbo",
+          messages: [
+            {
+              role: "system",
+              content: `You are a professional document editor specializing in pharmaceutical quality documents. Review the following document and improve it for:
+- Grammar and spelling
+- Clarity and professionalism
+- Completeness and detail
+- Consistency in terminology
+- Professional tone appropriate for regulatory environments
+
+Maintain the original structure and all key information. Only improve the writing quality. Do not add new information that wasn't provided by the user.
+
+Return ONLY the improved document text, without any explanations or comments.`
+            },
+            {
+              role: "user",
+              content: editedDocument
+            }
+          ],
+          max_tokens: 2000,
+          temperature: 0.3
+        }),
+        
+        // Generate improvement suggestions
+        openai.chat.completions.create({
+          model: "gpt-3.5-turbo",
+          messages: [
+            {
+              role: "system",
+              content: "Review this pharmaceutical quality document and suggest 3-5 specific improvements for grammar, clarity, and professionalism. Be brief and specific."
+            },
+            {
+              role: "user",
+              content: editedDocument
+            }
+          ],
+          max_tokens: 300,
+          temperature: 0.3
+        })
+      ]);
+
+      polishedDocument = aiResponse.choices[0]?.message?.content || editedDocument;
+      aiSuggestions = summaryResponse.choices[0]?.message?.content || 'Document improved for grammar, spelling, and clarity.';
+      
+      console.log('AI re-polish completed successfully');
+      
+      // Add AI re-polished version to history
+      if (polishedDocument !== editedDocument) {
+        const aiRepolishedVersion = {
+          version: versions.length + 1,
+          content: polishedDocument,
+          polished: true,
+          type: 'ai_repolished',
+          created_at: new Date().toISOString()
+        };
+        
+        versions.push(aiRepolishedVersion);
+        console.log(`Added AI re-polished version (v${aiRepolishedVersion.version})`);
+      }
+    } catch (aiError) {
+      console.error('AI re-polish failed:', aiError);
+      // Return the user's edited version if AI fails
+      polishedDocument = editedDocument;
+      aiSuggestions = 'AI polish failed. Returning your edited version.';
+    }
+
+    // Update instance with new versions and latest polished document
+    const updateResult = await pool.query(`
+      UPDATE qms_chat_workflow_instances 
+      SET 
+        generated_document = $1,
+        document_versions = $2,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+      RETURNING id, generated_document, document_versions, updated_at
+    `, [polishedDocument, JSON.stringify(versions), instanceId]);
+
+    const updatedInstance = updateResult.rows[0];
+
+    console.log(`Re-polished workflow document for instance ${instanceId}. Total versions: ${versions.length}`);
+
+    return {
+      statusCode: 200,
+      headers: setCorsHeaders(),
+      body: JSON.stringify({
+        success: true,
+        message: 'Document re-polished successfully',
+        versions: versions,
+        currentVersion: versions.length,
+        originalDocument: editedDocument,
+        polishedDocument: polishedDocument,
+        aiSuggestions: aiSuggestions,
+        hasAiImprovements: polishedDocument !== editedDocument
+      })
+    };
+
+  } catch (error) {
+    console.error('Error re-polishing workflow document:', error);
     throw error;
   }
 }
@@ -935,6 +1154,7 @@ async function getWorkflowInstance(pool, instanceId) {
         wi.current_step,
         wi.responses,
         wi.generated_document,
+        wi.document_versions,
         wi.created_at,
         wi.updated_at,
         wi.completed_at,
@@ -974,6 +1194,7 @@ async function getWorkflowInstance(pool, instanceId) {
           currentStep: instance.current_step,
           responses: instance.responses,
           generatedDocument: instance.generated_document,
+          documentVersions: instance.document_versions || [],
           createdAt: instance.created_at,
           updatedAt: instance.updated_at,
           completedAt: instance.completed_at

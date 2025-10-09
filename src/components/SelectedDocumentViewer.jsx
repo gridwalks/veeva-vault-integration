@@ -7,6 +7,12 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
   const [isEditMode, setIsEditMode] = React.useState(false);
   const [editableContent, setEditableContent] = React.useState('');
   const [originalContent, setOriginalContent] = React.useState('');
+  
+  // Version history state
+  const [documentVersions, setDocumentVersions] = React.useState([]);
+  const [currentVersionIndex, setCurrentVersionIndex] = React.useState(0);
+  const [workflowInstanceId, setWorkflowInstanceId] = React.useState(null);
+  const [isRepolishing, setIsRepolishing] = React.useState(false);
 
   const handleOpenDocument = React.useCallback(async (document) => {
     console.log('handleOpenDocument called with:', document);
@@ -24,9 +30,27 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
       if (document.isWorkflowDocument && document.content) {
         console.log('Displaying workflow-generated document with text content');
         
-        // Store the content for editing
-        setEditableContent(document.content);
-        setOriginalContent(document.content);
+        // Extract workflow instance ID (format: workflow_123 or numeric ID)
+        const instanceId = document.veeva_document_id?.toString().replace('workflow_', '');
+        setWorkflowInstanceId(instanceId);
+        
+        // Initialize version history
+        const versions = document.documentVersions || [];
+        setDocumentVersions(versions);
+        
+        // If versions exist, show the latest one by default
+        if (versions.length > 0) {
+          const latestVersion = versions[versions.length - 1];
+          setEditableContent(latestVersion.content);
+          setOriginalContent(latestVersion.content);
+          setCurrentVersionIndex(versions.length - 1);
+        } else {
+          // Fallback to document.content if no versions
+          setEditableContent(document.content);
+          setOriginalContent(document.content);
+          setCurrentVersionIndex(0);
+        }
+        
         setIsEditMode(false); // Start in view mode
         
         // Create a simple HTML document to display the text
@@ -227,6 +251,72 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
     setIsEditMode(false);
     setEditableContent('');
     setOriginalContent('');
+    setDocumentVersions([]);
+    setCurrentVersionIndex(0);
+    setWorkflowInstanceId(null);
+    setIsRepolishing(false);
+  };
+
+  const handleRepolishDocument = async () => {
+    if (!workflowInstanceId || !editableContent) {
+      alert('Cannot re-polish: Missing workflow instance or document content');
+      return;
+    }
+
+    setIsRepolishing(true);
+    
+    try {
+      console.log('Re-polishing document...', { instanceId: workflowInstanceId });
+      
+      const { repolishWorkflowDocument } = await import('../api');
+      const result = await repolishWorkflowDocument({
+        instanceId: workflowInstanceId,
+        editedDocument: editableContent
+      });
+
+      if (result.success) {
+        console.log('Re-polish successful:', result);
+        
+        // Update version history
+        setDocumentVersions(result.versions);
+        
+        // Switch to the newly polished version (last in array)
+        setCurrentVersionIndex(result.versions.length - 1);
+        setEditableContent(result.polishedDocument);
+        setOriginalContent(result.polishedDocument);
+        
+        // Exit edit mode to show the polished version
+        setIsEditMode(false);
+        
+        // Show success message with AI suggestions
+        const message = result.hasAiImprovements 
+          ? `✨ Document re-polished successfully!\n\n${result.aiSuggestions}\n\nYou are now viewing Version ${result.currentVersion}.`
+          : 'Document processed. No changes were needed.';
+        
+        alert(message);
+      } else {
+        throw new Error(result.error || 'Re-polish failed');
+      }
+    } catch (error) {
+      console.error('Error re-polishing document:', error);
+      alert(`Failed to re-polish document: ${error.message}`);
+    } finally {
+      setIsRepolishing(false);
+    }
+  };
+
+  const handleVersionChange = (versionIndex) => {
+    if (documentVersions[versionIndex]) {
+      const version = documentVersions[versionIndex];
+      setCurrentVersionIndex(versionIndex);
+      setEditableContent(version.content);
+      setOriginalContent(version.content);
+      
+      // Exit edit mode when switching versions
+      if (isEditMode) {
+        setIsEditMode(false);
+      }
+    }
   };
 
   const exportToWord = (documentContent, workflowName) => {
@@ -382,9 +472,51 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                     {activeDocument.document_type} • Version {activeDocument.version} • {activeDocument.document_number}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   {activeDocument.isWorkflowDocument && (
                     <>
+                      {/* Version Selector */}
+                      {documentVersions.length > 1 && (
+                        <select
+                          value={currentVersionIndex}
+                          onChange={(e) => handleVersionChange(parseInt(e.target.value))}
+                          disabled={isEditMode}
+                          style={{
+                            padding: '8px 12px',
+                            backgroundColor: '#ffffff',
+                            color: '#374151',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            fontWeight: '500',
+                            cursor: isEditMode ? 'not-allowed' : 'pointer',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                            opacity: isEditMode ? 0.5 : 1
+                          }}
+                        >
+                          {documentVersions.map((version, index) => {
+                            const date = new Date(version.created_at).toLocaleString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            });
+                            const typeLabel = {
+                              original: 'Original',
+                              ai_polished: 'AI Polished',
+                              user_edited: 'User Edited',
+                              ai_repolished: 'AI Re-polished'
+                            }[version.type] || version.type;
+                            
+                            return (
+                              <option key={index} value={index}>
+                                v{version.version} ({typeLabel} - {date})
+                              </option>
+                            );
+                          })}
+                        </select>
+                      )}
+                      
                       <button
                         onClick={() => {
                           if (isEditMode) {
@@ -411,6 +543,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                       >
                         {isEditMode ? '💾 Save Edits' : '✏️ Edit Document'}
                       </button>
+                      
                       {isEditMode && editableContent !== originalContent && (
                         <button
                           onClick={() => {
@@ -434,6 +567,49 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                           ↺ Revert Changes
                         </button>
                       )}
+                      
+                      {/* Re-polish Button - Shows when user has made edits */}
+                      {isEditMode && editableContent !== originalContent && workflowInstanceId && (
+                        <button
+                          onClick={handleRepolishDocument}
+                          disabled={isRepolishing}
+                          style={{
+                            padding: '8px 16px',
+                            backgroundColor: isRepolishing ? '#9ca3af' : '#8b5cf6',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            cursor: isRepolishing ? 'not-allowed' : 'pointer',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                            transition: 'background-color 0.2s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                          onMouseEnter={(e) => !isRepolishing && (e.target.style.backgroundColor = '#7c3aed')}
+                          onMouseLeave={(e) => !isRepolishing && (e.target.style.backgroundColor = '#8b5cf6')}
+                        >
+                          {isRepolishing ? (
+                            <>
+                              <span style={{
+                                display: 'inline-block',
+                                width: '12px',
+                                height: '12px',
+                                border: '2px solid #ffffff',
+                                borderTop: '2px solid transparent',
+                                borderRadius: '50%',
+                                animation: 'spin 1s linear infinite'
+                              }}></span>
+                              Re-polishing...
+                            </>
+                          ) : (
+                            <>✨ Re-polish with AI</>
+                          )}
+                        </button>
+                      )}
+                      
                       <button
                         onClick={() => {
                           // Always export the editableContent (which contains saved edits)
@@ -804,3 +980,19 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
 });
 
 export default SelectedDocumentViewer;
+
+// Add CSS for spinner animation
+if (typeof document !== 'undefined') {
+  const styleElement = document.createElement('style');
+  styleElement.textContent = `
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  `;
+  if (!document.head.querySelector('style[data-component="SelectedDocumentViewer"]')) {
+    styleElement.setAttribute('data-component', 'SelectedDocumentViewer');
+    document.head.appendChild(styleElement);
+  }
+}
+

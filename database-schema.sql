@@ -257,7 +257,8 @@ CREATE TABLE IF NOT EXISTS qms_chat_workflow_instances (
   status VARCHAR(50) DEFAULT 'in_progress', -- 'in_progress', 'completed', 'abandoned'
   current_step INTEGER DEFAULT 1,
   responses JSONB, -- Store all user responses
-  generated_document TEXT, -- Final generated document
+  generated_document TEXT, -- Final generated document (current version)
+  document_versions JSONB DEFAULT '[]', -- Version history array
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   completed_at TIMESTAMP
@@ -275,6 +276,10 @@ ON qms_chat_workflow_instances(session_id);
 
 CREATE INDEX IF NOT EXISTS idx_qms_chat_workflow_instances_status 
 ON qms_chat_workflow_instances(status);
+
+-- Index for document version history (GIN index for JSONB)
+CREATE INDEX IF NOT EXISTS idx_qms_chat_workflow_instances_versions 
+ON qms_chat_workflow_instances USING gin (document_versions);
 
 -- Insert sample CAPA workflow template
 INSERT INTO qms_chat_workflow_templates (name, description, category, trigger_keywords, document_template) VALUES 

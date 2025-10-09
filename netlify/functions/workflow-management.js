@@ -851,6 +851,7 @@ async function getWorkflowInstances(pool, queryParams) {
         wi.current_step,
         wi.responses,
         wi.generated_document,
+        wi.document_versions,
         wi.created_at,
         wi.updated_at,
         wi.completed_at,
@@ -895,6 +896,7 @@ async function getWorkflowInstances(pool, queryParams) {
           currentStep: row.current_step,
           responses: row.responses,
           generatedDocument: row.generated_document,
+          documentVersions: row.document_versions || [],
           createdAt: row.created_at,
           updatedAt: row.updated_at,
           completedAt: row.completed_at

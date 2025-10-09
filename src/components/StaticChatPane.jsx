@@ -586,7 +586,8 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
             isWorkflowDocument: true,
             hasAiVersion: data.hasAiImprovements,
             originalContent: data.generatedDocument,
-            aiContent: data.polishedDocument
+            aiContent: data.polishedDocument,
+            documentVersions: data.documentVersions || [] // Pass version history
           });
         }
       } else {
