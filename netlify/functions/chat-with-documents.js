@@ -113,7 +113,7 @@ export const handler = async (event) => {
             JOIN Veeva_Doc_Chat_document_index di ON dc.document_id = di.id
             WHERE dc.veeva_document_id IN (${placeholders})
             ORDER BY dc.embedding <=> $1::vector
-            LIMIT 10
+            LIMIT 5
           `;
           vectorParams = [embeddingStr, ...documentIds];
         } else {
@@ -133,7 +133,7 @@ export const handler = async (event) => {
             FROM Veeva_Doc_Chat_document_chunks dc
             JOIN Veeva_Doc_Chat_document_index di ON dc.document_id = di.id
             ORDER BY dc.embedding <=> $1::vector
-            LIMIT 10
+            LIMIT 5
           `;
           vectorParams = [embeddingStr];
         }
@@ -253,7 +253,7 @@ export const handler = async (event) => {
           FROM qms_chat_external_resources 
           WHERE ${keywordConditions}
           ORDER BY created_at DESC
-          LIMIT 5
+          LIMIT 3
         `;
         
         // Flatten parameters: for each keyword, add both the pattern for LIKE and the pattern for tag matching
@@ -403,7 +403,7 @@ ${documentContext}${externalResourcesContext}`;
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
       messages: messages,
-      max_tokens: 1000,
+      max_tokens: 800,
       temperature: 0.3,
     });
 
