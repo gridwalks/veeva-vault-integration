@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import DocumentViewer from './DocumentViewer.jsx';
 import { createQAInteraction } from '../api';
 
@@ -621,7 +622,25 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
           }}
         >
           {isAssistant ? (
-            <ReactMarkdown>{message.content}</ReactMarkdown>
+            <ReactMarkdown 
+              remarkPlugins={[remarkGfm]}
+              components={{
+                a: ({ node, ...props }) => (
+                  <a 
+                    {...props} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{
+                      color: '#007bff',
+                      textDecoration: 'underline',
+                      cursor: 'pointer'
+                    }}
+                  />
+                )
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
           ) : (
             message.content
           )}
