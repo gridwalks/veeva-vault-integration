@@ -309,8 +309,12 @@ export default function WorkflowManagement() {
   const handleEditStep = (step) => {
     console.log('Editing step:', step);
     
-    // Ensure we're on the steps tab
-    setActiveTab('steps');
+    // If clicking edit on the same step, close the form
+    if (editingStep && editingStep.id === step.id) {
+      setEditingStep(null);
+      setShowStepForm(false);
+      return;
+    }
     
     setEditingStep(step);
     setStepForm({
@@ -331,11 +335,6 @@ export default function WorkflowManagement() {
       groupOutputVariable: step.groupOutputVariable || ''
     });
     setShowStepForm(true);
-    
-    // Scroll to the top after a brief delay to ensure the form is rendered
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 100);
   };
 
   const resetTemplateForm = () => {
@@ -760,8 +759,8 @@ export default function WorkflowManagement() {
         </div>
       )}
 
-      {/* Step Form - Only show in steps tab */}
-      {showStepForm && selectedTemplate && activeTab === 'steps' && (
+      {/* Step Form for Adding New Steps (not inline editing) */}
+      {showStepForm && !editingStep && selectedTemplate && activeTab === 'steps' && (
         <div style={{
           marginBottom: '24px',
           padding: '20px',
@@ -776,7 +775,7 @@ export default function WorkflowManagement() {
             color: '#374151',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}>
-            {editingStep ? 'Edit Workflow Step' : 'Add New Workflow Step'}
+            Add New Workflow Step
           </h4>
           
           <form onSubmit={handleStepSubmit}>
@@ -1605,6 +1604,459 @@ export default function WorkflowManagement() {
                       </button>
                     </div>
                   </div>
+                  
+                  {/* Inline Edit Form - Shows only for the step being edited */}
+                  {editingStep && editingStep.id === step.id && (
+                    <div style={{
+                      marginTop: '16px',
+                      padding: '16px',
+                      backgroundColor: '#fffbeb',
+                      border: '2px solid #fbbf24',
+                      borderRadius: '8px'
+                    }}>
+                      <h4 style={{
+                        margin: '0 0 12px 0',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: '#92400e',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                      }}>
+                        ✏️ Edit Workflow Step
+                      </h4>
+                      
+                      <form onSubmit={handleStepSubmit}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                          <div>
+                            <label style={{
+                              display: 'block',
+                              marginBottom: '4px',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              color: '#374151',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                            }}>
+                              Step Order
+                            </label>
+                            <input
+                              type="number"
+                              value={stepForm.stepOrder}
+                              onChange={(e) => setStepForm(prev => ({ ...prev, stepOrder: parseInt(e.target.value) || 1 }))}
+                              style={{
+                                width: '100%',
+                                padding: '6px 10px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '4px',
+                                fontSize: '13px',
+                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                              }}
+                              min="1"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label style={{
+                              display: 'block',
+                              marginBottom: '4px',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              color: '#374151',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                            }}>
+                              Input Type *
+                            </label>
+                            <select
+                              value={stepForm.inputType}
+                              onChange={(e) => setStepForm(prev => ({ ...prev, inputType: e.target.value }))}
+                              style={{
+                                width: '100%',
+                                padding: '6px 10px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '4px',
+                                fontSize: '13px',
+                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                              }}
+                              required
+                            >
+                              {inputTypes.map(type => (
+                                <option key={type.value} value={type.value}>{type.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div style={{ marginBottom: '12px' }}>
+                          <label style={{
+                            display: 'block',
+                            marginBottom: '4px',
+                            fontSize: '13px',
+                            fontWeight: '500',
+                            color: '#374151',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                          }}>
+                            Question Text *
+                          </label>
+                          <textarea
+                            value={stepForm.questionText}
+                            onChange={(e) => setStepForm(prev => ({ ...prev, questionText: e.target.value }))}
+                            style={{
+                              width: '100%',
+                              padding: '6px 10px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '4px',
+                              fontSize: '13px',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                              minHeight: '60px',
+                              resize: 'vertical'
+                            }}
+                            placeholder="Enter the question or prompt for this step"
+                            required
+                          />
+                        </div>
+
+                        {(stepForm.inputType === 'select' || stepForm.inputType === 'radio' || stepForm.inputType === 'checkbox') && (
+                          <div style={{ marginBottom: '12px' }}>
+                            <label style={{
+                              display: 'block',
+                              marginBottom: '6px',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              color: '#374151',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                            }}>
+                              Options
+                            </label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '6px' }}>
+                              {stepForm.options.choices?.map((choice, index) => (
+                                <span key={index} style={{
+                                  padding: '3px 6px',
+                                  backgroundColor: '#e0e7ff',
+                                  color: '#4338ca',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}>
+                                  {choice}
+                                  <button
+                                    type="button"
+                                    onClick={() => removeOption(index)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: '#4338ca',
+                                      cursor: 'pointer',
+                                      fontSize: '11px',
+                                      padding: '0',
+                                      marginLeft: '2px'
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={addOption}
+                              style={{
+                                padding: '4px 8px',
+                                backgroundColor: '#f3f4f6',
+                                color: '#374151',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                cursor: 'pointer',
+                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                              }}
+                            >
+                              + Add Option
+                            </button>
+                          </div>
+                        )}
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                          <div>
+                            <label style={{
+                              display: 'block',
+                              marginBottom: '4px',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              color: '#374151',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                            }}>
+                              Placeholder Text
+                            </label>
+                            <input
+                              type="text"
+                              value={stepForm.placeholderText}
+                              onChange={(e) => setStepForm(prev => ({ ...prev, placeholderText: e.target.value }))}
+                              style={{
+                                width: '100%',
+                                padding: '6px 10px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '4px',
+                                fontSize: '13px',
+                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                              }}
+                              placeholder="Optional placeholder text"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              color: '#374151',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                              marginTop: '20px'
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={stepForm.isRequired}
+                                onChange={(e) => setStepForm(prev => ({ ...prev, isRequired: e.target.checked }))}
+                              />
+                              Required Field
+                            </label>
+                          </div>
+                        </div>
+
+                        <div style={{ marginBottom: '12px' }}>
+                          <label style={{
+                            display: 'block',
+                            marginBottom: '4px',
+                            fontSize: '13px',
+                            fontWeight: '500',
+                            color: '#374151',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                          }}>
+                            Help Text
+                          </label>
+                          <textarea
+                            value={stepForm.helpText}
+                            onChange={(e) => setStepForm(prev => ({ ...prev, helpText: e.target.value }))}
+                            style={{
+                              width: '100%',
+                              padding: '6px 10px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '4px',
+                              fontSize: '13px',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                              minHeight: '50px',
+                              resize: 'vertical'
+                            }}
+                            placeholder="Optional help text to guide the user"
+                          />
+                        </div>
+
+                        {/* Group Configuration Section */}
+                        <div style={{
+                          marginBottom: '12px',
+                          padding: '12px',
+                          backgroundColor: '#f0f9ff',
+                          border: '1px solid #bfdbfe',
+                          borderRadius: '6px'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            marginBottom: '10px'
+                          }}>
+                            <h5 style={{
+                              margin: 0,
+                              fontSize: '13px',
+                              fontWeight: '600',
+                              color: '#1e40af',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                            }}>
+                              🔗 Question Grouping (Advanced)
+                            </h5>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                            <div>
+                              <label style={{
+                                display: 'block',
+                                marginBottom: '4px',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                color: '#374151',
+                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                              }}>
+                                Group ID
+                              </label>
+                              <input
+                                type="text"
+                                value={stepForm.groupId}
+                                onChange={(e) => setStepForm(prev => ({ ...prev, groupId: e.target.value }))}
+                                style={{
+                                  width: '100%',
+                                  padding: '5px 8px',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: '4px',
+                                  fontSize: '12px',
+                                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                                }}
+                                placeholder="e.g., root_cause_group"
+                              />
+                            </div>
+
+                            <div>
+                              <label style={{
+                                display: 'block',
+                                marginBottom: '4px',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                color: '#374151',
+                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                              }}>
+                                Order in Group
+                              </label>
+                              <input
+                                type="number"
+                                value={stepForm.groupOrder || ''}
+                                onChange={(e) => setStepForm(prev => ({ ...prev, groupOrder: e.target.value ? parseInt(e.target.value) : null }))}
+                                style={{
+                                  width: '100%',
+                                  padding: '5px 8px',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: '4px',
+                                  fontSize: '12px',
+                                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                                }}
+                                placeholder="1, 2, 3..."
+                                min="1"
+                                disabled={!stepForm.groupId}
+                              />
+                            </div>
+                          </div>
+
+                          <div style={{ marginBottom: '10px' }}>
+                            <label style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '12px',
+                              fontWeight: '500',
+                              color: '#374151',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                              cursor: stepForm.groupId ? 'pointer' : 'not-allowed',
+                              opacity: stepForm.groupId ? 1 : 0.5
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={stepForm.isLastInGroup}
+                                onChange={(e) => setStepForm(prev => ({ ...prev, isLastInGroup: e.target.checked }))}
+                                disabled={!stepForm.groupId}
+                              />
+                              This is the last question in the group
+                            </label>
+                          </div>
+
+                          {stepForm.isLastInGroup && stepForm.groupId && (
+                            <>
+                              <div style={{ marginBottom: '10px' }}>
+                                <label style={{
+                                  display: 'block',
+                                  marginBottom: '4px',
+                                  fontSize: '12px',
+                                  fontWeight: '500',
+                                  color: '#374151',
+                                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                                }}>
+                                  AI Synthesis Prompt *
+                                </label>
+                                <textarea
+                                  value={stepForm.groupSynthesisPrompt}
+                                  onChange={(e) => setStepForm(prev => ({ ...prev, groupSynthesisPrompt: e.target.value }))}
+                                  style={{
+                                    width: '100%',
+                                    padding: '6px 8px',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                    minHeight: '60px',
+                                    resize: 'vertical'
+                                  }}
+                                  placeholder="e.g., Synthesize these answers into a cohesive root cause analysis paragraph..."
+                                  required={stepForm.isLastInGroup}
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{
+                                  display: 'block',
+                                  marginBottom: '4px',
+                                  fontSize: '12px',
+                                  fontWeight: '500',
+                                  color: '#374151',
+                                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                                }}>
+                                  Template Variable Name *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={stepForm.groupOutputVariable}
+                                  onChange={(e) => setStepForm(prev => ({ ...prev, groupOutputVariable: e.target.value }))}
+                                  style={{
+                                    width: '100%',
+                                    padding: '5px 8px',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    fontFamily: 'monospace'
+                                  }}
+                                  placeholder="e.g., root_cause_analysis"
+                                  required={stepForm.isLastInGroup}
+                                />
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            onClick={resetStepForm}
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: '#6b7280',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              cursor: 'pointer',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                            }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: '#16a34a',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              cursor: 'pointer',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                            }}
+                          >
+                            Update Step
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
