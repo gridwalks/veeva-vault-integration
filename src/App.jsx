@@ -5,6 +5,7 @@ import Header from "./components/Header.jsx";
 import AdminScreen from "./components/AdminScreen.jsx";
 import SelectedDocumentViewer from "./components/SelectedDocumentViewer.jsx";
 import AuthScreen from "./components/AuthScreen.jsx";
+import { useInactivityLogout } from "./hooks/useInactivityLogout.js";
 // import StatusPanel from "./components/StatusPanel.jsx";
 
 export default function App() {
@@ -12,6 +13,10 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState("main");
   const [selectedDocuments, setSelectedDocuments] = useState([]);
   const documentViewerRef = useRef(null);
+
+  // Set up inactivity logout for authenticated users
+  const handleLogout = () => logout({ logoutParams: { returnTo: window.location.origin } });
+  useInactivityLogout(handleLogout);
 
   const handleOpenDocumentInPane = (document) => {
     console.log('App: handleOpenDocumentInPane called with:', document);
@@ -42,7 +47,7 @@ export default function App() {
         user={user}
         currentScreen={currentScreen}
         onScreenChange={setCurrentScreen}
-        onLogout={() => logout({ logoutParams: { returnTo: window.location.origin } })}
+        onLogout={handleLogout}
       />
       
       {/* Main Content Area */}
