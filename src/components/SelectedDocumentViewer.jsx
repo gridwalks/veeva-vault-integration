@@ -119,17 +119,17 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
         setIsLoading(false);
         return;
       }
-      // First, convert document to PDF
+      // Download and convert document to viewable format (HTML or PDF)
       const versionParts = document.version ? document.version.split('.') : ['1', '0'];
       const major = versionParts[0] || 1;
       const minor = versionParts[1] || 0;
       
-      console.log('Converting document to PDF...', { docId: document.veeva_document_id, major, minor });
+      console.log('Loading document for viewing...', { docId: document.veeva_document_id, major, minor });
       
       try {
         // First, download the original document
         const originalUrl = `/api/download-file?docId=${document.veeva_document_id}&major=${major}&minor=${minor}`;
-        console.log('Downloading original document for conversion from URL:', originalUrl);
+        console.log('Downloading original document from URL:', originalUrl);
         
         const originalResponse = await fetch(originalUrl);
         if (!originalResponse.ok) {
@@ -139,7 +139,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
         const originalBlob = await originalResponse.blob();
         const fileType = originalResponse.headers.get('content-type') || 'application/octet-stream';
         
-        console.log('Original document downloaded for conversion:', {
+        console.log('Original document downloaded:', {
           size: originalBlob.size,
           type: fileType
         });
@@ -163,74 +163,52 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
 
         console.log('Using filename for conversion:', fileName);
 
-        // Create FormData for the conversion request
-        const formData = new FormData();
-        formData.append('file', originalBlob, fileName);
-        formData.append('output', 'pdf');
+        // Check if it's already a PDF
+        const isPdf = fileType.includes('pdf') || fileName.toLowerCase().endsWith('.pdf');
+        
+        if (isPdf) {
+          // It's already a PDF, display it directly
+          const pdfObjectUrl = URL.createObjectURL(originalBlob);
+          console.log('Document is already a PDF, displaying directly');
+          setDocumentContent(pdfObjectUrl);
+        } else {
+          // Convert document to HTML (preserves formatting for DOCX)
+          const formData = new FormData();
+          formData.append('file', originalBlob, fileName);
+          formData.append('output', 'html');
 
-        // Send the file to PDF conversion service
-        const convertResponse = await fetch('/api/convert-to-pdf', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (!convertResponse.ok) {
-          console.warn(`PDF conversion failed: ${convertResponse.status} ${convertResponse.statusText}, falling back to original document`);
-          throw new Error('PDF conversion service unavailable');
+          // Send the file to conversion service
+          const convertResponse = await fetch('/api/convert-to-pdf', {
+            method: 'POST',
+            body: formData
+          });
+          
+          if (!convertResponse.ok) {
+            console.warn(`Document conversion failed: ${convertResponse.status} ${convertResponse.statusText}`);
+            throw new Error('Document conversion service unavailable');
+          }
+          
+          const convertedBlob = await convertResponse.blob();
+          const responseType = convertResponse.headers.get('content-type') || '';
+          
+          console.log('Document conversion successful:', {
+            size: convertedBlob.size,
+            type: responseType
+          });
+          
+          // Validate the converted content
+          if (convertedBlob.size === 0) {
+            throw new Error('Converted document is empty');
+          }
+          
+          // Create object URL for the converted content
+          const objectUrl = URL.createObjectURL(convertedBlob);
+          setDocumentContent(objectUrl);
         }
-        
-        const convertedBlob = await convertResponse.blob();
-        const pdfObjectUrl = URL.createObjectURL(convertedBlob);
-        
-        console.log('PDF conversion successful, size:', convertedBlob.size);
-        
-        // Validate the PDF blob
-        if (convertedBlob.size === 0) {
-          throw new Error('Generated PDF is empty');
-        }
-        
-        // Check if the blob looks like a PDF
-        const firstBytes = await convertedBlob.slice(0, 4).arrayBuffer();
-        const header = new Uint8Array(firstBytes);
-        const headerString = String.fromCharCode(...header);
-        if (!headerString.startsWith('%PDF')) {
-          console.warn('Generated file may not be a valid PDF - header check failed');
-        }
-        
-        // Set the PDF URL for display
-        setDocumentContent(pdfObjectUrl);
         
       } catch (convertError) {
-        console.warn('PDF conversion failed, falling back to original document:', convertError.message);
-        
-        // Fallback: try to load the original document and detect if it's already a PDF
-        const originalUrl = `/api/download-file?docId=${document.veeva_document_id}&major=${major}&minor=${minor}`;
-        console.log('Loading original document from URL:', originalUrl);
-        
-        const response = await fetch(originalUrl);
-        console.log('Original document response status:', response.status, 'Content-Type:', response.headers.get('content-type'));
-        
-        if (response.ok) {
-          const contentType = response.headers.get('content-type') || '';
-          const isPdf = contentType.includes('pdf') || contentType.includes('application/pdf');
-          
-          console.log('Original document analysis:', { contentType, isPdf, size: response.headers.get('content-length') });
-          
-          if (isPdf) {
-            // It's already a PDF, load it directly
-            const pdfBlob = await response.blob();
-            const pdfObjectUrl = URL.createObjectURL(pdfBlob);
-            console.log('Original document is PDF, loaded directly, size:', pdfBlob.size);
-            setDocumentContent(pdfObjectUrl);
-          } else {
-            // Not a PDF, show message with download option
-            console.log('Original document is not PDF, showing fallback message');
-            setDocumentContent('This document cannot be displayed inline. PDF conversion is currently unavailable. Please use the download button to view the document.');
-          }
-        } else {
-          console.error('Failed to load original document:', response.status, response.statusText);
-          throw new Error(`Failed to load original document: ${response.status} ${response.statusText}`);
-        }
+        console.error('Document loading/conversion failed:', convertError.message);
+        setDocumentContent(`Error loading document: ${convertError.message}. Please use the download button to view the original document.`);
       }
       
     } catch (error) {
@@ -765,24 +743,26 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                     width: '100%'
                   }}>
                     {documentContent.startsWith('blob:') || documentContent.startsWith('http') ? (
-                      /* PDF Viewer */
+                      /* Document Viewer (PDF or HTML) */
                       <iframe
                         src={documentContent}
                         style={{
                           width: '100%',
                           height: '100%',
                           border: 'none',
-                          borderRadius: '4px'
+                          borderRadius: '4px',
+                          backgroundColor: '#ffffff'
                         }}
-                        title={`PDF Viewer - ${activeDocument.document_name}`}
+                        title={`Document Viewer - ${activeDocument.document_name}`}
                         onError={(e) => {
-                          console.error('PDF iframe error:', e);
-                          setDocumentContent('Error loading PDF viewer. Please try downloading the document.');
+                          console.error('Document iframe error:', e);
+                          setDocumentContent('Error loading document viewer. Please try downloading the document.');
                         }}
                       />
                     ) : documentContent.startsWith('PDF documents cannot be displayed') || 
                        documentContent.startsWith('Word documents (DOCX) cannot be displayed') ||
                        documentContent.startsWith('This document appears to be a binary file') ||
+                       documentContent.startsWith('This document cannot be displayed inline') ||
                        documentContent.startsWith('Document appears to be empty') ||
                        documentContent.startsWith('Document content could not be read') ||
                        documentContent.startsWith('Error loading document') ? (

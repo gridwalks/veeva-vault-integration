@@ -28,9 +28,9 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
 
   const convertDocumentToPdf = async (url) => {
     try {
-      console.log('Starting document conversion to PDF...', { url });
+      console.log('Starting document conversion...', { url });
       
-      // Create a FormData object to send the document
+      // Fetch the document
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`Failed to fetch document: ${response.status}`);
@@ -63,12 +63,25 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
 
       console.log('Using filename for conversion:', fileName);
 
+      // Check if it's already a PDF
+      const isPdf = fileType.includes('pdf') || fileName.toLowerCase().endsWith('.pdf');
+      
+      if (isPdf) {
+        // It's already a PDF, use it directly
+        const pdfUrl = URL.createObjectURL(blob);
+        console.log('Document is already a PDF, using directly');
+        setConvertedPdfUrl(pdfUrl);
+        setContentType('application/pdf');
+        setLoading(false);
+        return;
+      }
+
       // Create FormData for the conversion request
       const formData = new FormData();
       formData.append('file', blob, fileName);
-      formData.append('output', 'pdf');
+      formData.append('output', 'html');
 
-      // Use a document conversion service (you can replace this with your preferred service)
+      // Convert document to HTML (preserves formatting)
       const convertResponse = await fetch('/api/convert-to-pdf', {
         method: 'POST',
         body: formData
@@ -93,33 +106,29 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
       }
 
       const convertedBlob = await convertResponse.blob();
-      const pdfUrl = URL.createObjectURL(convertedBlob);
+      const convertedType = convertResponse.headers.get('content-type') || 'text/html';
+      const convertedUrl = URL.createObjectURL(convertedBlob);
       
-      console.log('Document converted to PDF successfully:', {
+      console.log('Document converted successfully:', {
         originalSize: blob.size,
         convertedSize: convertedBlob.size,
-        pdfUrl: pdfUrl,
+        convertedUrl: convertedUrl,
         originalType: fileType,
+        convertedType: convertedType,
         fileName: fileName
       });
       
-      // Validate the PDF blob
+      // Validate the converted blob
       if (convertedBlob.size === 0) {
-        throw new Error('Generated PDF is empty');
-      }
-      
-      // Check if the blob looks like a PDF
-      const firstBytes = await convertedBlob.slice(0, 4).text();
-      if (!firstBytes.startsWith('%PDF')) {
-        console.warn('Generated file may not be a valid PDF - header check failed');
+        throw new Error('Converted document is empty');
       }
 
-      setConvertedPdfUrl(pdfUrl);
-      setContentType('application/pdf');
+      setConvertedPdfUrl(convertedUrl);
+      setContentType(convertedType);
       
     } catch (err) {
       console.error('Document conversion error:', err);
-      setError(`Failed to convert document to PDF: ${err.message}`);
+      setError(`Failed to convert document: ${err.message}`);
       
       // Fallback: try to fetch original document
       try {
@@ -155,7 +164,7 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
             borderRadius: '50%',
             animation: 'spin 1s linear infinite'
           }}></div>
-          <p>Converting document to PDF...</p>
+          <p>Converting document...</p>
           <p style={{ fontSize: '14px', color: '#666' }}>This may take a few moments</p>
         </div>
       );
@@ -209,11 +218,12 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
       );
     }
 
-    // Display converted PDF or original if conversion failed
+    // Display converted document or original if conversion failed
     const displayUrl = convertedPdfUrl || documentUrl;
-    const isPdf = contentType?.includes('pdf') || convertedPdfUrl;
+    const isPdf = contentType?.includes('pdf');
+    const isHtml = contentType?.includes('html');
 
-    if (isPdf) {
+    if (isPdf || isHtml) {
       return (
         <div style={{ textAlign: 'center', marginBottom: '16px' }}>
           {convertedPdfUrl && (
@@ -225,11 +235,11 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
               marginBottom: '16px',
               fontSize: '14px'
             }}>
-              ✓ Document converted to PDF for viewing
+              ✓ Document converted for viewing with formatting preserved
             </div>
           )}
           
-          {/* PDF Viewer Options */}
+          {/* Document Viewer Options */}
           <div style={{ 
             display: 'flex', 
             gap: '12px', 
@@ -255,7 +265,8 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
               onClick={() => {
                 const link = document.createElement('a');
                 link.href = displayUrl;
-                link.download = documentName || 'document.pdf';
+                const extension = isPdf ? 'pdf' : 'html';
+                link.download = documentName ? documentName.replace(/\.[^/.]+$/, `.${extension}`) : `document.${extension}`;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -270,23 +281,24 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
                 fontSize: '14px'
               }}
             >
-              Download PDF
+              Download
             </button>
           </div>
           
-          {/* PDF iframe with fallback */}
+          {/* Document iframe with fallback */}
           <div style={{ position: 'relative' }}>
             <iframe
-              src={`${displayUrl}#toolbar=1&navpanes=1&scrollbar=1`}
+              src={isPdf ? `${displayUrl}#toolbar=1&navpanes=1&scrollbar=1` : displayUrl}
               style={{
                 width: '100%',
                 height: '600px',
                 border: '1px solid #ddd',
-                borderRadius: '4px'
+                borderRadius: '4px',
+                backgroundColor: '#ffffff'
               }}
               title={documentName}
               onError={() => {
-                console.error('PDF iframe failed to load');
+                console.error('Document iframe failed to load');
               }}
             />
             
@@ -301,9 +313,9 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
               borderRadius: '8px',
               display: 'none', // Hidden by default, can be shown via JavaScript if needed
               textAlign: 'center'
-            }} id="pdf-fallback">
-              <p>PDF viewer not supported in this browser.</p>
-              <p>Please use the "Open in New Tab" or "Download PDF" buttons above.</p>
+            }} id="document-fallback">
+              <p>Document viewer not supported in this browser.</p>
+              <p>Please use the "Open in New Tab" or "Download" buttons above.</p>
             </div>
           </div>
         </div>
@@ -419,7 +431,15 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
             </h3>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
-                onClick={() => window.open(documentUrl, '_blank')}
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = documentUrl;
+                  link.download = documentName || 'document';
+                  link.target = '_blank';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
                 style={{
                   padding: '6px 12px',
                   backgroundColor: '#28a745',
@@ -429,7 +449,7 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
                   cursor: 'pointer',
                   fontSize: '14px'
                 }}
-                title="Download"
+                title="Download original document"
               >
                 Download
               </button>

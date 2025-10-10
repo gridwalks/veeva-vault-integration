@@ -126,31 +126,33 @@ export const handler = async (event) => {
         isBase64Encoded: true
       };
     } else if (fileExtension === 'docx') {
-      // Extract text from DOCX and convert to PDF
+      // Convert DOCX to HTML with formatting preserved
       try {
         const mammoth = await import('mammoth');
-        const result = await mammoth.extractRawText({ buffer: fileBuffer });
-        const textContent = result.value;
+        const result = await mammoth.convertToHtml({ buffer: fileBuffer });
+        const htmlContent = result.value;
         
         if (result.messages.length > 0) {
-          console.log('Mammoth extraction warnings:', result.messages);
+          console.log('Mammoth conversion warnings:', result.messages);
         }
         
-        const pdfContent = await convertTextToPdf(textContent, fileName);
+        // Return HTML content wrapped in a styled document
+        const styledHtml = createStyledHtml(htmlContent, fileName);
+        const htmlBuffer = Buffer.from(styledHtml, 'utf-8');
         
         return {
           statusCode: 200,
           headers: {
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `inline; filename="${fileName.replace(/\.[^/.]+$/, '')}.pdf"`,
-            'Content-Length': pdfContent.length.toString()
+            'Content-Type': 'text/html; charset=utf-8',
+            'Content-Disposition': `inline; filename="${fileName.replace(/\.[^/.]+$/, '')}.html"`,
+            'Content-Length': htmlBuffer.length.toString()
           },
-          body: pdfContent.toString('base64'),
+          body: htmlBuffer.toString('base64'),
           isBase64Encoded: true
         };
       } catch (error) {
         console.error('DOCX conversion failed:', error);
-        throw new Error(`Failed to convert DOCX to PDF: ${error.message}`);
+        throw new Error(`Failed to convert DOCX to HTML: ${error.message}`);
       }
     } else {
       // For other file types, try to extract text and convert to PDF
@@ -547,4 +549,184 @@ endstream`);
   });
 
   return Buffer.from(pdfContent, 'utf8');
+}
+
+// Helper function to create styled HTML from DOCX content
+function createStyledHtml(htmlContent, fileName) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${fileName || 'Document'}</title>
+  <style>
+    body {
+      font-family: 'Calibri', 'Arial', 'Helvetica', sans-serif;
+      font-size: 11pt;
+      line-height: 1.5;
+      color: #000000;
+      background-color: #ffffff;
+      margin: 0;
+      padding: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    /* Headings */
+    h1, h2, h3, h4, h5, h6 {
+      font-family: 'Calibri', 'Arial', 'Helvetica', sans-serif;
+      font-weight: bold;
+      margin-top: 12pt;
+      margin-bottom: 6pt;
+      color: #000000;
+    }
+    
+    h1 {
+      font-size: 16pt;
+      border-bottom: 2px solid #2e75b6;
+      padding-bottom: 4pt;
+      margin-top: 0;
+    }
+    
+    h2 {
+      font-size: 14pt;
+      color: #2e75b6;
+    }
+    
+    h3 {
+      font-size: 12pt;
+    }
+    
+    h4, h5, h6 {
+      font-size: 11pt;
+    }
+    
+    /* Paragraphs */
+    p {
+      margin-top: 0;
+      margin-bottom: 8pt;
+      text-align: justify;
+    }
+    
+    /* Lists */
+    ul, ol {
+      margin-top: 0;
+      margin-bottom: 8pt;
+      padding-left: 30px;
+    }
+    
+    li {
+      margin-bottom: 4pt;
+    }
+    
+    /* Tables */
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 8pt;
+      margin-bottom: 8pt;
+      border: 1px solid #cccccc;
+    }
+    
+    th {
+      background-color: #2e75b6;
+      color: #ffffff;
+      font-weight: bold;
+      padding: 8pt;
+      text-align: left;
+      border: 1px solid #2e75b6;
+    }
+    
+    td {
+      padding: 6pt 8pt;
+      border: 1px solid #cccccc;
+      vertical-align: top;
+    }
+    
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+    
+    /* Text formatting */
+    strong, b {
+      font-weight: bold;
+    }
+    
+    em, i {
+      font-style: italic;
+    }
+    
+    u {
+      text-decoration: underline;
+    }
+    
+    /* Links */
+    a {
+      color: #0563c1;
+      text-decoration: underline;
+    }
+    
+    a:hover {
+      color: #1f497d;
+    }
+    
+    /* Images */
+    img {
+      max-width: 100%;
+      height: auto;
+      margin: 8pt 0;
+    }
+    
+    /* Code blocks */
+    pre {
+      background-color: #f5f5f5;
+      border: 1px solid #cccccc;
+      border-radius: 4px;
+      padding: 10px;
+      overflow-x: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 10pt;
+      line-height: 1.4;
+    }
+    
+    code {
+      background-color: #f5f5f5;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 10pt;
+    }
+    
+    /* Blockquotes */
+    blockquote {
+      border-left: 4px solid #cccccc;
+      margin-left: 0;
+      padding-left: 16px;
+      color: #666666;
+      font-style: italic;
+    }
+    
+    /* Horizontal rules */
+    hr {
+      border: none;
+      border-top: 1px solid #cccccc;
+      margin: 16pt 0;
+    }
+    
+    /* Print styles */
+    @media print {
+      body {
+        padding: 20px;
+      }
+      
+      @page {
+        margin: 1in;
+      }
+    }
+  </style>
+</head>
+<body>
+  ${htmlContent}
+</body>
+</html>`;
 }
