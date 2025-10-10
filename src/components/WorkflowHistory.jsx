@@ -632,14 +632,23 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
   // Initialize document content and versions
   useEffect(() => {
     if (instance) {
+      console.log('Initializing document for instance:', instance.id, {
+        hasDocumentVersions: !!instance.documentVersions,
+        versionsLength: instance.documentVersions?.length || 0,
+        hasGeneratedDocument: !!instance.generatedDocument,
+        generatedDocumentLength: instance.generatedDocument?.length || 0
+      });
+      
       // Get the latest version from documentVersions array, or fall back to generatedDocument
       const versions = instance.documentVersions || [];
       if (versions.length > 0) {
         const latestVersion = versions[versions.length - 1];
-        setEditedDocument(latestVersion.document || '');
+        console.log('Using latest version from documentVersions:', latestVersion);
+        setEditedDocument(latestVersion.document || latestVersion.content || '');
         setCurrentVersion(latestVersion);
         setDocumentVersions(versions);
       } else if (instance.generatedDocument) {
+        console.log('Using generatedDocument as fallback');
         setEditedDocument(instance.generatedDocument);
         setCurrentVersion({
           version: 1,
@@ -653,6 +662,12 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
           timestamp: instance.completedAt || instance.createdAt,
           type: 'original'
         }]);
+      } else {
+        // No document available
+        console.log('No document available for this instance');
+        setEditedDocument('');
+        setCurrentVersion(null);
+        setDocumentVersions([]);
       }
     }
   }, [instance]);
@@ -721,7 +736,7 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
 
   const handleRevertToOriginal = () => {
     if (currentVersion) {
-      setEditedDocument(currentVersion.document);
+      setEditedDocument(currentVersion.document || currentVersion.content || '');
       setEditInstructions('');
     }
   };
@@ -923,10 +938,27 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                 </div>
               </div>
               
-              <textarea
-                value={editedDocument}
-                onChange={(e) => setEditedDocument(e.target.value)}
-                style={{
+              {editedDocument ? (
+                <textarea
+                  value={editedDocument}
+                  onChange={(e) => setEditedDocument(e.target.value)}
+                  style={{
+                    width: '100%',
+                    minHeight: '400px',
+                    padding: '16px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontFamily: 'monospace',
+                    lineHeight: '1.5',
+                    resize: 'vertical',
+                    backgroundColor: '#ffffff',
+                    color: '#374151'
+                  }}
+                  placeholder="Edit your document here..."
+                />
+              ) : (
+                <div style={{
                   width: '100%',
                   minHeight: '400px',
                   padding: '16px',
@@ -935,12 +967,16 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                   fontSize: '13px',
                   fontFamily: 'monospace',
                   lineHeight: '1.5',
-                  resize: 'vertical',
-                  backgroundColor: '#ffffff',
-                  color: '#374151'
-                }}
-                placeholder="Edit your document here..."
-              />
+                  backgroundColor: '#f8fafc',
+                  color: '#6b7280',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  textAlign: 'center'
+                }}>
+                  No document available for this workflow instance.
+                </div>
+              )}
               
               <div style={{
                 marginTop: '16px',
@@ -993,6 +1029,11 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
                   <strong>Current Document:</strong> {editedDocument.length} characters
+                  {editedDocument.length === 0 && (
+                    <span style={{ color: '#dc2626', marginLeft: '8px' }}>
+                      (No document content available)
+                    </span>
+                  )}
                 </div>
               </div>
               
@@ -1077,21 +1118,24 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                   flexDirection: 'column',
                   gap: '12px'
                 }}>
-                  {documentVersions.map((version, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        padding: '16px',
-                        backgroundColor: version === currentVersion ? '#f0f9ff' : '#f8fafc',
-                        border: version === currentVersion ? '2px solid #3b82f6' : '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => {
-                        setCurrentVersion(version);
-                        setEditedDocument(version.document);
-                      }}
-                    >
+                  {documentVersions.map((version, index) => {
+                    if (!version) return null; // Skip null/undefined versions
+                    
+                    return (
+                      <div
+                        key={index}
+                        style={{
+                          padding: '16px',
+                          backgroundColor: version === currentVersion ? '#f0f9ff' : '#f8fafc',
+                          border: version === currentVersion ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => {
+                          setCurrentVersion(version);
+                          setEditedDocument(version.document || version.content || '');
+                        }}
+                      >
                       <div style={{
                         display: 'flex',
                         justifyContent: 'space-between',
@@ -1133,10 +1177,11 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap'
                       }}>
-                        {version.document.substring(0, 200)}...
+                        {(version.document || version.content || '').substring(0, 200)}...
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
