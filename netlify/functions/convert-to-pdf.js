@@ -72,18 +72,18 @@ export const handler = async (event) => {
       outputFormat
     });
 
-    // Use a cloud-based document conversion service
-    // For this example, we'll use a simple text-to-PDF conversion
-    // In production, you would integrate with services like:
-    // - CloudConvert API
-    // - Adobe Document Services
-    // - Aspose.Words API
-    // - ILovePDF API
-    
+    // Detect actual file type from content signature (not just extension)
     const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+    const actualFileType = detectFileType(fileBuffer, fileExtension);
     
-    // Handle different file types
-    if (fileExtension === 'pdf') {
+    console.log('File type detection:', {
+      fileName,
+      extensionHint: fileExtension,
+      detectedType: actualFileType
+    });
+    
+    // Handle different file types based on actual detected type
+    if (actualFileType === 'pdf') {
       // If it's already a PDF, return it directly
       console.log('Document is already a PDF, returning as-is:', {
         fileName,
@@ -110,7 +110,7 @@ export const handler = async (event) => {
         body: fileBuffer.toString('base64'),
         isBase64Encoded: true
       };
-    } else if (fileExtension === 'txt' || fileExtension === 'rtf') {
+    } else if (actualFileType === 'txt' || actualFileType === 'rtf') {
       // Simple text-to-PDF conversion
       const textContent = fileBuffer.toString('utf-8');
       const pdfContent = await convertTextToPdf(textContent, fileName);
@@ -125,7 +125,7 @@ export const handler = async (event) => {
         body: pdfContent.toString('base64'),
         isBase64Encoded: true
       };
-    } else if (fileExtension === 'docx') {
+    } else if (actualFileType === 'docx') {
       // Convert DOCX to HTML with formatting preserved
       try {
         const mammoth = await import('mammoth');
@@ -155,45 +155,21 @@ export const handler = async (event) => {
         throw new Error(`Failed to convert DOCX to HTML: ${error.message}`);
       }
     } else {
-      // For other file types, try to extract text and convert to PDF
-      console.log('Attempting text extraction for file type:', fileExtension);
+      // Unsupported file type
+      console.error('Unsupported file type detected:', actualFileType);
       
-      try {
-        // Try to extract text from the file
-        const extractedText = await extractTextFromFile(fileBuffer, fileName, fileExtension);
-        
-        if (extractedText && extractedText.trim().length > 0) {
-          const pdfContent = await convertTextToPdf(extractedText, fileName);
-          
-          return {
-            statusCode: 200,
-            headers: {
-              'Content-Type': 'application/pdf',
-              'Content-Disposition': `inline; filename="${fileName.replace(/\.[^/.]+$/, '')}.pdf"`,
-              'Content-Length': pdfContent.length.toString()
-            },
-            body: pdfContent.toString('base64'),
-            isBase64Encoded: true
-          };
-        } else {
-          throw new Error('No text content could be extracted from the document');
-        }
-      } catch (error) {
-        console.error('Text extraction failed:', error);
-        
-        // Return a 400 error with helpful information
-        return {
-          statusCode: 400,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            error: 'Document conversion failed',
-            message: `Unable to convert ${fileExtension.toUpperCase()} file to PDF: ${error.message}`,
-            supportedTypes: ['pdf', 'txt', 'rtf', 'docx'],
-            receivedType: fileExtension,
-            suggestion: 'The document may be corrupted, password-protected, or in an unsupported format'
-          }),
-        };
-      }
+      return {
+        statusCode: 400,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          error: 'Document conversion failed',
+          message: `Unable to convert file: unsupported or unrecognized file type`,
+          supportedTypes: ['pdf', 'txt', 'rtf', 'docx'],
+          detectedType: actualFileType,
+          fileName: fileName,
+          suggestion: 'The document may be corrupted, password-protected, or in an unsupported format'
+        }),
+      };
     }
 
   } catch (error) {
@@ -549,6 +525,39 @@ endstream`);
   });
 
   return Buffer.from(pdfContent, 'utf8');
+}
+
+// Helper function to detect file type from content
+function detectFileType(buffer, extensionHint) {
+  if (!buffer || buffer.length === 0) {
+    return extensionHint || 'unknown';
+  }
+
+  // Check for DOCX (ZIP signature + docx-specific content)
+  if (looksLikeDocx(buffer)) {
+    console.log('Detected DOCX file by content signature');
+    return 'docx';
+  }
+  
+  // Check for PDF signature
+  if (buffer.length >= 4) {
+    const header = String.fromCharCode(...buffer.slice(0, 4));
+    if (header === '%PDF') {
+      console.log('Detected PDF file by signature');
+      return 'pdf';
+    }
+  }
+  
+  // Check for text-based formats
+  const decoded = decodeTextBuffer(buffer);
+  if (decoded.readable) {
+    console.log('Detected text-based file');
+    return extensionHint || 'txt';
+  }
+  
+  // Use extension as fallback
+  console.log('Using extension hint as fallback:', extensionHint);
+  return extensionHint || 'unknown';
 }
 
 // Helper function to create styled HTML from DOCX content
