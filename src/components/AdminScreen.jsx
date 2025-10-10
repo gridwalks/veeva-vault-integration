@@ -12,7 +12,6 @@ export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState("indexed");
   const [isIndexing, setIsIndexing] = useState(false);
   const [indexResult, setIndexResult] = useState(null);
-  const [selectedDocuments, setSelectedDocuments] = useState([]);
 
   async function loadIndexed(offset = 0) {
     console.log('Loading indexed documents...', { query: q, offset });
@@ -336,8 +335,7 @@ export default function AdminScreen() {
       {activeTab === "indexed" ? (
         <>
           <IndexedDocumentList 
-            items={indexedData.items} 
-            onDocumentsSelected={setSelectedDocuments}
+            items={indexedData.items}
           />
           <div className="pager" style={{display:'flex', gap:8, alignItems:'center', marginTop:10}}>
             <button 
@@ -382,98 +380,6 @@ export default function AdminScreen() {
       ) : activeTab === "workflow" ? (
         <WorkflowManagement />
       ) : null}
-
-      {/* Selected Documents for Chat */}
-      <div style={{
-        marginTop: '16px',
-        padding: '12px',
-        backgroundColor: '#f8fafc',
-        border: '1px solid #e5e7eb',
-        borderRadius: '6px'
-      }}>
-        <h3 style={{
-          margin: '0 0 8px 0',
-          fontSize: '14px',
-          fontWeight: '600',
-          color: '#374151',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-        }}>
-          Selected Documents for Chat
-        </h3>
-        <p style={{
-          margin: '0 0 12px 0',
-          fontSize: '12px',
-          color: '#6b7280',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-        }}>
-          Select documents below to use them in the chat interface.
-        </p>
-        
-        {selectedDocuments.length > 0 ? (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }}>
-            {selectedDocuments.map((doc, index) => (
-              <div key={index} style={{
-                padding: '8px',
-                backgroundColor: '#ffffff',
-                border: '1px solid #e5e7eb',
-                borderRadius: '4px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <div>
-                  <div style={{
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    color: '#374151',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                  }}>
-                    {doc.document_name}
-                  </div>
-                  <div style={{
-                    fontSize: '11px',
-                    color: '#6b7280',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                  }}>
-                    {doc.document_type} • v{doc.version}
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setSelectedDocuments(prev => prev.filter((_, i) => i !== index));
-                  }}
-                  style={{
-                    padding: '4px 8px',
-                    backgroundColor: '#dc2626',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '3px',
-                    fontSize: '11px',
-                    cursor: 'pointer',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                  }}
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div style={{
-            padding: '16px',
-            textAlign: 'center',
-            color: '#6b7280',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          }}>
-            <div style={{ fontSize: '24px', marginBottom: '6px' }}>📄</div>
-            <p style={{ margin: 0, fontSize: '12px' }}>No documents selected for chat</p>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
