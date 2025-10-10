@@ -196,26 +196,14 @@ export default function WorkflowHistory() {
 
   return (
     <div style={{
-      padding: '24px',
-      backgroundColor: '#ffffff',
-      border: '1px solid #e5e7eb',
-      borderRadius: '8px'
+      padding: '24px'
     }}>
       <div style={{
         display: 'flex',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-end',
         alignItems: 'center',
         marginBottom: '24px'
       }}>
-        <h3 style={{
-          margin: '0',
-          fontSize: '18px',
-          fontWeight: '600',
-          color: '#374151',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-        }}>
-          Workflow History
-        </h3>
         <button
           onClick={loadInstances}
           disabled={loading}

@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function LeftMenu({ currentScreen, onScreenChange, onChatOpen, onLogout }) {
+export default function LeftMenu({ currentScreen, onScreenChange, onChatOpen, onLogout, onWorkflowHistoryOpen }) {
   const menuItems = [
     {
       id: 'main',
@@ -13,6 +13,12 @@ export default function LeftMenu({ currentScreen, onScreenChange, onChatOpen, on
       icon: '⚙️',
       label: 'Admin Panel',
       onClick: () => onScreenChange('admin')
+    },
+    {
+      id: 'workflow-history',
+      icon: '📋',
+      label: 'Workflow History',
+      onClick: () => onWorkflowHistoryOpen && onWorkflowHistoryOpen()
     }
   ];
 

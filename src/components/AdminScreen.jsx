@@ -251,26 +251,6 @@ export default function AdminScreen() {
         >
           Workflow Management
         </button>
-        <button
-          onClick={() => {
-            console.log('Switching to workflow history tab');
-            setActiveTab("history");
-          }}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: activeTab === "history" ? '#4338ca' : '#f3f4f6',
-            color: activeTab === "history" ? 'white' : '#374151',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: '500',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          Workflow History
-        </button>
       </div>
 
       {/* Search form - only show for indexed tab */}
@@ -401,8 +381,6 @@ export default function AdminScreen() {
         <QAManagement />
       ) : activeTab === "workflow" ? (
         <WorkflowManagement />
-      ) : activeTab === "history" ? (
-        <WorkflowHistory />
       ) : null}
 
       {/* Selected Documents for Chat */}
