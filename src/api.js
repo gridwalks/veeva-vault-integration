@@ -718,3 +718,54 @@ export async function repolishWorkflowDocument({ instanceId, editedDocument }) {
     throw error;
   }
 }
+
+export async function refineWorkflowDocument({ instanceId, currentDocument, instructions }) {
+  const startTime = Date.now();
+  console.log('Refining workflow document with AI...', { 
+    instanceId, 
+    contentLength: currentDocument?.length,
+    instructionsLength: instructions?.length 
+  });
+  
+  try {
+    const res = await fetch('/api/workflow-execution/refine-document', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        instanceId,
+        currentDocument,
+        instructions
+      })
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to refine document:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error
+      });
+      throw new Error(errorData.error || `Failed to refine document: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Document refined in ${duration}ms:`, {
+      versions: data.versions?.length || 0,
+      currentVersion: data.currentVersion,
+      hasImprovements: data.hasAiImprovements,
+      aiSuggestions: data.aiSuggestions
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error refining document after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}

@@ -129,6 +129,8 @@ export const handler = async (event) => {
           return await completeWorkflow(pool, event.body);
         } else if (action === 'repolish-document') {
           return await repolishWorkflowDocument(pool, event.body);
+        } else if (action === 'refine-document') {
+          return await refineWorkflowDocument(pool, event.body);
         }
 
       case 'GET':
@@ -1135,6 +1137,165 @@ Return ONLY the improved document text, without any explanations or comments.`
 
   } catch (error) {
     console.error('Error re-polishing workflow document:', error);
+    throw error;
+  }
+}
+
+async function refineWorkflowDocument(pool, requestBody) {
+  try {
+    const { instanceId, currentDocument, instructions } = JSON.parse(requestBody);
+    
+    if (!instanceId || !currentDocument || !instructions) {
+      return {
+        statusCode: 400,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'Instance ID, current document, and instructions are required'
+        })
+      };
+    }
+
+    console.log(`Refining workflow document for instance ${instanceId} with instructions: ${instructions.substring(0, 100)}...`);
+
+    // Get current instance
+    const instanceResult = await pool.query(`
+      SELECT 
+        id,
+        workflow_template_id,
+        generated_document,
+        document_versions,
+        status
+      FROM qms_chat_workflow_instances 
+      WHERE id = $1
+    `, [instanceId]);
+
+    if (instanceResult.rows.length === 0) {
+      return {
+        statusCode: 404,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'Workflow instance not found'
+        })
+      };
+    }
+
+    const instance = instanceResult.rows[0];
+    
+    // Get current versions array or initialize if empty
+    let versions = instance.document_versions || [];
+    
+    // Run AI refinement based on user instructions
+    let refinedDocument = currentDocument;
+    let aiSuggestions = null;
+    
+    try {
+      console.log('Sending document to AI for refinement based on user instructions...');
+      
+      const [aiResponse, summaryResponse] = await Promise.all([
+        // Refine the document based on user instructions
+        openai.chat.completions.create({
+          model: "gpt-3.5-turbo",
+          messages: [
+            {
+              role: "system",
+              content: `You are a professional document editor specializing in pharmaceutical quality documents. 
+              
+Your task is to refine the following document according to the user's specific instructions while maintaining:
+- Professional tone appropriate for regulatory environments
+- All original information and structure
+- Compliance with quality management standards
+- Clarity and completeness
+
+User Instructions: ${instructions}
+
+Please refine the document according to these instructions and return ONLY the improved document text, without any explanations or comments.`
+            },
+            {
+              role: "user",
+              content: currentDocument
+            }
+          ],
+          max_tokens: 2000,
+          temperature: 0.3
+        }),
+        
+        // Generate improvement summary
+        openai.chat.completions.create({
+          model: "gpt-3.5-turbo",
+          messages: [
+            {
+              role: "system",
+              content: "Summarize the key improvements made to this pharmaceutical quality document based on the user's instructions. Be brief and specific about what was changed."
+            },
+            {
+              role: "user",
+              content: `Original document: ${currentDocument}\n\nUser instructions: ${instructions}`
+            }
+          ],
+          max_tokens: 300,
+          temperature: 0.3
+        })
+      ]);
+
+      refinedDocument = aiResponse.choices[0]?.message?.content || currentDocument;
+      aiSuggestions = summaryResponse.choices[0]?.message?.content || 'Document refined according to your instructions.';
+      
+      console.log('AI refinement completed successfully');
+      
+      // Add AI refined version to history
+      if (refinedDocument !== currentDocument) {
+        const aiRefinedVersion = {
+          version: versions.length + 1,
+          document: refinedDocument,
+          timestamp: new Date().toISOString(),
+          type: 'ai_refine',
+          instructions: instructions,
+          userId: null // Could be enhanced to capture user info
+        };
+        
+        versions.push(aiRefinedVersion);
+        console.log(`Added AI refined version (v${aiRefinedVersion.version})`);
+      }
+    } catch (aiError) {
+      console.error('AI refinement failed:', aiError);
+      // Return the original document if AI fails
+      refinedDocument = currentDocument;
+      aiSuggestions = 'AI refinement failed. Returning original document.';
+    }
+
+    // Update instance with new versions and latest refined document
+    const updateResult = await pool.query(`
+      UPDATE qms_chat_workflow_instances 
+      SET 
+        generated_document = $1,
+        document_versions = $2,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+      RETURNING id, generated_document, document_versions, updated_at
+    `, [refinedDocument, JSON.stringify(versions), instanceId]);
+
+    const updatedInstance = updateResult.rows[0];
+
+    console.log(`Refined workflow document for instance ${instanceId}. Total versions: ${versions.length}`);
+
+    return {
+      statusCode: 200,
+      headers: setCorsHeaders(),
+      body: JSON.stringify({
+        success: true,
+        message: 'Document refined successfully',
+        versions: versions,
+        currentVersion: versions[versions.length - 1],
+        refinedDocument: refinedDocument,
+        aiSuggestions: aiSuggestions,
+        hasAiImprovements: refinedDocument !== currentDocument
+      })
+    };
+
+  } catch (error) {
+    console.error('Error refining workflow document:', error);
     throw error;
   }
 }

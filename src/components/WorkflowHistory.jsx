@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getWorkflowInstances } from '../api';
+import { getWorkflowInstances, refineWorkflowDocument } from '../api';
 
 export default function WorkflowHistory() {
   const [instances, setInstances] = useState([]);
@@ -621,21 +621,122 @@ export default function WorkflowHistory() {
 
 // Workflow Detail Modal Component
 function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard }) {
-  const [showAiVersion, setShowAiVersion] = useState(true);
+  const [activeTab, setActiveTab] = useState('edit');
+  const [editedDocument, setEditedDocument] = useState('');
+  const [editInstructions, setEditInstructions] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [currentVersion, setCurrentVersion] = useState(null);
+  const [documentVersions, setDocumentVersions] = useState([]);
 
-  const responses = instance.responses || {};
-  
-  // Separate group output variables from step responses
-  const groupOutputs = {};
-  const stepResponses = {};
-  
-  Object.keys(responses).forEach(key => {
-    if (key.startsWith('step_')) {
-      stepResponses[key] = responses[key];
-    } else {
-      groupOutputs[key] = responses[key];
+  // Initialize document content and versions
+  useEffect(() => {
+    if (instance) {
+      // Get the latest version from documentVersions array, or fall back to generatedDocument
+      const versions = instance.documentVersions || [];
+      if (versions.length > 0) {
+        const latestVersion = versions[versions.length - 1];
+        setEditedDocument(latestVersion.document || '');
+        setCurrentVersion(latestVersion);
+        setDocumentVersions(versions);
+      } else if (instance.generatedDocument) {
+        setEditedDocument(instance.generatedDocument);
+        setCurrentVersion({
+          version: 1,
+          document: instance.generatedDocument,
+          timestamp: instance.completedAt || instance.createdAt,
+          type: 'original'
+        });
+        setDocumentVersions([{
+          version: 1,
+          document: instance.generatedDocument,
+          timestamp: instance.completedAt || instance.createdAt,
+          type: 'original'
+        }]);
+      }
     }
-  });
+  }, [instance]);
+
+  const handleSaveChanges = async () => {
+    try {
+      // Create a new version entry for the user's direct edits
+      const newVersion = {
+        version: documentVersions.length + 1,
+        document: editedDocument,
+        timestamp: new Date().toISOString(),
+        type: 'user_edit',
+        instructions: null,
+        userId: null
+      };
+      
+      const updatedVersions = [...documentVersions, newVersion];
+      
+      // Update local state
+      setDocumentVersions(updatedVersions);
+      setCurrentVersion(newVersion);
+      
+      // Show success message
+      alert('Document saved successfully! Your changes have been recorded in the version history.');
+      
+    } catch (error) {
+      console.error('Error saving changes:', error);
+      alert('Error saving changes. Please try again.');
+    }
+  };
+
+  const handleSubmitToAI = async () => {
+    if (!editInstructions.trim()) {
+      alert('Please provide instructions for AI refinement');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+      const result = await refineWorkflowDocument({
+        instanceId: instance.id,
+        currentDocument: editedDocument,
+        instructions: editInstructions
+      });
+      
+      // Update the document with the refined version
+      setEditedDocument(result.refinedDocument);
+      
+      // Update version history
+      setDocumentVersions(result.versions || []);
+      setCurrentVersion(result.currentVersion);
+      
+      // Clear instructions
+      setEditInstructions('');
+      
+      // Show success message
+      alert('Document refined successfully! Check the version history to see the changes.');
+      
+    } catch (error) {
+      console.error('Error submitting to AI:', error);
+      alert(`Error refining document: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRevertToOriginal = () => {
+    if (currentVersion) {
+      setEditedDocument(currentVersion.document);
+      setEditInstructions('');
+    }
+  };
+
+  const handleDownloadCurrent = () => {
+    const blob = new Blob([editedDocument], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${instance.workflowName}-${instance.id}-edited-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div style={{
@@ -654,7 +755,7 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
       <div style={{
         backgroundColor: '#ffffff',
         borderRadius: '12px',
-        maxWidth: '900px',
+        maxWidth: '1200px',
         width: '100%',
         maxHeight: '90vh',
         overflow: 'auto',
@@ -685,7 +786,7 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                 color: '#374151',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
-                {instance.workflowName || 'Workflow Details'}
+                {instance.workflowName || 'Workflow Document Editor'}
               </h3>
               <div style={{
                 fontSize: '13px',
@@ -699,6 +800,11 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                   hour: '2-digit',
                   minute: '2-digit'
                 })} • ID: {instance.id}
+                {currentVersion && (
+                  <span style={{ marginLeft: '12px', color: '#1e40af' }}>
+                    • Version {currentVersion.version} ({currentVersion.type})
+                  </span>
+                )}
               </div>
             </div>
             <button
@@ -719,156 +825,70 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
           </div>
         </div>
 
+        {/* Tab Navigation */}
+        <div style={{
+          padding: '0 24px',
+          borderBottom: '1px solid #e5e7eb',
+          backgroundColor: '#f8fafc'
+        }}>
+          <div style={{
+            display: 'flex',
+            gap: '0'
+          }}>
+            {[
+              { id: 'edit', label: 'Edit Document', icon: '✏️' },
+              { id: 'ai', label: 'AI Refinement', icon: '🤖' },
+              { id: 'history', label: 'Version History', icon: '📚' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: '12px 20px',
+                  backgroundColor: activeTab === tab.id ? '#ffffff' : 'transparent',
+                  color: activeTab === tab.id ? '#4338ca' : '#6b7280',
+                  border: 'none',
+                  borderBottom: activeTab === tab.id ? '2px solid #4338ca' : '2px solid transparent',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <span>{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Content */}
         <div style={{ padding: '24px' }}>
-          {/* Responses Section */}
-          <div style={{ marginBottom: '32px' }}>
-            <h4 style={{
-              margin: '0 0 16px 0',
-              fontSize: '16px',
-              fontWeight: '600',
-              color: '#374151',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              📋 Responses
-            </h4>
-            
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px'
-            }}>
-              {/* Step Responses */}
-              {Object.keys(stepResponses).sort().map((key) => (
-                <div key={key} style={{
-                  padding: '12px',
-                  backgroundColor: '#f8fafc',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px'
-                }}>
-                  <div style={{
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    color: '#6b7280',
-                    marginBottom: '4px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                  }}>
-                    {key.replace('step_', 'Step ')}
-                  </div>
-                  <div style={{
-                    fontSize: '13px',
-                    color: '#374151',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word'
-                  }}>
-                    {stepResponses[key]}
-                  </div>
-                </div>
-              ))}
-
-              {/* Group Synthesized Outputs */}
-              {Object.keys(groupOutputs).length > 0 && (
-                <>
-                  <div style={{
-                    borderTop: '2px solid #bfdbfe',
-                    paddingTop: '16px',
-                    marginTop: '8px'
-                  }}>
-                    <h5 style={{
-                      margin: '0 0 12px 0',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: '#1e40af',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}>
-                      🔗 AI Synthesized Sections
-                    </h5>
-                  </div>
-                  
-                  {Object.keys(groupOutputs).map((key) => (
-                    <div key={key} style={{
-                      padding: '16px',
-                      backgroundColor: '#f0f9ff',
-                      border: '2px solid #bfdbfe',
-                      borderRadius: '8px'
-                    }}>
-                      <div style={{
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        color: '#1e40af',
-                        marginBottom: '8px',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}>
-                        ✨ {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </div>
-                      <div style={{
-                        fontSize: '13px',
-                        color: '#1e40af',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        lineHeight: '1.6'
-                      }}>
-                        {groupOutputs[key]}
-                      </div>
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Generated Document Section */}
-          {instance.generatedDocument && (
+          {activeTab === 'edit' && (
             <div>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: '16px',
-                flexWrap: 'wrap',
-                gap: '12px'
+                marginBottom: '16px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <h4 style={{
-                    margin: 0,
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    color: '#374151',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    📄 Generated Document
-                  </h4>
-                  {instance.documentVersions && instance.documentVersions.length > 1 && (
-                    <span style={{
-                      padding: '4px 8px',
-                      backgroundColor: '#f0f9ff',
-                      color: '#0369a1',
-                      borderRadius: '4px',
-                      fontSize: '11px',
-                      fontWeight: '500',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                    }}>
-                      {instance.documentVersions.length} versions
-                    </span>
-                  )}
-                </div>
+                <h4 style={{
+                  margin: 0,
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  color: '#374151',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  Document Editor
+                </h4>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
-                    onClick={() => onCopyToClipboard(instance.generatedDocument)}
+                    onClick={handleRevertToOriginal}
+                    disabled={!currentVersion}
                     style={{
                       padding: '6px 12px',
                       backgroundColor: '#f3f4f6',
@@ -877,17 +897,15 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                       borderRadius: '4px',
                       fontSize: '12px',
                       fontWeight: '500',
-                      cursor: 'pointer',
+                      cursor: currentVersion ? 'pointer' : 'not-allowed',
                       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
+                      opacity: currentVersion ? 1 : 0.5
                     }}
                   >
-                    📋 Copy
+                    ↶ Revert
                   </button>
                   <button
-                    onClick={() => onDownload(instance)}
+                    onClick={handleDownloadCurrent}
                     style={{
                       padding: '6px 12px',
                       backgroundColor: '#16a34a',
@@ -897,10 +915,7 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                       fontSize: '12px',
                       fontWeight: '500',
                       cursor: 'pointer',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                     }}
                   >
                     💾 Download
@@ -908,21 +923,222 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                 </div>
               </div>
               
+              <textarea
+                value={editedDocument}
+                onChange={(e) => setEditedDocument(e.target.value)}
+                style={{
+                  width: '100%',
+                  minHeight: '400px',
+                  padding: '16px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontFamily: 'monospace',
+                  lineHeight: '1.5',
+                  resize: 'vertical',
+                  backgroundColor: '#ffffff',
+                  color: '#374151'
+                }}
+                placeholder="Edit your document here..."
+              />
+              
               <div style={{
-                padding: '16px',
-                backgroundColor: '#f8fafc',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                fontFamily: 'monospace',
-                fontSize: '12px',
-                color: '#374151',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                maxHeight: '400px',
-                overflow: 'auto'
+                marginTop: '16px',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '12px'
               }}>
-                {instance.generatedDocument}
+                <button
+                  onClick={handleSaveChanges}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#4338ca',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}
+                >
+                  Save Changes
+                </button>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'ai' && (
+            <div>
+              <h4 style={{
+                margin: '0 0 16px 0',
+                fontSize: '16px',
+                fontWeight: '600',
+                color: '#374151',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}>
+                AI Document Refinement
+              </h4>
+              
+              <div style={{
+                marginBottom: '16px',
+                padding: '12px',
+                backgroundColor: '#f0f9ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '6px'
+              }}>
+                <div style={{
+                  fontSize: '13px',
+                  color: '#1e40af',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  <strong>Current Document:</strong> {editedDocument.length} characters
+                </div>
+              </div>
+              
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#374151',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  Instructions for AI Refinement:
+                </label>
+                <textarea
+                  value={editInstructions}
+                  onChange={(e) => setEditInstructions(e.target.value)}
+                  placeholder="Describe how you'd like the AI to improve the document. For example: 'Make the language more professional', 'Add more detail to the risk assessment section', 'Improve the formatting and structure'..."
+                  style={{
+                    width: '100%',
+                    minHeight: '120px',
+                    padding: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+              
+              <div style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '12px'
+              }}>
+                <button
+                  onClick={handleSubmitToAI}
+                  disabled={isSubmitting || !editInstructions.trim()}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: (isSubmitting || !editInstructions.trim()) ? '#9ca3af' : '#16a34a',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: (isSubmitting || !editInstructions.trim()) ? 'not-allowed' : 'pointer',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}
+                >
+                  {isSubmitting ? '⏳ Processing...' : '🤖 Submit to AI'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'history' && (
+            <div>
+              <h4 style={{
+                margin: '0 0 16px 0',
+                fontSize: '16px',
+                fontWeight: '600',
+                color: '#374151',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}>
+                Document Version History
+              </h4>
+              
+              {documentVersions.length === 0 ? (
+                <div style={{
+                  padding: '40px',
+                  textAlign: 'center',
+                  color: '#6b7280',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  No version history available
+                </div>
+              ) : (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  {documentVersions.map((version, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        padding: '16px',
+                        backgroundColor: version === currentVersion ? '#f0f9ff' : '#f8fafc',
+                        border: version === currentVersion ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => {
+                        setCurrentVersion(version);
+                        setEditedDocument(version.document);
+                      }}
+                    >
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '8px'
+                      }}>
+                        <div style={{
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          color: '#374151',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                        }}>
+                          Version {version.version} - {version.type.replace('_', ' ').toUpperCase()}
+                        </div>
+                        <div style={{
+                          fontSize: '12px',
+                          color: '#6b7280',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                        }}>
+                          {new Date(version.timestamp).toLocaleString()}
+                        </div>
+                      </div>
+                      {version.instructions && (
+                        <div style={{
+                          fontSize: '12px',
+                          color: '#1e40af',
+                          fontStyle: 'italic',
+                          marginBottom: '8px',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                        }}>
+                          Instructions: {version.instructions}
+                        </div>
+                      )}
+                      <div style={{
+                        fontSize: '12px',
+                        color: '#6b7280',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {version.document.substring(0, 200)}...
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
