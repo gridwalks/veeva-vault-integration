@@ -3,8 +3,7 @@ import { OpenAI } from 'openai';
 import mammoth from 'mammoth';
 import { parseDocument } from 'docx-parser';
 import { chunkText } from './chunking-utils.js';
-// Temporarily disable Netlify Blobs import to test if it's causing issues
-// import { put } from '@netlify/blobs';
+import { getStore } from '@netlify/blobs';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -79,14 +78,12 @@ function parseMultipartFormData(body, contentType) {
   return { files, fileCount, uploadType };
 }
 
-// Helper function to save file to Netlify Blob storage (temporarily disabled)
+// Helper function to save file to Netlify Blob storage
 async function saveFileToBlob(fileBuffer, fileName, mimeType) {
-  console.log(`Blob storage disabled for testing: ${fileName}`);
-  return null;
-  
-  // Original implementation commented out for testing
-  /*
   try {
+    // Get the blob store for uploaded documents
+    const store = getStore('uploaded-documents');
+    
     // Generate a unique filename to avoid conflicts
     const timestamp = Date.now();
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
@@ -94,26 +91,24 @@ async function saveFileToBlob(fileBuffer, fileName, mimeType) {
     
     console.log(`Saving file to Netlify Blob: ${blobKey}`);
     
-    // Save file to Netlify Blob
-    await put(blobKey, fileBuffer, {
+    // Save file to Netlify Blob with metadata
+    await store.set(blobKey, fileBuffer, {
       metadata: {
         originalName: fileName,
         mimeType: mimeType,
         uploadedAt: new Date().toISOString(),
-        size: fileBuffer.length
+        size: fileBuffer.length.toString()
       }
     });
     
-    // Return the blob URL (this will be accessible via Netlify's blob API)
-    const blobUrl = `/.netlify/blobs/${blobKey}`;
-    console.log(`File saved to blob storage: ${blobUrl}`);
+    // Return the blob key (we'll use this to retrieve the file)
+    console.log(`File saved to blob storage with key: ${blobKey}`);
     
-    return blobUrl;
+    return blobKey;
   } catch (error) {
     console.error('Error saving file to blob storage:', error);
     throw error;
   }
-  */
 }
 
 // Helper function to extract text from different file types
@@ -537,7 +532,7 @@ export const handler = async (event) => {
       
       try {
         // Save file to Netlify Blob storage first
-        let blobUrl = null;
+        let blobKey = null;
         let mimeType = 'application/octet-stream';
         
         try {
@@ -553,14 +548,9 @@ export const handler = async (event) => {
           };
           mimeType = mimeTypeMap[fileExtension] || 'application/octet-stream';
           
-          // Temporarily disable blob storage to test if it's causing the 502 error
-          console.log(`Blob storage temporarily disabled for testing: ${file.fileName} (${mimeType})`);
-          blobUrl = null; // Disable blob storage temporarily
-          
-          // Uncomment the lines below to re-enable blob storage after testing
-          // console.log(`Attempting to save file to blob storage: ${file.fileName} (${mimeType})`);
-          // blobUrl = await saveFileToBlob(file.buffer, file.fileName, mimeType);
-          // console.log(`✅ File saved to blob storage: ${blobUrl}`);
+          console.log(`Attempting to save file to blob storage: ${file.fileName} (${mimeType})`);
+          blobKey = await saveFileToBlob(file.buffer, file.fileName, mimeType);
+          console.log(`✅ File saved to blob storage with key: ${blobKey}`);
         } catch (blobError) {
           console.error(`❌ Failed to save file to blob storage:`, {
             fileName: file.fileName,
@@ -568,7 +558,7 @@ export const handler = async (event) => {
             stack: blobError.stack
           });
           // Continue processing even if blob storage fails
-          blobUrl = null;
+          blobKey = null;
         }
 
         // Extract text from file
@@ -593,7 +583,7 @@ export const handler = async (event) => {
           summary,
           file.size,
           extractionMethod,
-          blobUrl,
+          blobKey,
           file.fileName,
           mimeType
         );
@@ -629,7 +619,7 @@ export const handler = async (event) => {
             chunksCreated,
             summary: summary.substring(0, 200) + (summary.length > 200 ? '...' : ''),
             extractionMethod,
-            blobUrl: blobUrl,
+            blobKey: blobKey,
             originalFileName: file.fileName,
             mimeType: mimeType
           });

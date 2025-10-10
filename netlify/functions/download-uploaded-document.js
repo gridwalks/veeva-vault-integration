@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { get } from '@netlify/blobs';
+import { getStore } from '@netlify/blobs';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -67,12 +67,13 @@ export const handler = async (event) => {
       };
     }
 
-    // Extract blob key from URL
-    const blobKey = document.blob_url.replace('/.netlify/blobs/', '');
+    // Get the blob store and retrieve the file using the blob key
+    const store = getStore('uploaded-documents');
+    const blobKey = document.blob_url;
     
     try {
       // Get file from Netlify Blob storage
-      const fileBuffer = await get(blobKey);
+      const fileBuffer = await store.get(blobKey, { type: 'arrayBuffer' });
       
       if (!fileBuffer) {
         return {
@@ -91,18 +92,21 @@ export const handler = async (event) => {
       const downloadFilename = document.original_filename || document.document_name;
       const mimeType = document.mime_type || 'application/octet-stream';
 
-      console.log(`Downloading file: ${downloadFilename} (${fileBuffer.length} bytes)`);
+      // Convert ArrayBuffer to Buffer
+      const buffer = Buffer.from(fileBuffer);
+      
+      console.log(`Downloading file: ${downloadFilename} (${buffer.length} bytes)`);
 
       return {
         statusCode: 200,
         headers: {
           'Content-Type': mimeType,
           'Content-Disposition': `attachment; filename="${downloadFilename}"`,
-          'Content-Length': fileBuffer.length,
+          'Content-Length': buffer.length,
           'Access-Control-Allow-Origin': '*',
           'Cache-Control': 'public, max-age=3600'
         },
-        body: fileBuffer.toString('base64'),
+        body: buffer.toString('base64'),
         isBase64Encoded: true
       };
 

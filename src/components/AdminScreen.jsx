@@ -5,7 +5,6 @@ import DocumentUpload from "./DocumentUpload.jsx";
 import ExternalResources from "./ExternalResources.jsx";
 import QAManagement from "./QAManagement.jsx";
 import WorkflowManagement from "./WorkflowManagement.jsx";
-import WorkflowHistory from "./WorkflowHistory.jsx";
 
 export default function AdminScreen() {
   const [q, setQ] = useState("");

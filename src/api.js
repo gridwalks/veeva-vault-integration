@@ -137,6 +137,49 @@ export function downloadUploadedDocumentUrl({ documentId }) {
   return `/api/download-uploaded-document?${p}`;
 }
 
+export async function getUploadedDocuments({ limit = 50, offset = 0, search = '' } = {}) {
+  const startTime = Date.now();
+  console.log('Fetching uploaded documents...', { limit, offset, search });
+  
+  try {
+    const params = new URLSearchParams({ limit, offset });
+    if (search) params.set('search', search);
+    
+    const res = await fetch(`/api/list-uploaded-documents?${params}`);
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to load uploaded documents:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText,
+        url: res.url,
+        params: { limit, offset, search }
+      });
+      throw new Error(`Failed to load uploaded documents: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Uploaded documents fetched in ${duration}ms:`, {
+      total: data.total,
+      itemsReturned: data.items?.length || 0,
+      pageOffset: data.pageOffset,
+      pageSize: data.pageSize
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error fetching uploaded documents after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack,
+      params: { limit, offset, search }
+    });
+    throw error;
+  }
+}
+
 export async function chatWithDocuments({ message, documentIds = [], conversationHistory = [] }) {
   const startTime = Date.now();
   console.log('Sending chat message...', { message: message.substring(0, 100) + '...', documentIds });

@@ -2,10 +2,14 @@ import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import DocumentViewer from './DocumentViewer.jsx';
-import { createQAInteraction } from '../api';
+import { createQAInteraction, getUploadedDocuments, downloadUploadedDocumentUrl } from '../api';
 
 export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane }) {
   const [conversationHistory, setConversationHistory] = useState([]);
+  const [uploadedDocuments, setUploadedDocuments] = useState([]);
+  const [selectedUploadedDocs, setSelectedUploadedDocs] = useState([]);
+  const [loadingUploadedDocs, setLoadingUploadedDocs] = useState(false);
+  const [showUploadedDocsPanel, setShowUploadedDocsPanel] = useState(false);
   
   // Debug conversation history changes
   useEffect(() => {
@@ -37,6 +41,25 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     // Scroll to bottom when new messages are added
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversationHistory, isLoading]);
+
+  // Fetch uploaded documents on mount
+  useEffect(() => {
+    const fetchUploadedDocuments = async () => {
+      setLoadingUploadedDocs(true);
+      try {
+        const response = await getUploadedDocuments({ limit: 100 });
+        console.log('Uploaded documents loaded:', response.items?.length || 0);
+        setUploadedDocuments(response.items || []);
+      } catch (error) {
+        console.error('Failed to load uploaded documents:', error);
+        // Don't show error to user, just log it
+      } finally {
+        setLoadingUploadedDocs(false);
+      }
+    };
+    
+    fetchUploadedDocuments();
+  }, []);
 
   const sendMessage = async () => {
     if (!currentMessage.trim() || isLoading) return;
@@ -91,9 +114,14 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
 
     try {
       // Proceed with normal chat (will detect workflow after answering)
+      // Combine Veeva document IDs and uploaded document IDs
+      const veevaDocIds = selectedDocuments.map(doc => doc.veeva_document_id);
+      const uploadedDocIds = selectedUploadedDocs.map(id => `uploaded_${id}`);
+      const allDocumentIds = [...veevaDocIds, ...uploadedDocIds];
+      
       const requestBody = {
         message: userMessage,
-        documentIds: selectedDocuments.map(doc => doc.veeva_document_id),
+        documentIds: allDocumentIds,
         conversationHistory: newHistory
       };
       
@@ -255,8 +283,20 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
   const handleOpenDocument = (document) => {
     console.log('StaticChatPane handleOpenDocument called with:', document);
     
-    if (onOpenDocumentInPane) {
-      // Open document in the selected documents pane
+    // Check if this is an uploaded document
+    if (document.isUploaded || document.source_type === 'upload') {
+      // Handle uploaded document
+      const url = downloadUploadedDocumentUrl({ documentId: document.id || document.document_id });
+      const a = window.document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.download = document.original_filename || document.document_name || 'document';
+      window.document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } else if (onOpenDocumentInPane) {
+      // Open Veeva document in the selected documents pane
       const mappedDocument = {
         veeva_document_id: document.id,
         document_name: document.name,
@@ -267,15 +307,15 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       console.log('Mapped document for pane:', mappedDocument);
       onOpenDocumentInPane(mappedDocument);
     } else {
-      // Fallback to direct download if no callback provided
+      // Fallback to direct download for Veeva documents
       const [major, minor] = document.version.split('.');
       const url = `/api/download-file?docId=${document.id}&major=${major}&minor=${minor}`;
-      const a = document.createElement('a');
+      const a = window.document.createElement('a');
       a.href = url;
       a.target = '_blank';
       a.rel = 'noopener noreferrer';
       a.download = '';
-      document.body.appendChild(a);
+      window.document.body.appendChild(a);
       a.click();
       a.remove();
     }
@@ -966,6 +1006,16 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     );
   };
 
+  const toggleUploadedDoc = (docId) => {
+    setSelectedUploadedDocs(prev => {
+      if (prev.includes(docId)) {
+        return prev.filter(id => id !== docId);
+      } else {
+        return [...prev, docId];
+      }
+    });
+  };
+
   return (
     <>
       <div style={{
@@ -989,9 +1039,10 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center'
+            alignItems: 'center',
+            gap: '12px'
           }}>
-            <div>
+            <div style={{ flex: 1 }}>
               <div>
                 <h3 style={{ 
                   margin: 0, 
@@ -1019,6 +1070,229 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                 )}
               </div>
             </div>
+            
+            {/* Uploaded Documents Button */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowUploadedDocsPanel(!showUploadedDocsPanel)}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: selectedUploadedDocs.length > 0 ? '#3b82f6' : '#e5e7eb',
+                  color: selectedUploadedDocs.length > 0 ? '#ffffff' : '#374151',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  fontWeight: '500',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  transition: 'background-color 0.2s ease',
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedUploadedDocs.length > 0) {
+                    e.target.style.backgroundColor = '#2563eb';
+                  } else {
+                    e.target.style.backgroundColor = '#d1d5db';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedUploadedDocs.length > 0) {
+                    e.target.style.backgroundColor = '#3b82f6';
+                  } else {
+                    e.target.style.backgroundColor = '#e5e7eb';
+                  }
+                }}
+                title={`${uploadedDocuments.length} uploaded documents available`}
+              >
+                📄 Uploaded ({selectedUploadedDocs.length}/{uploadedDocuments.length})
+              </button>
+              
+              {/* Uploaded Documents Panel */}
+              {showUploadedDocsPanel && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '8px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '6px',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                  width: '320px',
+                  maxHeight: '400px',
+                  zIndex: 1000,
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}>
+                  <div style={{
+                    padding: '12px',
+                    borderBottom: '1px solid #e5e7eb',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: '#f8fafc'
+                  }}>
+                    <h4 style={{
+                      margin: 0,
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#374151',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}>
+                      Uploaded Documents
+                    </h4>
+                    <button
+                      onClick={() => setShowUploadedDocsPanel(false)}
+                      style={{
+                        padding: '4px',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#6b7280',
+                        fontSize: '16px',
+                        lineHeight: 1
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  
+                  <div style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    padding: '8px'
+                  }}>
+                    {loadingUploadedDocs ? (
+                      <div style={{
+                        padding: '20px',
+                        textAlign: 'center',
+                        color: '#6b7280',
+                        fontSize: '12px'
+                      }}>
+                        Loading documents...
+                      </div>
+                    ) : uploadedDocuments.length === 0 ? (
+                      <div style={{
+                        padding: '20px',
+                        textAlign: 'center',
+                        color: '#6b7280',
+                        fontSize: '12px'
+                      }}>
+                        No uploaded documents yet
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {uploadedDocuments.map(doc => (
+                          <label
+                            key={doc.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'start',
+                              gap: '8px',
+                              padding: '8px',
+                              backgroundColor: selectedUploadedDocs.includes(doc.id) ? '#eff6ff' : '#ffffff',
+                              border: selectedUploadedDocs.includes(doc.id) ? '1px solid #3b82f6' : '1px solid #e5e7eb',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!selectedUploadedDocs.includes(doc.id)) {
+                                e.currentTarget.style.backgroundColor = '#f9fafb';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!selectedUploadedDocs.includes(doc.id)) {
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                              }
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedUploadedDocs.includes(doc.id)}
+                              onChange={() => toggleUploadedDoc(doc.id)}
+                              style={{
+                                marginTop: '2px',
+                                cursor: 'pointer'
+                              }}
+                            />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                color: '#374151',
+                                marginBottom: '2px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {doc.document_name}
+                              </div>
+                              {doc.ai_summary && (
+                                <div style={{
+                                  fontSize: '10px',
+                                  color: '#6b7280',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical'
+                                }}>
+                                  {doc.ai_summary}
+                                </div>
+                              )}
+                              <div style={{
+                                fontSize: '9px',
+                                color: '#9ca3af',
+                                marginTop: '2px'
+                              }}>
+                                {doc.chunk_count} chunks • {new Date(doc.created_at).toLocaleDateString()}
+                              </div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {selectedUploadedDocs.length > 0 && (
+                    <div style={{
+                      padding: '10px',
+                      borderTop: '1px solid #e5e7eb',
+                      backgroundColor: '#f8fafc',
+                      fontSize: '11px',
+                      color: '#6b7280',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <span>{selectedUploadedDocs.length} selected</span>
+                      <button
+                        onClick={() => setSelectedUploadedDocs([])}
+                        style={{
+                          padding: '4px 8px',
+                          backgroundColor: 'transparent',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                          fontSize: '10px',
+                          color: '#374151',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                        }}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
             {conversationHistory.length > 0 && (
               <button
                 onClick={clearConversation}
