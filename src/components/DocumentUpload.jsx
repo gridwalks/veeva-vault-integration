@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { getUploadedDocuments, downloadUploadedDocumentUrl } from '../api';
 
 export default function DocumentUpload({ onUploadComplete }) {
   const [isDragOver, setIsDragOver] = useState(false);
@@ -6,6 +7,8 @@ export default function DocumentUpload({ onUploadComplete }) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResult, setUploadResult] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [uploadedDocuments, setUploadedDocuments] = useState([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
   const fileInputRef = useRef(null);
 
   const acceptedFileTypes = {
@@ -54,6 +57,22 @@ export default function DocumentUpload({ onUploadComplete }) {
     setSelectedFiles(prev => [...prev, ...validFiles]);
   };
 
+  const loadUploadedDocuments = async () => {
+    setLoadingDocuments(true);
+    try {
+      const result = await getUploadedDocuments({ limit: 100, offset: 0, search: '' });
+      setUploadedDocuments(result.items || []);
+    } catch (error) {
+      console.error('Error loading uploaded documents:', error);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUploadedDocuments();
+  }, []);
+
   const removeFile = (index) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
@@ -101,6 +120,9 @@ export default function DocumentUpload({ onUploadComplete }) {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+
+      // Refresh uploaded documents list
+      loadUploadedDocuments();
 
     } catch (error) {
       console.error('Upload error:', error);
@@ -353,6 +375,164 @@ export default function DocumentUpload({ onUploadComplete }) {
           )}
         </div>
       )}
+
+      {/* Uploaded Documents List */}
+      <div style={{ marginTop: '32px' }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '16px'
+        }}>
+          <h3 style={{
+            margin: '0',
+            fontSize: '18px',
+            fontWeight: '600',
+            color: '#374151',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          }}>
+            Uploaded Documents
+          </h3>
+          <button
+            onClick={loadUploadedDocuments}
+            disabled={loadingDocuments}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#4338ca',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: loadingDocuments ? 'not-allowed' : 'pointer',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              opacity: loadingDocuments ? 0.6 : 1
+            }}
+          >
+            {loadingDocuments ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+
+        {loadingDocuments ? (
+          <div style={{
+            padding: '40px',
+            textAlign: 'center',
+            color: '#6b7280',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              border: '3px solid #e5e7eb',
+              borderTop: '3px solid #4338ca',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto 12px'
+            }} />
+            Loading documents...
+          </div>
+        ) : uploadedDocuments.length === 0 ? (
+          <div style={{
+            padding: '40px',
+            textAlign: 'center',
+            backgroundColor: '#f8fafc',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            color: '#6b7280',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>📄</div>
+            <p style={{ margin: '0', fontSize: '16px', fontWeight: '500' }}>
+              No uploaded documents found
+            </p>
+            <p style={{ margin: '8px 0 0 0', fontSize: '14px' }}>
+              Upload your first document using the form above
+            </p>
+          </div>
+        ) : (
+          <div style={{
+            backgroundColor: '#ffffff',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 150px 150px 120px',
+              gap: '16px',
+              padding: '12px 16px',
+              backgroundColor: '#f8fafc',
+              borderBottom: '1px solid #e5e7eb',
+              fontWeight: '600',
+              fontSize: '13px',
+              color: '#374151',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            }}>
+              <div>Document Name</div>
+              <div>Type</div>
+              <div>Uploaded</div>
+              <div>Actions</div>
+            </div>
+            {uploadedDocuments.map((doc, index) => (
+              <div
+                key={doc.id || index}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 150px 150px 120px',
+                  gap: '16px',
+                  padding: '12px 16px',
+                  borderBottom: index < uploadedDocuments.length - 1 ? '1px solid #e5e7eb' : 'none',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  transition: 'background-color 0.2s ease'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <div style={{
+                  fontSize: '14px',
+                  color: '#374151',
+                  fontWeight: '500',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {doc.original_filename || doc.filename || 'Untitled'}
+                </div>
+                <div style={{
+                  fontSize: '13px',
+                  color: '#6b7280'
+                }}>
+                  {doc.mime_type || doc.document_type || 'Unknown'}
+                </div>
+                <div style={{
+                  fontSize: '13px',
+                  color: '#6b7280'
+                }}>
+                  {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'N/A'}
+                </div>
+                <div>
+                  <a
+                    href={downloadUploadedDocumentUrl({ documentId: doc.id })}
+                    download
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: '#4338ca',
+                      color: '#ffffff',
+                      textDecoration: 'none',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      display: 'inline-block'
+                    }}
+                  >
+                    Download
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <style jsx>{`
         @keyframes spin {
