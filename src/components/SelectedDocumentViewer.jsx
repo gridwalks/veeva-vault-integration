@@ -3,6 +3,7 @@ import React from 'react';
 const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocumentsSelected }, ref) => {
   const [activeDocument, setActiveDocument] = React.useState(null);
   const [documentContent, setDocumentContent] = React.useState('');
+  const [htmlContent, setHtmlContent] = React.useState(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isEditMode, setIsEditMode] = React.useState(false);
   const [editableContent, setEditableContent] = React.useState('');
@@ -171,6 +172,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
           const pdfObjectUrl = URL.createObjectURL(originalBlob);
           console.log('Document is already a PDF, displaying directly');
           setDocumentContent(pdfObjectUrl);
+          setHtmlContent(null);
         } else {
           // Convert document to HTML (preserves formatting for DOCX)
           const formData = new FormData();
@@ -201,9 +203,19 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
             throw new Error('Converted document is empty');
           }
           
-          // Create object URL for the converted content
-          const objectUrl = URL.createObjectURL(convertedBlob);
-          setDocumentContent(objectUrl);
+          // Check if response is HTML
+          if (responseType.includes('html')) {
+            // Read blob as text and store HTML content directly
+            const htmlText = await convertedBlob.text();
+            console.log('HTML content loaded, length:', htmlText.length);
+            setHtmlContent(htmlText);
+            setDocumentContent(''); // Clear blob URL
+          } else {
+            // For other formats (PDF), create blob URL
+            const objectUrl = URL.createObjectURL(convertedBlob);
+            setDocumentContent(objectUrl);
+            setHtmlContent(null);
+          }
         }
         
       } catch (convertError) {
@@ -226,6 +238,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
     }
     setActiveDocument(null);
     setDocumentContent('');
+    setHtmlContent(null);
     setIsEditMode(false);
     setEditableContent('');
     setOriginalContent('');
@@ -742,8 +755,22 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                     height: '100%',
                     width: '100%'
                   }}>
-                    {documentContent.startsWith('blob:') || documentContent.startsWith('http') ? (
-                      /* Document Viewer (PDF or HTML) */
+                    {htmlContent ? (
+                      /* HTML Document Viewer using srcdoc */
+                      <iframe
+                        srcDoc={htmlContent}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          border: 'none',
+                          borderRadius: '4px',
+                          backgroundColor: '#ffffff'
+                        }}
+                        title={`Document Viewer - ${activeDocument.document_name}`}
+                        sandbox="allow-same-origin"
+                      />
+                    ) : (documentContent.startsWith('blob:') || documentContent.startsWith('http')) ? (
+                      /* PDF Viewer */
                       <iframe
                         src={documentContent}
                         style={{

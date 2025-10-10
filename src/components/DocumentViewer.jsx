@@ -5,14 +5,16 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
   const [error, setError] = useState(null);
   const [contentType, setContentType] = useState(null);
   const [convertedPdfUrl, setConvertedPdfUrl] = useState(null);
+  const [htmlContent, setHtmlContent] = useState(null);
 
   useEffect(() => {
     if (isOpen && documentUrl) {
       setLoading(true);
       setError(null);
       setConvertedPdfUrl(null);
+      setHtmlContent(null);
       
-      // Convert document to PDF
+      // Convert document
       convertDocumentToPdf(documentUrl);
     }
   }, [isOpen, documentUrl]);
@@ -107,12 +109,10 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
 
       const convertedBlob = await convertResponse.blob();
       const convertedType = convertResponse.headers.get('content-type') || 'text/html';
-      const convertedUrl = URL.createObjectURL(convertedBlob);
       
       console.log('Document converted successfully:', {
         originalSize: blob.size,
         convertedSize: convertedBlob.size,
-        convertedUrl: convertedUrl,
         originalType: fileType,
         convertedType: convertedType,
         fileName: fileName
@@ -123,8 +123,21 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
         throw new Error('Converted document is empty');
       }
 
-      setConvertedPdfUrl(convertedUrl);
-      setContentType(convertedType);
+      // Check if response is HTML
+      if (convertedType.includes('html')) {
+        // Read blob as text and store HTML content directly
+        const htmlText = await convertedBlob.text();
+        console.log('HTML content loaded for viewer, length:', htmlText.length);
+        setHtmlContent(htmlText);
+        setConvertedPdfUrl(null);
+        setContentType(convertedType);
+      } else {
+        // For other formats (PDF), create blob URL
+        const convertedUrl = URL.createObjectURL(convertedBlob);
+        setConvertedPdfUrl(convertedUrl);
+        setHtmlContent(null);
+        setContentType(convertedType);
+      }
       
     } catch (err) {
       console.error('Document conversion error:', err);
@@ -223,10 +236,10 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
     const isPdf = contentType?.includes('pdf');
     const isHtml = contentType?.includes('html');
 
-    if (isPdf || isHtml) {
+    if (isPdf || isHtml || htmlContent) {
       return (
         <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-          {convertedPdfUrl && (
+          {(convertedPdfUrl || htmlContent) && (
             <div style={{ 
               backgroundColor: '#d4edda', 
               color: '#155724', 
@@ -247,29 +260,45 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
             justifyContent: 'center',
             flexWrap: 'wrap'
           }}>
-            <button 
-              onClick={() => window.open(displayUrl, '_blank')}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
-            >
-              Open in New Tab
-            </button>
+            {!htmlContent && (
+              <button 
+                onClick={() => window.open(displayUrl, '_blank')}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#007bff',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                Open in New Tab
+              </button>
+            )}
             <button 
               onClick={() => {
-                const link = document.createElement('a');
-                link.href = displayUrl;
-                const extension = isPdf ? 'pdf' : 'html';
-                link.download = documentName ? documentName.replace(/\.[^/.]+$/, `.${extension}`) : `document.${extension}`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                if (htmlContent) {
+                  // Download HTML content
+                  const blob = new Blob([htmlContent], { type: 'text/html' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = documentName ? documentName.replace(/\.[^/.]+$/, '.html') : 'document.html';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                } else {
+                  // Download from URL
+                  const link = document.createElement('a');
+                  link.href = displayUrl;
+                  const extension = isPdf ? 'pdf' : 'html';
+                  link.download = documentName ? documentName.replace(/\.[^/.]+$/, `.${extension}`) : `document.${extension}`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }
               }}
               style={{
                 padding: '8px 16px',
@@ -287,20 +316,37 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
           
           {/* Document iframe with fallback */}
           <div style={{ position: 'relative' }}>
-            <iframe
-              src={isPdf ? `${displayUrl}#toolbar=1&navpanes=1&scrollbar=1` : displayUrl}
-              style={{
-                width: '100%',
-                height: '600px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                backgroundColor: '#ffffff'
-              }}
-              title={documentName}
-              onError={() => {
-                console.error('Document iframe failed to load');
-              }}
-            />
+            {htmlContent ? (
+              /* HTML content using srcdoc */
+              <iframe
+                srcDoc={htmlContent}
+                style={{
+                  width: '100%',
+                  height: '600px',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  backgroundColor: '#ffffff'
+                }}
+                title={documentName}
+                sandbox="allow-same-origin"
+              />
+            ) : (
+              /* PDF or other content using src */
+              <iframe
+                src={isPdf ? `${displayUrl}#toolbar=1&navpanes=1&scrollbar=1` : displayUrl}
+                style={{
+                  width: '100%',
+                  height: '600px',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  backgroundColor: '#ffffff'
+                }}
+                title={documentName}
+                onError={() => {
+                  console.error('Document iframe failed to load');
+                }}
+              />
+            )}
             
             {/* Fallback message if iframe fails */}
             <div style={{
@@ -315,7 +361,7 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
               textAlign: 'center'
             }} id="document-fallback">
               <p>Document viewer not supported in this browser.</p>
-              <p>Please use the "Open in New Tab" or "Download" buttons above.</p>
+              <p>Please use the "Download" button above.</p>
             </div>
           </div>
         </div>
