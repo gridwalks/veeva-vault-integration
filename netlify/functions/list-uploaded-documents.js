@@ -65,7 +65,7 @@ export const handler = async (event) => {
     }
 
     // Build the WHERE clause for search
-    let whereClause = "WHERE source_type = 'upload' AND user_id = $1";
+    let whereClause = "WHERE source_type = 'upload' AND d.user_id = $1";
     const queryParams = [userId];
     let paramIndex = 2;
 
