@@ -45,13 +45,29 @@ export const handler = async (event) => {
     const limit = parseInt(params.limit || '50', 10);
     const offset = parseInt(params.offset || '0', 10);
     const search = params.search || '';
+    const userId = params.userId;
 
-    console.log('Query parameters:', { limit, offset, search });
+    console.log('Query parameters:', { limit, offset, search, userId });
+
+    // Validate userId is provided
+    if (!userId) {
+      return {
+        statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({
+          success: false,
+          error: 'User ID is required to list uploaded documents'
+        })
+      };
+    }
 
     // Build the WHERE clause for search
-    let whereClause = "WHERE source_type = 'upload'";
-    const queryParams = [];
-    let paramIndex = 1;
+    let whereClause = "WHERE source_type = 'upload' AND user_id = $1";
+    const queryParams = [userId];
+    let paramIndex = 2;
 
     if (search) {
       whereClause += ` AND (document_name ILIKE $${paramIndex} OR ai_summary ILIKE $${paramIndex})`;

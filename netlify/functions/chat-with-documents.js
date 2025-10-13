@@ -37,7 +37,7 @@ export const handler = async (event) => {
 
     // Parse request body
     const body = JSON.parse(event.body || '{}');
-    const { message, documentIds, conversationHistory = [] } = body;
+    const { message, documentIds, conversationHistory = [], userId } = body;
     
     if (!message || !message.trim()) {
       return {
@@ -45,6 +45,16 @@ export const handler = async (event) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           error: "Message is required"
+        })
+      };
+    }
+
+    if (!userId) {
+      return {
+        statusCode: 400,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          error: "User ID is required for document chat"
         })
       };
     }
@@ -176,13 +186,13 @@ export const handler = async (event) => {
               'upload' as source_type
             FROM qms_chat_document_chunks c
             JOIN qms_chat_documents d ON c.document_id = d.id
-            WHERE c.document_id IN (${uploadedPlaceholders})
+            WHERE c.document_id IN (${uploadedPlaceholders}) AND c.user_id = $${uploadedDocumentIds.length + 2}
             ORDER BY c.embedding <=> $1::vector
             LIMIT 5
           `;
-          const uploadedResult = await pool.query(uploadedQuery, [embeddingStr, ...uploadedDocumentIds]);
+          const uploadedResult = await pool.query(uploadedQuery, [embeddingStr, ...uploadedDocumentIds, userId]);
           uploadedChunks = uploadedResult.rows;
-          console.log(`Found ${uploadedChunks.length} uploaded document chunks`);
+          console.log(`Found ${uploadedChunks.length} uploaded document chunks for user ${userId}`);
         }
         
         // Combine and sort by similarity

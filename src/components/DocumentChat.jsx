@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import DocumentViewer from './DocumentViewer.jsx';
-import { chatWithDocuments, createQAInteraction } from '../api';
+import { chatWithDocuments, createQAInteraction, getUploadedDocuments } from '../api';
+import { getSessionId } from '../utils/sessionManager';
 
 export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], onOpenDocumentInPane }) {
   const [conversationHistory, setConversationHistory] = useState([]);
@@ -12,11 +13,23 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
   const [usedDocuments, setUsedDocuments] = useState([]);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [uploadedDocuments, setUploadedDocuments] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null);
+  const [userId, setUserId] = useState(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
+      // Initialize user session
+      const sessionId = getSessionId();
+      setUserId(sessionId);
+      
+      // Load user's uploaded documents
+      loadUploadedDocuments(sessionId);
+      
       // Focus input when chat opens
       setTimeout(() => {
         if (inputRef.current) {
@@ -25,6 +38,77 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       }, 100);
     }
   }, [isOpen]);
+
+  const loadUploadedDocuments = async (sessionId) => {
+    try {
+      const data = await getUploadedDocuments({ userId: sessionId });
+      setUploadedDocuments(data.items || []);
+    } catch (error) {
+      console.error('Error loading uploaded documents:', error);
+    }
+  };
+
+  const handleFileUpload = async (event) => {
+    const files = Array.from(event.target.files);
+    if (files.length === 0) return;
+
+    setIsUploading(true);
+    setUploadProgress({ fileName: files[0].name, progress: 0 });
+
+    try {
+      const formData = new FormData();
+      files.forEach((file, index) => {
+        formData.append(`file_${index}`, file);
+      });
+      formData.append('fileCount', files.length.toString());
+      formData.append('uploadType', 'chat_upload');
+      formData.append('userId', userId);
+
+      const response = await fetch('/api/upload-documents', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // Reload uploaded documents
+        await loadUploadedDocuments(userId);
+        setUploadProgress({ fileName: files[0].name, progress: 100, success: true });
+        
+        // Auto-select the uploaded documents
+        const newDocumentIds = result.results
+          .filter(r => r.success)
+          .map(r => r.documentId);
+        
+        if (newDocumentIds.length > 0) {
+          // Add to selected documents (this would need to be handled by parent component)
+          console.log('Uploaded documents ready for selection:', newDocumentIds);
+        }
+      } else {
+        throw new Error(result.error || 'Upload failed');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      setUploadProgress({ fileName: files[0].name, progress: 0, error: error.message });
+    } finally {
+      setIsUploading(false);
+      // Clear file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const triggerFileUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
 
   useEffect(() => {
     // Scroll to bottom when new messages are added
@@ -47,7 +131,8 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       const data = await chatWithDocuments({
         message: userMessage,
         documentIds: selectedDocuments.map(doc => doc.veeva_document_id),
-        conversationHistory: newHistory
+        conversationHistory: newHistory,
+        userId: userId
       });
 
       // Update conversation with AI response
@@ -545,6 +630,50 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               >
                 {isLoading ? '...' : 'Send'}
               </button>
+            </div>
+            
+            {/* Upload Section */}
+            <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={triggerFileUpload}
+                disabled={isUploading}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: isUploading ? '#f3f4f6' : '#f8f9fa',
+                  color: isUploading ? '#9ca3af' : '#374151',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  cursor: isUploading ? 'not-allowed' : 'pointer',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                📎 Upload Document
+              </button>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx,.txt,.csv"
+                onChange={handleFileUpload}
+                style={{ display: 'none' }}
+              />
+              
+              {uploadProgress && (
+                <div style={{ fontSize: '12px', color: '#666' }}>
+                  {uploadProgress.success ? (
+                    <span style={{ color: '#10b981' }}>✓ {uploadProgress.fileName} uploaded</span>
+                  ) : uploadProgress.error ? (
+                    <span style={{ color: '#ef4444' }}>✗ {uploadProgress.error}</span>
+                  ) : (
+                    <span>Uploading {uploadProgress.fileName}...</span>
+                  )}
+                </div>
+              )}
             </div>
             <div style={{
               marginTop: '8px',

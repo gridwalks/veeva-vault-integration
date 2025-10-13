@@ -137,12 +137,12 @@ export function downloadUploadedDocumentUrl({ documentId }) {
   return `/api/download-uploaded-document?${p}`;
 }
 
-export async function getUploadedDocuments({ limit = 50, offset = 0, search = '' } = {}) {
+export async function getUploadedDocuments({ limit = 50, offset = 0, search = '', userId } = {}) {
   const startTime = Date.now();
-  console.log('Fetching uploaded documents...', { limit, offset, search });
+  console.log('Fetching uploaded documents...', { limit, offset, search, userId });
   
   try {
-    const params = new URLSearchParams({ limit, offset });
+    const params = new URLSearchParams({ limit, offset, userId });
     if (search) params.set('search', search);
     
     const res = await fetch(`/api/list-uploaded-documents?${params}`);
@@ -180,9 +180,9 @@ export async function getUploadedDocuments({ limit = 50, offset = 0, search = ''
   }
 }
 
-export async function chatWithDocuments({ message, documentIds = [], conversationHistory = [] }) {
+export async function chatWithDocuments({ message, documentIds = [], conversationHistory = [], userId }) {
   const startTime = Date.now();
-  console.log('Sending chat message...', { message: message.substring(0, 100) + '...', documentIds });
+  console.log('Sending chat message...', { message: message.substring(0, 100) + '...', documentIds, userId });
   
   try {
     const res = await fetch('/api/chat-with-documents', {
@@ -193,7 +193,8 @@ export async function chatWithDocuments({ message, documentIds = [], conversatio
       body: JSON.stringify({
         message,
         documentIds,
-        conversationHistory
+        conversationHistory,
+        userId
       })
     });
     

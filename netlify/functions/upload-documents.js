@@ -29,6 +29,7 @@ function parseMultipartFormData(body, contentType) {
   const files = [];
   let fileCount = 0;
   let uploadType = 'bulk_import';
+  let userId = null;
 
   for (const rawPart of rawParts) {
     const trimmedPart = rawPart.replace(/^\r\n/, '').replace(/\r\n$/, '');
@@ -72,10 +73,12 @@ function parseMultipartFormData(body, contentType) {
       fileCount = parseInt(contentBuffer.toString('utf-8').trim());
     } else if (headers.includes('name="uploadType"')) {
       uploadType = contentBuffer.toString('utf-8').trim();
+    } else if (headers.includes('name="userId"')) {
+      userId = contentBuffer.toString('utf-8').trim();
     }
   }
 
-  return { files, fileCount, uploadType };
+  return { files, fileCount, uploadType, userId };
 }
 
 // Helper function to save file to Netlify Blob storage
@@ -251,7 +254,7 @@ async function createDocumentsTable() {
 }
 
 // Helper function to store document in database
-async function storeDocument(fileName, extractedText, summary, fileSize, extractionMethod, blobUrl, originalFileName, mimeType) {
+async function storeDocument(fileName, extractedText, summary, fileSize, extractionMethod, blobUrl, originalFileName, mimeType, userId) {
   try {
     // Ensure table exists
     const tableCheck = await pool.query(`
@@ -271,8 +274,8 @@ async function storeDocument(fileName, extractedText, summary, fileSize, extract
     try {
       result = await pool.query(`
         INSERT INTO qms_chat_documents 
-        (document_name, document_type, version, content, ai_summary, file_size, extraction_method, source_type, blob_url, original_filename, mime_type, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
+        (document_name, document_type, version, content, ai_summary, file_size, extraction_method, source_type, blob_url, original_filename, mime_type, user_id, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)
         RETURNING id
       `, [
         fileName,
@@ -285,15 +288,16 @@ async function storeDocument(fileName, extractedText, summary, fileSize, extract
         'upload',
         blobUrl,
         originalFileName,
-        mimeType
+        mimeType,
+        userId
       ]);
     } catch (error) {
       if (error.message.includes('column') && error.message.includes('does not exist')) {
         console.log('New columns not found, using basic insert...');
         result = await pool.query(`
           INSERT INTO qms_chat_documents 
-          (document_name, document_type, version, content, ai_summary, file_size, extraction_method, source_type, created_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
+          (document_name, document_type, version, content, ai_summary, file_size, extraction_method, source_type, user_id, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
           RETURNING id
         `, [
           fileName,
@@ -303,7 +307,8 @@ async function storeDocument(fileName, extractedText, summary, fileSize, extract
           summary,
           fileSize,
           extractionMethod,
-          'upload'
+          'upload',
+          userId
         ]);
       } else {
         throw error;
@@ -350,7 +355,7 @@ async function createChunksTable() {
 }
 
 // Helper function to chunk and embed document
-async function chunkAndEmbedDocument(documentText, documentId, fileName) {
+async function chunkAndEmbedDocument(documentText, documentId, fileName, userId) {
   try {
     console.log(`Chunking and embedding document ${fileName}...`);
     
@@ -408,17 +413,18 @@ async function chunkAndEmbedDocument(documentText, documentId, fileName) {
 
           await pool.query(`
             INSERT INTO qms_chat_document_chunks 
-            (document_id, veeva_document_id, chunk_index, chunk_text, embedding, token_count)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            (document_id, veeva_document_id, chunk_index, chunk_text, embedding, token_count, user_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (document_id, chunk_index) 
-            DO UPDATE SET chunk_text = $4, embedding = $5, token_count = $6, created_at = CURRENT_TIMESTAMP
+            DO UPDATE SET chunk_text = $4, embedding = $5, token_count = $6, user_id = $7, created_at = CURRENT_TIMESTAMP
           `, [
             documentId,
             null, // No Veeva document ID for uploaded files
             chunk.index,
             chunk.text,
             embeddingStr,
-            chunk.tokenCount
+            chunk.tokenCount,
+            userId
           ]);
 
           chunksCreated++;
@@ -479,7 +485,7 @@ export const handler = async (event) => {
     console.log('Parsing multipart form data...');
     const parseStartTime = Date.now();
     
-    const { files, fileCount, uploadType } = parseMultipartFormData(
+    const { files, fileCount, uploadType, userId } = parseMultipartFormData(
       event.body, 
       event.headers['content-type']
     );
@@ -504,6 +510,23 @@ export const handler = async (event) => {
         body: JSON.stringify({
           success: false,
           error: 'No files received'
+        })
+      };
+    }
+
+    // Validate userId is provided
+    if (!userId) {
+      return {
+        statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS'
+        },
+        body: JSON.stringify({
+          success: false,
+          error: 'User ID is required for document upload'
         })
       };
     }
@@ -585,7 +608,8 @@ export const handler = async (event) => {
           extractionMethod,
           blobKey,
           file.fileName,
-          mimeType
+          mimeType,
+          userId
         );
         const storeDuration = Date.now() - storeStartTime;
         console.log(`Document stored in database in ${storeDuration}ms with ID: ${documentId}`);
@@ -596,7 +620,8 @@ export const handler = async (event) => {
         const { chunksCreated, error: chunkError } = await chunkAndEmbedDocument(
           extractedText,
           documentId,
-          file.fileName
+          file.fileName,
+          userId
         );
         const chunkDuration = Date.now() - chunkStartTime;
         console.log(`Chunking and embedding completed in ${chunkDuration}ms for: ${file.fileName}`);
