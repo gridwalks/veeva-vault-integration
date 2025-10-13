@@ -356,6 +356,32 @@ export default function AdminScreen() {
       {/* Content based on active tab */}
       {activeTab === "indexed" ? (
         <>
+          {/* Total count display */}
+          <div style={{
+            backgroundColor: '#f8f9fa',
+            border: '1px solid #e9ecef',
+            borderRadius: '6px',
+            padding: '12px',
+            marginBottom: '12px',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#495057',
+              marginBottom: '4px'
+            }}>
+              Total Indexed Documents
+            </div>
+            <div style={{
+              fontSize: '24px',
+              fontWeight: '700',
+              color: '#007bff'
+            }}>
+              {indexedData.total || 0}
+            </div>
+          </div>
+          
           <IndexedDocumentList 
             items={indexedData.items}
           />
