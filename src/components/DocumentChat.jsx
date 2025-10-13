@@ -289,19 +289,19 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
           flexDirection: 'column'
         }}
       >
-        <div
-          style={{
-            maxWidth: '80%',
-            padding: '12px 16px',
-            borderRadius: '18px',
-            backgroundColor: isUser ? '#007bff' : '#f1f3f4',
-            color: isUser ? 'white' : '#333',
-            fontSize: '13px',
-            lineHeight: '1.4',
-            wordWrap: 'break-word',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          }}
-        >
+          <div
+            style={{
+              maxWidth: '80%',
+              padding: '12px 16px',
+              borderRadius: '18px',
+              backgroundColor: isUser ? '#6b7280' : 'transparent',
+              color: isUser ? 'white' : '#333',
+              fontSize: '13px',
+              lineHeight: '1.4',
+              wordWrap: 'break-word',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            }}
+          >
           {isAssistant ? (
             <div style={{ 
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -541,7 +541,8 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
             padding: '12px',
             backgroundColor: '#e3f2fd',
             borderRadius: '8px',
-            border: '1px solid #bbdefb'
+            border: '1px solid #bbdefb',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}>
             <div style={{
               fontSize: '12px',
@@ -550,7 +551,8 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               marginBottom: '8px',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '4px',
+              fontFamily: 'inherit'
             }}>
               📄 Documents referenced in this response:
             </div>
@@ -558,7 +560,8 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
             <div style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: '6px'
+              gap: '6px',
+              fontFamily: 'inherit'
             }}>
               {usedDocuments.map((doc, docIndex) => (
                 <div key={docIndex} style={{
@@ -568,7 +571,8 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                   padding: '8px',
                   backgroundColor: 'white',
                   borderRadius: '6px',
-                  border: '1px solid #e0e0e0'
+                  border: '1px solid #e0e0e0',
+                  fontFamily: 'inherit'
                 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
@@ -578,13 +582,15 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                       marginBottom: '2px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      fontFamily: 'inherit'
                     }}>
                       {doc.name}
                     </div>
                     <div style={{
                       fontSize: '11px',
-                      color: '#666'
+                      color: '#666',
+                      fontFamily: 'inherit'
                     }}>
                       {doc.number} • v{doc.version} • {doc.type}
                     </div>
@@ -601,7 +607,8 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                       fontSize: '11px',
                       fontWeight: '500',
                       whiteSpace: 'nowrap',
-                      marginLeft: '8px'
+                      marginLeft: '8px',
+                      fontFamily: 'inherit'
                     }}
                   >
                     Open
@@ -720,10 +727,11 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               padding: '12px 20px',
               backgroundColor: '#e3f2fd',
               borderBottom: '1px solid #eee',
-              fontSize: '12px'
+              fontSize: '12px',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}>
-              <strong>Using {usedDocuments.length} document{usedDocuments.length !== 1 ? 's' : ''}:</strong>
-              <div style={{ marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              <strong style={{fontFamily: 'inherit'}}>Using {usedDocuments.length} document{usedDocuments.length !== 1 ? 's' : ''}:</strong>
+              <div style={{ marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '8px', fontFamily: 'inherit' }}>
                 {usedDocuments.map((doc, index) => (
                   <span
                     key={index}
@@ -732,7 +740,8 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                       color: 'white',
                       padding: '2px 8px',
                       borderRadius: '12px',
-                      fontSize: '11px'
+                      fontSize: '11px',
+                      fontFamily: 'inherit'
                     }}
                     title={`${doc.name} (${doc.number})`}
                   >
