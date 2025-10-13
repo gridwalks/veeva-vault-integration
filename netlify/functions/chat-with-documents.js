@@ -158,8 +158,8 @@ export const handler = async (event) => {
           const veevaResult = await pool.query(veevaQuery, [embeddingStr, ...veevaDocumentIds]);
           veevaChunks = veevaResult.rows;
           console.log(`Found ${veevaChunks.length} Veeva chunks`);
-        } else if (uploadedDocumentIds.length === 0) {
-          // If no specific docs selected, search all Veeva docs
+        } else if (veevaDocumentIds.length === 0 && uploadedDocumentIds.length === 0) {
+          // If no specific docs selected at all, search all Veeva docs
           const veevaQuery = `
             SELECT 
               dc.chunk_text,
@@ -180,6 +180,7 @@ export const handler = async (event) => {
           `;
           const veevaResult = await pool.query(veevaQuery, [embeddingStr]);
           veevaChunks = veevaResult.rows;
+          console.log(`Found ${veevaChunks.length} Veeva chunks from all documents`);
         }
         
         // Query uploaded document chunks if we have uploaded document IDs
@@ -270,7 +271,7 @@ export const handler = async (event) => {
       console.log('Falling back to keyword search...');
       const searchTerms = message.toLowerCase().split(' ').filter(term => term.length > 3);
       
-      if (searchTerms.length > 0 && (!documentIds || documentIds.length === 0)) {
+      if (searchTerms.length > 0 && veevaDocumentIds.length === 0 && uploadedDocumentIds.length === 0) {
         // Create a search query that looks for terms in document names, summaries, manual summaries, and types
         const searchConditions = searchTerms.map((term, index) => 
           `(document_name ILIKE $${index + 1} OR summary ILIKE $${index + 1} OR manual_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1})`
