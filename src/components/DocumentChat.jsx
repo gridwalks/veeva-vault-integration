@@ -302,25 +302,56 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
           }}
         >
           {isAssistant ? (
-            <ReactMarkdown 
-              remarkPlugins={[remarkGfm]}
-              components={{
-                a: ({ node, ...props }) => (
-                  <a 
-                    {...props} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    style={{
-                      color: '#007bff',
-                      textDecoration: 'underline',
-                      cursor: 'pointer'
-                    }}
-                  />
-                )
-              }}
-            >
-              {message.content}
-            </ReactMarkdown>
+            <div style={{ 
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              fontSize: '14px',
+              lineHeight: '1.5'
+            }}>
+              <ReactMarkdown 
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  p: ({ children }) => <p style={{ margin: '0 0 8px 0', fontFamily: 'inherit' }}>{children}</p>,
+                  h1: ({ children }) => <h1 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '600', fontFamily: 'inherit' }}>{children}</h1>,
+                  h2: ({ children }) => <h2 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '600', fontFamily: 'inherit' }}>{children}</h2>,
+                  h3: ({ children }) => <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: '600', fontFamily: 'inherit' }}>{children}</h3>,
+                  ul: ({ children }) => <ul style={{ margin: '0 0 8px 0', paddingLeft: '20px', fontFamily: 'inherit' }}>{children}</ul>,
+                  ol: ({ children }) => <ol style={{ margin: '0 0 8px 0', paddingLeft: '20px', fontFamily: 'inherit' }}>{children}</ol>,
+                  li: ({ children }) => <li style={{ fontFamily: 'inherit' }}>{children}</li>,
+                  strong: ({ children }) => <strong style={{ fontWeight: '600', fontFamily: 'inherit' }}>{children}</strong>,
+                  em: ({ children }) => <em style={{ fontStyle: 'italic', fontFamily: 'inherit' }}>{children}</em>,
+                  code: ({ children }) => <code style={{ 
+                    backgroundColor: '#f1f3f4', 
+                    padding: '2px 4px', 
+                    borderRadius: '3px', 
+                    fontSize: '13px',
+                    fontFamily: 'Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace'
+                  }}>{children}</code>,
+                  pre: ({ children }) => <pre style={{ 
+                    backgroundColor: '#f1f3f4', 
+                    padding: '8px', 
+                    borderRadius: '4px', 
+                    overflow: 'auto',
+                    fontSize: '13px',
+                    fontFamily: 'Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace'
+                  }}>{children}</pre>,
+                  a: ({ node, ...props }) => (
+                    <a 
+                      {...props} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      style={{
+                        color: '#007bff',
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit'
+                      }}
+                    />
+                  )
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            </div>
           ) : (
             message.content
           )}
