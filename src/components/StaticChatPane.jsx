@@ -839,15 +839,16 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
 
 
     return (
-      <div
-        key={index}
-        style={{
-          display: 'flex',
-          justifyContent: isUser ? 'flex-end' : 'flex-start',
-          marginBottom: '16px',
-          flexDirection: 'column'
-        }}
-      >
+        <div
+          key={index}
+          style={{
+            display: 'flex',
+            justifyContent: isUser ? 'flex-end' : 'flex-start',
+            marginBottom: '16px',
+            flexDirection: 'column',
+            alignItems: isUser ? 'flex-end' : 'flex-start'
+          }}
+        >
           <div
             style={{
               maxWidth: '80%',
@@ -1181,15 +1182,15 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
             maxWidth: '80%',
             marginTop: '8px',
             padding: '12px',
-            backgroundColor: '#e3f2fd',
+            backgroundColor: '#f3f4f6',
             borderRadius: '8px',
-            border: '1px solid #bbdefb',
+            border: '1px solid #d1d5db',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}>
             <div style={{
               fontSize: '12px',
               fontWeight: '600',
-              color: '#1976d2',
+              color: '#6b7280',
               marginBottom: '8px',
               display: 'flex',
               alignItems: 'center',
@@ -1241,7 +1242,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                     onClick={() => handleOpenDocument(doc)}
                     style={{
                       padding: '6px 12px',
-                      backgroundColor: '#1976d2',
+                      backgroundColor: '#6b7280',
                       color: 'white',
                       border: 'none',
                       borderRadius: '4px',

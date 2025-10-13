@@ -280,15 +280,16 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
 
 
     return (
-      <div
-        key={index}
-        style={{
-          display: 'flex',
-          justifyContent: isUser ? 'flex-end' : 'flex-start',
-          marginBottom: '16px',
-          flexDirection: 'column'
-        }}
-      >
+        <div
+          key={index}
+          style={{
+            display: 'flex',
+            justifyContent: isUser ? 'flex-end' : 'flex-start',
+            marginBottom: '16px',
+            flexDirection: 'column',
+            alignItems: isUser ? 'flex-end' : 'flex-start'
+          }}
+        >
           <div
             style={{
               maxWidth: '80%',
@@ -539,15 +540,15 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
             maxWidth: '80%',
             marginTop: '8px',
             padding: '12px',
-            backgroundColor: '#e3f2fd',
+            backgroundColor: '#f3f4f6',
             borderRadius: '8px',
-            border: '1px solid #bbdefb',
+            border: '1px solid #d1d5db',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}>
             <div style={{
               fontSize: '12px',
               fontWeight: '600',
-              color: '#1976d2',
+              color: '#6b7280',
               marginBottom: '8px',
               display: 'flex',
               alignItems: 'center',
@@ -599,7 +600,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                     onClick={() => handleOpenDocument(doc)}
                     style={{
                       padding: '6px 12px',
-                      backgroundColor: '#1976d2',
+                      backgroundColor: '#6b7280',
                       color: 'white',
                       border: 'none',
                       borderRadius: '4px',
@@ -725,8 +726,8 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
           {usedDocuments.length > 0 && (
             <div style={{
               padding: '12px 20px',
-              backgroundColor: '#e3f2fd',
-              borderBottom: '1px solid #eee',
+              backgroundColor: '#f3f4f6',
+              borderBottom: '1px solid #d1d5db',
               fontSize: '12px',
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}>
@@ -736,7 +737,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                   <span
                     key={index}
                     style={{
-                      backgroundColor: '#2196f3',
+                      backgroundColor: '#6b7280',
                       color: 'white',
                       padding: '2px 8px',
                       borderRadius: '12px',
