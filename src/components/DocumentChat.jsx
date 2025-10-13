@@ -296,24 +296,24 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
             borderRadius: '18px',
             backgroundColor: isUser ? '#007bff' : '#f1f3f4',
             color: isUser ? 'white' : '#333',
-            fontSize: '14px',
-            lineHeight: '1.5',
+            fontSize: '13px',
+            lineHeight: '1.4',
             wordWrap: 'break-word'
           }}
         >
           {isAssistant ? (
             <div style={{ 
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              fontSize: '14px',
-              lineHeight: '1.5'
+              fontSize: '13px',
+              lineHeight: '1.4'
             }}>
               <ReactMarkdown 
                 remarkPlugins={[remarkGfm]}
                 components={{
                   p: ({ children }) => <p style={{ margin: '0 0 8px 0', fontFamily: 'inherit' }}>{children}</p>,
-                  h1: ({ children }) => <h1 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '600', fontFamily: 'inherit' }}>{children}</h1>,
-                  h2: ({ children }) => <h2 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '600', fontFamily: 'inherit' }}>{children}</h2>,
-                  h3: ({ children }) => <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: '600', fontFamily: 'inherit' }}>{children}</h3>,
+                  h1: ({ children }) => <h1 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '600', fontFamily: 'inherit' }}>{children}</h1>,
+                  h2: ({ children }) => <h2 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: '600', fontFamily: 'inherit' }}>{children}</h2>,
+                  h3: ({ children }) => <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', fontFamily: 'inherit' }}>{children}</h3>,
                   ul: ({ children }) => <ul style={{ margin: '0 0 8px 0', paddingLeft: '20px', fontFamily: 'inherit' }}>{children}</ul>,
                   ol: ({ children }) => <ol style={{ margin: '0 0 8px 0', paddingLeft: '20px', fontFamily: 'inherit' }}>{children}</ol>,
                   li: ({ children }) => <li style={{ fontFamily: 'inherit' }}>{children}</li>,
@@ -795,7 +795,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                       borderRadius: '18px',
                       backgroundColor: '#f1f3f4',
                       color: '#666',
-                      fontSize: '14px',
+                      fontSize: '13px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px'
@@ -851,7 +851,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                   border: '1px solid #ddd',
                   borderRadius: '8px',
                   resize: 'none',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   minHeight: '44px',
                   maxHeight: '120px'
@@ -868,7 +868,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                   border: 'none',
                   borderRadius: '8px',
                   cursor: (!currentMessage.trim() || isLoading) ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontWeight: '500',
                   minWidth: '80px'
                 }}

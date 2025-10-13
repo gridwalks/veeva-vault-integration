@@ -855,24 +855,24 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
             borderRadius: '12px',
             backgroundColor: isUser ? '#007bff' : '#f1f3f4',
             color: isUser ? 'white' : '#333',
-            fontSize: '14px',
-            lineHeight: '1.5',
+            fontSize: '13px',
+            lineHeight: '1.4',
             wordWrap: 'break-word'
           }}
         >
           {isAssistant ? (
             <div style={{ 
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              fontSize: '14px',
-              lineHeight: '1.5'
+              fontSize: '13px',
+              lineHeight: '1.4'
             }}>
               <ReactMarkdown 
                 remarkPlugins={[remarkGfm]}
                 components={{
                   p: ({ children }) => <p style={{ margin: '0 0 8px 0', fontFamily: 'inherit' }}>{children}</p>,
-                  h1: ({ children }) => <h1 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '600', fontFamily: 'inherit' }}>{children}</h1>,
-                  h2: ({ children }) => <h2 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '600', fontFamily: 'inherit' }}>{children}</h2>,
-                  h3: ({ children }) => <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: '600', fontFamily: 'inherit' }}>{children}</h3>,
+                  h1: ({ children }) => <h1 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '600', fontFamily: 'inherit' }}>{children}</h1>,
+                  h2: ({ children }) => <h2 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: '600', fontFamily: 'inherit' }}>{children}</h2>,
+                  h3: ({ children }) => <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', fontFamily: 'inherit' }}>{children}</h3>,
                   ul: ({ children }) => <ul style={{ margin: '0 0 8px 0', paddingLeft: '20px', fontFamily: 'inherit' }}>{children}</ul>,
                   ol: ({ children }) => <ol style={{ margin: '0 0 8px 0', paddingLeft: '20px', fontFamily: 'inherit' }}>{children}</ol>,
                   li: ({ children }) => <li style={{ fontFamily: 'inherit' }}>{children}</li>,
@@ -1123,7 +1123,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                   border: 'none',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontWeight: '500',
                   display: 'flex',
                   alignItems: 'center',
@@ -1156,7 +1156,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                   border: 'none',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontWeight: '500',
                   display: 'flex',
                   alignItems: 'center',
@@ -1381,7 +1381,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               <div>
                 <h3 style={{ 
                   margin: 0, 
-                  fontSize: '14px',
+                  fontSize: '13px',
                   color: '#374151',
                   fontWeight: '600',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -1712,7 +1712,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                     borderRadius: '18px',
                     backgroundColor: '#f3f4f6',
                     color: '#6b7280',
-                    fontSize: '14px',
+                    fontSize: '13px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
@@ -1778,7 +1778,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                 border: '1px solid #d1d5db',
                 borderRadius: '6px',
                 resize: 'none',
-                fontSize: '14px',
+                fontSize: '13px',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 minHeight: '36px',
                 maxHeight: '100px',
@@ -1799,7 +1799,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                 border: 'none',
                 borderRadius: '6px',
                 cursor: (!currentMessage.trim() || isLoading) ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
+                fontSize: '13px',
                 fontWeight: '500',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 minWidth: '70px',
