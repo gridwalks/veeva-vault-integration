@@ -114,7 +114,7 @@ export default function QAManagement() {
         alignItems: 'center', 
         marginBottom: '12px' 
       }}>
-        <h2 style={{ margin: 0, color: '#374151', fontSize: '16px', fontWeight: '600' }}>Q&A Interactions</h2>
+        <h2 style={{ margin: 0, color: '#374151', fontSize: '16px', fontWeight: '600', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Q&A Interactions</h2>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={handleExport}
@@ -126,7 +126,8 @@ export default function QAManagement() {
               border: 'none',
               borderRadius: '4px',
               cursor: isExporting ? 'not-allowed' : 'pointer',
-              fontSize: '12px'
+              fontSize: '12px',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}
           >
             {isExporting ? 'Exporting...' : 'Export CSV'}
@@ -141,7 +142,8 @@ export default function QAManagement() {
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '12px'
+                fontSize: '12px',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}
             >
               Delete Selected ({selectedItems.length})
@@ -167,7 +169,8 @@ export default function QAManagement() {
             padding: '6px 10px',
             border: '1px solid #d1d5db',
             borderRadius: '4px',
-            fontSize: '12px'
+            fontSize: '12px',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}
         />
         <button
@@ -180,7 +183,8 @@ export default function QAManagement() {
             border: 'none',
             borderRadius: '4px',
             cursor: isLoading ? 'not-allowed' : 'pointer',
-            fontSize: '12px'
+            fontSize: '12px',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}
         >
           {isLoading ? 'Searching...' : 'Search'}
@@ -196,7 +200,8 @@ export default function QAManagement() {
           borderRadius: '4px',
           marginBottom: '12px',
           border: '1px solid #fecaca',
-          fontSize: '12px'
+          fontSize: '12px',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
         }}>
           <strong>Error:</strong> {error}
         </div>
@@ -209,7 +214,7 @@ export default function QAManagement() {
         borderRadius: '8px',
         overflow: 'hidden'
       }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
           <thead style={{ backgroundColor: '#f9fafb' }}>
             <tr>
               <th style={{ 
@@ -225,7 +230,7 @@ export default function QAManagement() {
                   onChange={handleSelectAll}
                   style={{ marginRight: '6px' }}
                 />
-                Select All
+                <span style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Select All</span>
               </th>
               <th style={{ 
                 padding: '8px', 
@@ -233,42 +238,43 @@ export default function QAManagement() {
                 borderBottom: '1px solid #e5e7eb',
                 fontSize: '12px',
                 fontWeight: '600'
-              }}>Question</th>
+              }}><span style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Question</span></th>
               <th style={{ 
                 padding: '8px', 
                 textAlign: 'left', 
                 borderBottom: '1px solid #e5e7eb',
                 fontSize: '12px',
                 fontWeight: '600'
-              }}>Answer</th>
+              }}><span style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Answer</span></th>
               <th style={{ 
                 padding: '8px', 
                 textAlign: 'left', 
                 borderBottom: '1px solid #e5e7eb',
                 fontSize: '12px',
                 fontWeight: '600'
-              }}>Documents</th>
+              }}><span style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Documents</span></th>
               <th style={{ 
                 padding: '8px', 
                 textAlign: 'left', 
                 borderBottom: '1px solid #e5e7eb',
                 fontSize: '12px',
                 fontWeight: '600'
-              }}>Date</th>
+              }}><span style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Date</span></th>
               <th style={{ 
                 padding: '8px', 
                 textAlign: 'left', 
                 borderBottom: '1px solid #e5e7eb',
                 fontSize: '12px',
                 fontWeight: '600'
-              }}>Actions</th>
+              }}><span style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Actions</span></th>
             </tr>
           </thead>
           <tbody>
             {qaData.items.map((item) => (
               <tr key={item.id} style={{ 
                 borderBottom: '1px solid #f3f4f6',
-                backgroundColor: selectedItems.includes(item.id) ? '#f0f9ff' : 'white'
+                backgroundColor: selectedItems.includes(item.id) ? '#f0f9ff' : 'white',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
                 <td style={{ padding: '8px' }}>
                   <input
@@ -365,11 +371,12 @@ export default function QAManagement() {
           <div style={{
             padding: '32px',
             textAlign: 'center',
-            color: '#6b7280'
+            color: '#6b7280',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}>
             <div style={{ fontSize: '28px', marginBottom: '12px' }}>💬</div>
-            <h3 style={{ margin: '0 0 6px 0', color: '#374151', fontSize: '14px' }}>No Q&A interactions found</h3>
-            <p style={{ margin: 0, fontSize: '12px' }}>
+            <h3 style={{ margin: '0 0 6px 0', color: '#374151', fontSize: '14px', fontFamily: 'inherit' }}>No Q&A interactions found</h3>
+            <p style={{ margin: 0, fontSize: '12px', fontFamily: 'inherit' }}>
               {searchQuery ? 'Try adjusting your search criteria.' : 'Start chatting with documents to see Q&A interactions here.'}
             </p>
           </div>
@@ -379,7 +386,8 @@ export default function QAManagement() {
           <div style={{
             padding: '32px',
             textAlign: 'center',
-            color: '#6b7280'
+            color: '#6b7280',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}>
             <div style={{
               width: '28px',
@@ -390,7 +398,7 @@ export default function QAManagement() {
               animation: 'spin 1s linear infinite',
               margin: '0 auto 12px'
             }}></div>
-            <p style={{ margin: 0, fontSize: '12px' }}>Loading Q&A interactions...</p>
+            <p style={{ margin: 0, fontSize: '12px', fontFamily: 'inherit' }}>Loading Q&A interactions...</p>
           </div>
         )}
       </div>
@@ -402,7 +410,8 @@ export default function QAManagement() {
           justifyContent: 'center',
           alignItems: 'center',
           gap: '10px',
-          marginTop: '16px'
+          marginTop: '16px',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
         }}>
           <button
             onClick={() => loadQAInteractions(qaData.page - 1, searchQuery)}
@@ -414,13 +423,14 @@ export default function QAManagement() {
               border: 'none',
               borderRadius: '4px',
               cursor: qaData.page <= 1 || isLoading ? 'not-allowed' : 'pointer',
-              fontSize: '12px'
+              fontSize: '12px',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}
           >
             Previous
           </button>
           
-          <span style={{ fontSize: '12px', color: '#6b7280' }}>
+          <span style={{ fontSize: '12px', color: '#6b7280', fontFamily: 'inherit' }}>
             Page {qaData.page} of {qaData.totalPages} ({qaData.total} total)
           </span>
           
@@ -434,7 +444,8 @@ export default function QAManagement() {
               border: 'none',
               borderRadius: '4px',
               cursor: qaData.page >= qaData.totalPages || isLoading ? 'not-allowed' : 'pointer',
-              fontSize: '12px'
+              fontSize: '12px',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}
           >
             Next

@@ -177,8 +177,8 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
             borderRadius: '50%',
             animation: 'spin 1s linear infinite'
           }}></div>
-          <p>Converting document...</p>
-          <p style={{ fontSize: '14px', color: '#666' }}>This may take a few moments</p>
+          <p style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Converting document...</p>
+          <p style={{ fontSize: '14px', color: '#666', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>This may take a few moments</p>
         </div>
       );
     }
@@ -194,7 +194,7 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
           gap: '16px',
           color: '#dc3545'
         }}>
-          <p>{error}</p>
+          <p style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>{error}</p>
           <div style={{ display: 'flex', gap: '12px' }}>
             <button 
               onClick={() => window.open(documentUrl, '_blank')}
@@ -204,7 +204,8 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}
             >
               Download Original
@@ -221,7 +222,8 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}
             >
               Retry Conversion
@@ -246,7 +248,8 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
               padding: '8px 12px', 
               borderRadius: '4px', 
               marginBottom: '16px',
-              fontSize: '14px'
+              fontSize: '14px',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}>
               ✓ Document converted for viewing with formatting preserved
             </div>
@@ -270,7 +273,8 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
                   border: 'none',
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '14px'
+                  fontSize: '14px',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}
               >
                 Open in New Tab
@@ -307,7 +311,8 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '14px'
+                fontSize: '14px',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}
             >
               Download
@@ -358,10 +363,11 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
               padding: '20px',
               borderRadius: '8px',
               display: 'none', // Hidden by default, can be shown via JavaScript if needed
-              textAlign: 'center'
+              textAlign: 'center',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }} id="document-fallback">
-              <p>Document viewer not supported in this browser.</p>
-              <p>Please use the "Download" button above.</p>
+              <p style={{ fontFamily: 'inherit' }}>Document viewer not supported in this browser.</p>
+              <p style={{ fontFamily: 'inherit' }}>Please use the "Download" button above.</p>
             </div>
           </div>
         </div>
@@ -379,8 +385,8 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
         gap: '16px',
         textAlign: 'center'
       }}>
-        <p>Document conversion failed. Showing original format.</p>
-        <p style={{ fontSize: '14px', color: '#666' }}>
+        <p style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Document conversion failed. Showing original format.</p>
+        <p style={{ fontSize: '14px', color: '#666', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
           Content Type: {contentType || 'Unknown'}
         </p>
         <div style={{ display: 'flex', gap: '12px' }}>
@@ -393,7 +399,8 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '16px'
+              fontSize: '16px',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}
           >
             View Original
@@ -411,7 +418,8 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '16px'
+              fontSize: '16px',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}
           >
             Retry PDF Conversion
@@ -471,7 +479,8 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
               maxWidth: '80%',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}>
               {documentName || 'Document Viewer'}
             </h3>
@@ -493,7 +502,8 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
                   border: 'none',
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '14px'
+                  fontSize: '14px',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}
                 title="Download original document"
               >
@@ -508,7 +518,8 @@ export default function DocumentViewer({ isOpen, onClose, documentUrl, documentN
                   border: 'none',
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '14px'
+                  fontSize: '14px',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}
                 title="Close"
               >

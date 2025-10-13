@@ -27,8 +27,8 @@ export default function DocumentList({ items = [] }) {
         {items.map(d => (
           <li key={d.id} className="doc-row" style={{display:'flex', justifyContent:'space-between', borderBottom:'1px solid #eee', padding:'8px 0'}}>
             <div>
-              <strong style={{fontSize:'13px'}}>{d.name}</strong>
-              <div className="sub" style={{fontSize:11, color:'#555'}}>#{d.number ?? d.id} · {d.status} · v{d.major}.{d.minor}</div>
+              <strong style={{fontSize:'13px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'}}>{d.name}</strong>
+              <div className="sub" style={{fontSize:11, color:'#555', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'}}>#{d.number ?? d.id} · {d.status} · v{d.major}.{d.minor}</div>
             </div>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <button
@@ -40,7 +40,8 @@ export default function DocumentList({ items = [] }) {
                   border: 'none',
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '11px'
+                  fontSize: '11px',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}
               >
                 View
@@ -53,7 +54,8 @@ export default function DocumentList({ items = [] }) {
                   color: 'white',
                   textDecoration: 'none',
                   borderRadius: '4px',
-                  fontSize: '11px'
+                  fontSize: '11px',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}
               >
                 Download

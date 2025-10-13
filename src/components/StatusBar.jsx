@@ -40,6 +40,7 @@ export default function StatusBar() {
       color: "#fff",
       fontSize: 14,
       textAlign: "center",
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
       {text}
     </div>

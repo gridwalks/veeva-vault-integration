@@ -22,37 +22,37 @@ export default function StatusPanel() {
   return (
     <section className="status-panel" style={{border:'1px solid #ddd', borderRadius:12, padding:16, marginTop:16}}>
       <header style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-        <h2 style={{margin:0}}>Vault Connection Status</h2>
-        <button onClick={load} disabled={loading} style={{padding:'6px 12px'}}>
+        <h2 style={{margin:0, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'}}>Vault Connection Status</h2>
+        <button onClick={load} disabled={loading} style={{padding:'6px 12px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'}}>
           {loading ? "Checking…" : "Re-check"}
         </button>
       </header>
 
-      {error && <p style={{color:'#b00020', marginTop:12}}>Error: {String(error)}</p>}
+      {error && <p style={{color:'#b00020', marginTop:12, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'}}>Error: {String(error)}</p>}
 
       {data && (
-        <div style={{marginTop:12}}>
-          <p>
-            Overall: <strong style={{color: ok ? '#0a7d00' : '#b00020'}}>
+        <div style={{marginTop:12, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'}}>
+          <p style={{fontFamily: 'inherit'}}>
+            Overall: <strong style={{color: ok ? '#0a7d00' : '#b00020', fontFamily: 'inherit'}}>
               {ok ? "OK" : "NOT OK"}
             </strong>
           </p>
-          <ul style={{listStyle:'none', paddingLeft:0, lineHeight:1.7}}>
-            <li>
-              Limits check: <strong style={{color: data.checks?.limits?.ok ? '#0a7d00' : '#b00020'}}>
+          <ul style={{listStyle:'none', paddingLeft:0, lineHeight:1.7, fontFamily: 'inherit'}}>
+            <li style={{fontFamily: 'inherit'}}>
+              Limits check: <strong style={{color: data.checks?.limits?.ok ? '#0a7d00' : '#b00020', fontFamily: 'inherit'}}>
                 {data.checks?.limits?.ok ? "OK" : "Failed"}
               </strong>
             </li>
-            <li>
-              Who am I: <strong style={{color: data.checks?.whoami?.ok ? '#0a7d00' : '#b00020'}}>
+            <li style={{fontFamily: 'inherit'}}>
+              Who am I: <strong style={{color: data.checks?.whoami?.ok ? '#0a7d00' : '#b00020', fontFamily: 'inherit'}}>
                 {data.checks?.whoami?.ok ? "OK" : "Failed"}
               </strong>
               {data.user && (
-                <span> — {data.user?.name || data.user?.username || data.user?.id}</span>
+                <span style={{fontFamily: 'inherit'}}> — {data.user?.name || data.user?.username || data.user?.id}</span>
               )}
             </li>
           </ul>
-          <div style={{fontSize:12, color:'#555'}}>Last checked: {new Date(data.timestamp).toLocaleString()}</div>
+          <div style={{fontSize:12, color:'#555', fontFamily: 'inherit'}}>Last checked: {new Date(data.timestamp).toLocaleString()}</div>
         </div>
       )}
     </section>
