@@ -65,12 +65,12 @@ export const handler = async (event) => {
     }
 
     // Build the WHERE clause for search
-    let whereClause = "WHERE source_type = 'upload' AND d.user_id = $1";
+    let baseWhereClause = "WHERE source_type = 'upload' AND user_id = $1";
     const queryParams = [userId];
     let paramIndex = 2;
 
     if (search) {
-      whereClause += ` AND (document_name ILIKE $${paramIndex} OR ai_summary ILIKE $${paramIndex})`;
+      baseWhereClause += ` AND (document_name ILIKE $${paramIndex} OR ai_summary ILIKE $${paramIndex})`;
       queryParams.push(`%${search}%`);
       paramIndex++;
     }
@@ -79,7 +79,7 @@ export const handler = async (event) => {
     const countQuery = `
       SELECT COUNT(*) as total
       FROM qms_chat_documents
-      ${whereClause}
+      ${baseWhereClause}
     `;
     
     console.log('Executing count query:', countQuery);
@@ -89,6 +89,13 @@ export const handler = async (event) => {
 
     // Get paginated documents with chunk counts
     queryParams.push(limit, offset);
+    
+    // Build WHERE clause for documents query with table aliases
+    let documentsWhereClause = "WHERE d.source_type = 'upload' AND d.user_id = $1";
+    if (search) {
+      documentsWhereClause += ` AND (d.document_name ILIKE $2 OR d.ai_summary ILIKE $2)`;
+    }
+    
     const documentsQuery = `
       SELECT 
         d.id,
@@ -107,7 +114,7 @@ export const handler = async (event) => {
         COUNT(c.id) as chunk_count
       FROM qms_chat_documents d
       LEFT JOIN qms_chat_document_chunks c ON d.id = c.document_id
-      ${whereClause}
+      ${documentsWhereClause}
       GROUP BY d.id, d.document_name, d.document_type, d.version, d.content, 
                d.ai_summary, d.file_size, d.extraction_method, d.blob_url, 
                d.original_filename, d.mime_type, d.created_at, d.updated_at
