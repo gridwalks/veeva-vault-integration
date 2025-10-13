@@ -851,7 +851,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         >
           <div
             style={{
-              maxWidth: '80%',
+              maxWidth: isUser ? '80%' : '100%',
               padding: '8px 12px',
               borderRadius: '12px',
               backgroundColor: isUser ? '#6b7280' : 'transparent',
@@ -920,18 +920,18 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
 
         {/* Action buttons for assistant messages */}
         {isAssistant && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginTop: '8px',
-            padding: '4px 8px',
-            backgroundColor: 'rgba(0, 0, 0, 0.05)',
-            borderRadius: '6px',
-            opacity: 0.7,
-            transition: 'opacity 0.2s ease',
-            maxWidth: '80%'
-          }}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginTop: '8px',
+              padding: '4px 8px',
+              backgroundColor: 'rgba(0, 0, 0, 0.05)',
+              borderRadius: '6px',
+              opacity: 0.7,
+              transition: 'opacity 0.2s ease',
+              maxWidth: '100%'
+            }}
           onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
           onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
           >
@@ -1179,7 +1179,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         {/* Document opening options for the last assistant message */}
         {isLastAssistantMessage && usedDocuments && usedDocuments.length > 0 && (
           <div style={{
-            maxWidth: '80%',
+            maxWidth: '100%',
             marginTop: '8px',
             padding: '12px',
             backgroundColor: '#f3f4f6',
