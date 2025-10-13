@@ -25,8 +25,11 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
   const [usedExternalResources, setUsedExternalResources] = useState([]);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
   
   // Workflow state
   const [workflowState, setWorkflowState] = useState({
@@ -60,6 +63,68 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     
     fetchUploadedDocuments();
   }, []);
+
+  const handleFileUpload = async (event) => {
+    const files = Array.from(event.target.files);
+    if (files.length === 0) return;
+
+    setIsUploading(true);
+    setUploadProgress({ fileName: files[0].name, progress: 0 });
+
+    try {
+      const formData = new FormData();
+      files.forEach((file, index) => {
+        formData.append(`file_${index}`, file);
+      });
+      formData.append('fileCount', files.length.toString());
+      formData.append('uploadType', 'chat_upload');
+      formData.append('userId', userId);
+
+      const response = await fetch('/api/upload-documents', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // Reload uploaded documents
+        await fetchUploadedDocuments();
+        setUploadProgress({ fileName: files[0].name, progress: 100, success: true });
+        
+        // Auto-select the uploaded documents
+        const newDocumentIds = result.results
+          .filter(r => r.success)
+          .map(r => r.documentId);
+        
+        if (newDocumentIds.length > 0) {
+          // Add to selected uploaded documents
+          setSelectedUploadedDocs(prev => [...prev, ...newDocumentIds]);
+        }
+      } else {
+        throw new Error(result.error || 'Upload failed');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      setUploadProgress({ fileName: files[0].name, progress: 0, error: error.message });
+    } finally {
+      setIsUploading(false);
+      // Clear file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const triggerFileUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
 
   const sendMessage = async () => {
     if (!currentMessage.trim() || isLoading) return;
@@ -1485,6 +1550,63 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               {isLoading ? '...' : 'Send'}
             </button>
           </div>
+          
+          {/* Upload Section */}
+          <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              onClick={triggerFileUpload}
+              disabled={isUploading}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: isUploading ? '#f3f4f6' : '#e5e7eb',
+                color: isUploading ? '#9ca3af' : '#374151',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                cursor: isUploading ? 'not-allowed' : 'pointer',
+                fontSize: '11px',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                if (!isUploading) {
+                  e.target.style.backgroundColor = '#d1d5db';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isUploading) {
+                  e.target.style.backgroundColor = '#e5e7eb';
+                }
+              }}
+            >
+              📎 Upload Document
+            </button>
+            
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.doc,.docx,.txt,.csv"
+              onChange={handleFileUpload}
+              style={{ display: 'none' }}
+            />
+            
+            {uploadProgress && (
+              <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                {uploadProgress.success ? (
+                  <span style={{ color: '#10b981' }}>✓ {uploadProgress.fileName} uploaded</span>
+                ) : uploadProgress.error ? (
+                  <span style={{ color: '#ef4444' }}>✗ {uploadProgress.error}</span>
+                ) : (
+                  <span>Uploading {uploadProgress.fileName}...</span>
+                )}
+              </div>
+            )}
+          </div>
+          
           <div style={{
             marginTop: '4px',
             fontSize: '10px',
