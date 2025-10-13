@@ -298,7 +298,8 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
             color: isUser ? 'white' : '#333',
             fontSize: '13px',
             lineHeight: '1.4',
-            wordWrap: 'break-word'
+            wordWrap: 'break-word',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}
         >
           {isAssistant ? (
