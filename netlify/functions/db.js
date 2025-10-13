@@ -130,6 +130,43 @@ export async function initDatabase() {
 
     console.log('Q&A interactions table created or already exists');
 
+    // Create document comparison history table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS qms_chat_document_comparisons (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255),
+        session_id VARCHAR(255),
+        document_ids TEXT[],
+        comparison_query TEXT,
+        comparison_result TEXT,
+        comparison_metadata JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create indexes for document comparisons
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_document_comparisons_user_id 
+      ON qms_chat_document_comparisons(user_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_document_comparisons_session_id 
+      ON qms_chat_document_comparisons(session_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_document_comparisons_created_at 
+      ON qms_chat_document_comparisons(created_at)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_document_comparisons_document_ids 
+      ON qms_chat_document_comparisons USING gin (document_ids)
+    `);
+
+    console.log('Document comparison history table created or already exists');
+
     const duration = Date.now() - startTime;
     console.log(`Database schema initialized successfully in ${duration}ms`);
   } catch (error) {

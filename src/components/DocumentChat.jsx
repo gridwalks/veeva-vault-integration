@@ -348,7 +348,40 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                         fontFamily: 'inherit'
                       }}
                     />
-                  )
+                  ),
+                  table: ({ children }) => <table style={{ 
+                    borderCollapse: 'collapse', 
+                    width: '100%', 
+                    margin: '12px 0',
+                    fontFamily: 'inherit',
+                    fontSize: '13px',
+                    backgroundColor: 'white',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    borderRadius: '6px',
+                    overflow: 'hidden'
+                  }}>{children}</table>,
+                  thead: ({ children }) => <thead style={{ backgroundColor: '#f8f9fa' }}>{children}</thead>,
+                  tbody: ({ children }) => <tbody>{children}</tbody>,
+                  th: ({ children }) => <th style={{ 
+                    border: '1px solid #dee2e6', 
+                    padding: '12px 8px', 
+                    backgroundColor: '#f8f9fa',
+                    fontWeight: '600',
+                    textAlign: 'left',
+                    fontFamily: 'inherit',
+                    fontSize: '12px',
+                    color: '#495057'
+                  }}>{children}</th>,
+                  td: ({ children }) => <td style={{ 
+                    border: '1px solid #dee2e6', 
+                    padding: '12px 8px',
+                    fontFamily: 'inherit',
+                    fontSize: '12px',
+                    verticalAlign: 'top'
+                  }}>{children}</td>,
+                  tr: ({ children, ...props }) => <tr style={{
+                    '&:nth-child(even)': { backgroundColor: '#f8f9fa' }
+                  }}>{children}</tr>
                 }}
               >
                 {message.content}
@@ -683,6 +716,19 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                   color: '#666' 
                 }}>
                   {selectedDocuments.length} document{selectedDocuments.length !== 1 ? 's' : ''} selected
+                  {selectedDocuments.length >= 2 && (
+                    <span style={{ 
+                      marginLeft: '8px', 
+                      padding: '2px 6px', 
+                      backgroundColor: '#e3f2fd', 
+                      color: '#1976d2', 
+                      borderRadius: '12px', 
+                      fontSize: '11px',
+                      fontWeight: '500'
+                    }}>
+                      🔍 Comparison Ready
+                    </span>
+                  )}
                 </p>
               )}
             </div>

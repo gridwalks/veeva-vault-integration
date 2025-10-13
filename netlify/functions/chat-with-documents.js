@@ -5,6 +5,41 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Function to detect comparison intent in user messages
+function detectComparisonIntent(message) {
+  if (!message || typeof message !== 'string') {
+    return false;
+  }
+  
+  const comparisonKeywords = [
+    'compare', 'comparison', 'compare to', 'compare with',
+    'differences between', 'difference between', 'diff between',
+    'errors based on', 'error based on', 'review against',
+    'compliance with', 'comply with', 'against the',
+    'versus', 'vs', 'vs.', 'against', 'check against',
+    'validate against', 'verify against', 'cross-check',
+    'cross reference', 'cross-reference', 'match against',
+    'align with', 'alignment with', 'consistency with',
+    'inconsistencies', 'gaps', 'missing requirements',
+    'requirements mapping', 'traceability'
+  ];
+  
+  const lowerMessage = message.toLowerCase();
+  
+  // Check for comparison keywords
+  const hasComparisonKeywords = comparisonKeywords.some(keyword => 
+    lowerMessage.includes(keyword.toLowerCase())
+  );
+  
+  // Check for document reference patterns
+  const hasDocumentReferences = /\b(?:document|doc|file|report|assessment|specification|requirement|srd|risk assessment)\b/i.test(message);
+  
+  // Check for comparison structure patterns
+  const hasComparisonStructure = /\b(?:this|that|these|those)\s+(?:document|doc|file|report|assessment|specification|requirement|srd)\b/i.test(message);
+  
+  return hasComparisonKeywords && (hasDocumentReferences || hasComparisonStructure);
+}
+
 export const handler = async (event) => {
   const startTime = Date.now();
   console.log('=== CHAT WITH DOCUMENTS STARTED ===');
@@ -38,6 +73,10 @@ export const handler = async (event) => {
     // Parse request body
     const body = JSON.parse(event.body || '{}');
     const { message, documentIds, conversationHistory = [], userId } = body;
+    
+    // Detect comparison intent
+    const isComparisonQuery = detectComparisonIntent(message);
+    console.log('Comparison intent detected:', isComparisonQuery);
     
     if (!message || !message.trim()) {
       return {
@@ -136,6 +175,8 @@ export const handler = async (event) => {
         // Query Veeva document chunks if we have Veeva document IDs
         if (veevaDocumentIds.length > 0) {
           const veevaPlaceholders = veevaDocumentIds.map((_, index) => `$${index + 2}`).join(',');
+          // Increase chunk limit for comparison mode to get more comprehensive content
+          const chunkLimit = isComparisonQuery ? 15 : 5;
           const veevaQuery = `
             SELECT 
               dc.chunk_text,
@@ -153,11 +194,11 @@ export const handler = async (event) => {
             JOIN Veeva_Doc_Chat_document_index di ON dc.document_id = di.id
             WHERE dc.veeva_document_id IN (${veevaPlaceholders})
             ORDER BY dc.embedding <=> $1::vector
-            LIMIT 5
+            LIMIT ${chunkLimit}
           `;
           const veevaResult = await pool.query(veevaQuery, [embeddingStr, ...veevaDocumentIds]);
           veevaChunks = veevaResult.rows;
-          console.log(`Found ${veevaChunks.length} Veeva chunks`);
+          console.log(`Found ${veevaChunks.length} Veeva chunks (comparison mode: ${isComparisonQuery})`);
         } else if (veevaDocumentIds.length === 0 && uploadedDocumentIds.length === 0) {
           // If no specific docs selected at all, search all Veeva docs
           const veevaQuery = `
@@ -186,6 +227,8 @@ export const handler = async (event) => {
         // Query uploaded document chunks if we have uploaded document IDs
         if (uploadedDocumentIds.length > 0) {
           const uploadedPlaceholders = uploadedDocumentIds.map((_, index) => `$${index + 2}`).join(',');
+          // Increase chunk limit for comparison mode to get more comprehensive content
+          const chunkLimit = isComparisonQuery ? 15 : 5;
           const uploadedQuery = `
             SELECT 
               c.chunk_text,
@@ -202,17 +245,19 @@ export const handler = async (event) => {
             JOIN qms_chat_documents d ON c.document_id = d.id
             WHERE c.document_id IN (${uploadedPlaceholders}) AND c.user_id = $${uploadedDocumentIds.length + 2}
             ORDER BY c.embedding <=> $1::vector
-            LIMIT 5
+            LIMIT ${chunkLimit}
           `;
           const uploadedResult = await pool.query(uploadedQuery, [embeddingStr, ...uploadedDocumentIds, userId]);
           uploadedChunks = uploadedResult.rows;
-          console.log(`Found ${uploadedChunks.length} uploaded document chunks for user ${userId}`);
+          console.log(`Found ${uploadedChunks.length} uploaded document chunks for user ${userId} (comparison mode: ${isComparisonQuery})`);
         }
         
         // Combine and sort by similarity
+        // For comparison mode, keep more chunks to ensure comprehensive analysis
+        const maxChunks = isComparisonQuery ? 20 : 5;
         relevantChunks = [...veevaChunks, ...uploadedChunks]
           .sort((a, b) => b.similarity - a.similarity)
-          .slice(0, 5);
+          .slice(0, maxChunks);
         
         console.log(`Vector search completed in ${Date.now() - vectorSearchStartTime}ms`);
         console.log(`Found ${relevantChunks.length} relevant chunks with similarity scores:`, 
@@ -472,8 +517,38 @@ Status: ${doc.status || 'Unknown'}`;
         }).join('\n\n');
     }
 
-    // Prepare the system prompt
-    const systemPrompt = relevantChunks.length > 0
+    // Prepare the system prompt based on whether this is a comparison query
+    const systemPrompt = isComparisonQuery && relevantChunks.length > 0
+      ? `You are an AI assistant specialized in comparing pharmaceutical documents. You have access to content from multiple documents and need to perform a comprehensive comparison analysis.
+
+COMPARISON ANALYSIS INSTRUCTIONS:
+1. **Document Analysis**: Analyze each document to understand its purpose, scope, and key requirements
+2. **Requirements Mapping**: Identify requirements, specifications, or standards in the reference document(s)
+3. **Implementation Review**: Check how these requirements are addressed in the target document(s)
+4. **Gap Analysis**: Identify missing requirements, inconsistencies, and implementation gaps
+5. **Error Detection**: Look for errors, contradictions, or non-compliance issues
+6. **Compliance Assessment**: Evaluate adherence to stated requirements and standards
+
+OUTPUT FORMAT REQUIREMENTS:
+You MUST provide BOTH structured and narrative outputs:
+
+**Structured Output (Tables/Lists):**
+- Create comparison tables showing requirements vs implementation
+- Use status indicators: ✓ (Compliant), ✗ (Missing/Gap), ⚠ (Partial/Inconsistent)
+- Include specific section references and page numbers when available
+- Organize findings by category (Missing Requirements, Inconsistencies, Gaps, etc.)
+
+**Narrative Output:**
+- Provide detailed analysis explaining the findings
+- Explain the significance of each gap or inconsistency
+- Suggest specific actions to address identified issues
+- Reference specific document sections and quotes
+
+DOCUMENT CONTEXT:
+${documentContext}${externalResourcesContext}
+
+Remember: Be thorough, specific, and actionable in your comparison analysis.`
+      : relevantChunks.length > 0
       ? `You are an AI assistant that helps users understand and work with pharmaceutical documents from Veeva Vault. You have access to relevant sections from documents retrieved using semantic search (RAG - Retrieval Augmented Generation) and related external resources.
 
 When answering questions:
@@ -556,11 +631,43 @@ ${externalResourcesContext}`;
       finishReason: completion.choices[0]?.finish_reason
     });
 
+    // Store comparison history if this was a comparison query
+    if (isComparisonQuery && relevantDocuments.length > 0) {
+      try {
+        const comparisonMetadata = {
+          isComparison: true,
+          documentsCompared: relevantDocuments.length,
+          chunksAnalyzed: relevantChunks.length,
+          comparisonType: 'document_analysis',
+          timestamp: new Date().toISOString()
+        };
+        
+        await pool.query(`
+          INSERT INTO qms_chat_document_comparisons 
+          (user_id, session_id, document_ids, comparison_query, comparison_result, comparison_metadata)
+          VALUES ($1, $2, $3, $4, $5, $6)
+        `, [
+          userId,
+          Date.now().toString(), // Simple session identifier
+          relevantDocuments.map(doc => doc.veeva_document_id || doc.document_id),
+          message,
+          response,
+          JSON.stringify(comparisonMetadata)
+        ]);
+        
+        console.log('Comparison history stored successfully');
+      } catch (comparisonError) {
+        console.warn('Error storing comparison history:', comparisonError);
+        // Don't fail the request if comparison storage fails
+      }
+    }
+
     const totalDuration = Date.now() - startTime;
     console.log('Chat with documents completed:', {
       totalDuration: `${totalDuration}ms`,
       documentsUsed: relevantDocuments.length,
       externalResourcesUsed: relevantExternalResources.length,
+      isComparisonQuery,
       timestamp: new Date().toISOString()
     });
 
@@ -596,7 +703,8 @@ ${externalResourcesContext}`;
           externalResourcesUsed: relevantExternalResources.length,
           usingRAG: relevantChunks.length > 0,
           responseTime: openaiDuration,
-          tokensUsed: completion.usage?.total_tokens || 0
+          tokensUsed: completion.usage?.total_tokens || 0,
+          isComparisonQuery: isComparisonQuery
         }
       })
     };

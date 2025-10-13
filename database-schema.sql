@@ -281,6 +281,32 @@ ON qms_chat_workflow_instances(status);
 CREATE INDEX IF NOT EXISTS idx_qms_chat_workflow_instances_versions 
 ON qms_chat_workflow_instances USING gin (document_versions);
 
+-- Table for storing document comparison history
+CREATE TABLE IF NOT EXISTS qms_chat_document_comparisons (
+  id SERIAL PRIMARY KEY,
+  user_id VARCHAR(255),
+  session_id VARCHAR(255),
+  document_ids TEXT[], -- Array of document IDs being compared
+  comparison_query TEXT, -- User's question
+  comparison_result TEXT, -- AI's comparison output
+  comparison_metadata JSONB, -- Structured comparison data
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for document comparisons
+CREATE INDEX IF NOT EXISTS idx_qms_chat_document_comparisons_user_id 
+ON qms_chat_document_comparisons(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_qms_chat_document_comparisons_session_id 
+ON qms_chat_document_comparisons(session_id);
+
+CREATE INDEX IF NOT EXISTS idx_qms_chat_document_comparisons_created_at 
+ON qms_chat_document_comparisons(created_at);
+
+-- Index for document IDs array (GIN index for array operations)
+CREATE INDEX IF NOT EXISTS idx_qms_chat_document_comparisons_document_ids 
+ON qms_chat_document_comparisons USING gin (document_ids);
+
 -- Insert sample CAPA workflow template
 INSERT INTO qms_chat_workflow_templates (name, description, category, trigger_keywords, document_template) VALUES 
 ('CAPA Workflow', 'Corrective and Preventive Action workflow for addressing nonconformities', 'Quality', 
