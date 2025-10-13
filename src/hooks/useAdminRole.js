@@ -25,6 +25,7 @@ export function useAdminRole() {
     
     // Check multiple possible locations for roles in Auth0
     const rolesFromCustomClaim = user[customClaimNamespace];
+    const rolesFromAcceleraqaClaim = user['https://acceleraqa.com/roles']; // Specific to your setup
     const rolesFromRolesProperty = user.roles;
     const rolesFromAppMetadata = user['https://your-domain.com/app_metadata']?.roles;
     const rolesFromUserMetadata = user['https://your-domain.com/user_metadata']?.roles;
@@ -32,6 +33,7 @@ export function useAdminRole() {
     // Collect all roles from different sources
     const allRoles = [
       ...(Array.isArray(rolesFromCustomClaim) ? rolesFromCustomClaim : []),
+      ...(Array.isArray(rolesFromAcceleraqaClaim) ? rolesFromAcceleraqaClaim : []),
       ...(Array.isArray(rolesFromRolesProperty) ? rolesFromRolesProperty : []),
       ...(Array.isArray(rolesFromAppMetadata) ? rolesFromAppMetadata : []),
       ...(Array.isArray(rolesFromUserMetadata) ? rolesFromUserMetadata : [])
@@ -44,6 +46,7 @@ export function useAdminRole() {
       auth0Domain,
       customClaimNamespace,
       rolesFromCustomClaim,
+      rolesFromAcceleraqaClaim,
       rolesFromRolesProperty,
       rolesFromAppMetadata,
       rolesFromUserMetadata,
@@ -58,6 +61,7 @@ export function useAdminRole() {
       console.log('Auth0 Domain:', auth0Domain);
       console.log('Custom Claim Namespace:', customClaimNamespace);
       console.log('Roles from custom claim:', rolesFromCustomClaim);
+      console.log('Roles from acceleraqa claim:', rolesFromAcceleraqaClaim);
       console.log('Roles from roles property:', rolesFromRolesProperty);
       console.log('Roles from app_metadata:', rolesFromAppMetadata);
       console.log('Roles from user_metadata:', rolesFromUserMetadata);
