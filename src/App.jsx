@@ -152,6 +152,7 @@ export default function App() {
             <StaticChatPane 
               selectedDocuments={selectedDocuments} 
               onOpenDocumentInPane={handleOpenDocumentInPane}
+              userId={user?.sub}
             />
           </div>
 

@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import DocumentViewer from './DocumentViewer.jsx';
 import { createQAInteraction, getUploadedDocuments, downloadUploadedDocumentUrl } from '../api';
 
-export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane }) {
+export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane, userId }) {
   const [conversationHistory, setConversationHistory] = useState([]);
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
   const [selectedUploadedDocs, setSelectedUploadedDocs] = useState([]);
@@ -47,7 +47,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     const fetchUploadedDocuments = async () => {
       setLoadingUploadedDocs(true);
       try {
-        const response = await getUploadedDocuments({ limit: 100 });
+        const response = await getUploadedDocuments({ limit: 100, userId });
         console.log('Uploaded documents loaded:', response.items?.length || 0);
         setUploadedDocuments(response.items || []);
       } catch (error) {
@@ -122,7 +122,8 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       const requestBody = {
         message: userMessage,
         documentIds: allDocumentIds,
-        conversationHistory: newHistory
+        conversationHistory: newHistory,
+        userId: userId
       };
       
       console.log('Sending chat request:', {
@@ -346,7 +347,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         answer,
         document_ids: documentIds,
         document_names: documentNames,
-        user_id: null, // Could be enhanced to capture user info
+        user_id: userId,
         session_id: Date.now().toString() // Simple session identifier
       });
 
