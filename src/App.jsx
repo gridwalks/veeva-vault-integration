@@ -6,10 +6,12 @@ import AdminScreen from "./components/AdminScreen.jsx";
 import SelectedDocumentViewer from "./components/SelectedDocumentViewer.jsx";
 import AuthScreen from "./components/AuthScreen.jsx";
 import { useInactivityLogout } from "./hooks/useInactivityLogout.js";
+import { useAdminRole } from "./hooks/useAdminRole.js";
 // import StatusPanel from "./components/StatusPanel.jsx";
 
 export default function App() {
   const { isAuthenticated, loginWithRedirect, logout, user } = useAuth0();
+  const { isAdmin, isLoading: isRoleLoading } = useAdminRole();
   const [currentScreen, setCurrentScreen] = useState("main");
   const [selectedDocuments, setSelectedDocuments] = useState([]);
   const documentViewerRef = useRef(null);
@@ -41,6 +43,84 @@ export default function App() {
     return <AuthScreen onLogin={() => loginWithRedirect()} />;
   }
 
+  // Show loading state while checking user role
+  if (isRoleLoading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        backgroundColor: '#f8fafc'
+      }}>
+        <div style={{
+          textAlign: 'center',
+          color: '#374151',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '4px solid #e5e7eb',
+            borderTop: '4px solid #4338ca',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 16px'
+          }} />
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect non-admin users away from admin screen
+  if (currentScreen === "admin" && !isAdmin) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        backgroundColor: '#f8fafc'
+      }}>
+        <div style={{
+          textAlign: 'center',
+          color: '#374151',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          maxWidth: '400px',
+          padding: '24px'
+        }}>
+          <div style={{
+            fontSize: '48px',
+            marginBottom: '16px'
+          }}>🚫</div>
+          <h2 style={{ margin: '0 0 12px 0', fontSize: '20px', fontWeight: '600' }}>
+            Access Denied
+          </h2>
+          <p style={{ margin: '0 0 24px 0', color: '#6b7280' }}>
+            You don't have permission to access the admin panel. Only users with admin role can access this area.
+          </p>
+          <button
+            onClick={() => setCurrentScreen("main")}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#4338ca',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            }}
+          >
+            Return to Main App
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh' }}>
       <Header 
@@ -48,6 +128,7 @@ export default function App() {
         currentScreen={currentScreen}
         onScreenChange={setCurrentScreen}
         onLogout={handleLogout}
+        isAdmin={isAdmin}
       />
       
       {/* Main Content Area */}

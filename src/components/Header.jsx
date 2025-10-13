@@ -3,7 +3,7 @@ import { Menu, User, Shield, LogOut, Home, Clock } from 'lucide-react';
 import acceleraqaLogo from '../../assets/AceleraQA_logo.png';
 import WorkflowHistory from './WorkflowHistory.jsx';
 
-export default function Header({ user, currentScreen, onScreenChange, onLogout }) {
+export default function Header({ user, currentScreen, onScreenChange, onLogout, isAdmin }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showWorkflowHistory, setShowWorkflowHistory] = useState(false);
 
@@ -186,38 +186,40 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout }
                   <span>Main App</span>
                 </button>
 
-                {/* Admin Panel */}
-                <button
-                  onClick={() => {
-                    onScreenChange('admin');
-                    setMenuOpen(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '12px 16px',
-                    border: 'none',
-                    backgroundColor: currentScreen === 'admin' ? '#f3f4f6' : 'transparent',
-                    color: currentScreen === 'admin' ? '#4338ca' : '#374151',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    textAlign: 'left',
-                    transition: 'background-color 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (currentScreen !== 'admin') e.target.style.backgroundColor = '#f9fafb';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (currentScreen !== 'admin') e.target.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <Shield style={{ width: '16px', height: '16px' }} />
-                  <span>Admin Panel</span>
-                </button>
+                {/* Admin Panel - Only show for admin users */}
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      onScreenChange('admin');
+                      setMenuOpen(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '12px 16px',
+                      border: 'none',
+                      backgroundColor: currentScreen === 'admin' ? '#f3f4f6' : 'transparent',
+                      color: currentScreen === 'admin' ? '#4338ca' : '#374151',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      textAlign: 'left',
+                      transition: 'background-color 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (currentScreen !== 'admin') e.target.style.backgroundColor = '#f9fafb';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (currentScreen !== 'admin') e.target.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <Shield style={{ width: '16px', height: '16px' }} />
+                    <span>Admin Panel</span>
+                  </button>
+                )}
 
                 {/* Workflow History */}
                 <button
