@@ -1265,21 +1265,23 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         {/* External resources for the last assistant message */}
         {isLastAssistantMessage && usedExternalResources && usedExternalResources.length > 0 && (
           <div style={{
-            maxWidth: '80%',
+            maxWidth: '100%',
             marginTop: '8px',
             padding: '12px',
-            backgroundColor: '#eff6ff',
+            backgroundColor: '#f3f4f6',
             borderRadius: '8px',
-            border: '1px solid #bfdbfe'
+            border: '1px solid #d1d5db',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}>
             <div style={{
               fontSize: '12px',
               fontWeight: '600',
-              color: '#1e40af',
+              color: '#6b7280',
               marginBottom: '8px',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '4px',
+              fontFamily: 'inherit'
             }}>
               🔗 Related external resources:
             </div>
@@ -1287,7 +1289,8 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
             <div style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: '6px'
+              gap: '6px',
+              fontFamily: 'inherit'
             }}>
               {usedExternalResources.map((resource, resIndex) => (
                 <div key={resIndex} style={{
@@ -1297,7 +1300,8 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                   padding: '8px',
                   backgroundColor: 'white',
                   borderRadius: '6px',
-                  border: '1px solid #e0e0e0'
+                  border: '1px solid #e0e0e0',
+                  fontFamily: 'inherit'
                 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
@@ -1307,14 +1311,16 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                       marginBottom: '2px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      fontFamily: 'inherit'
                     }}>
                       {resource.title}
                     </div>
                     {resource.description && (
                       <div style={{
                         fontSize: '11px',
-                        color: '#666'
+                        color: '#666',
+                        fontFamily: 'inherit'
                       }}>
                         {resource.description}
                       </div>
@@ -1326,7 +1332,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                     rel="noopener noreferrer"
                     style={{
                       padding: '6px 12px',
-                      backgroundColor: '#1e40af',
+                      backgroundColor: '#6b7280',
                       color: 'white',
                       border: 'none',
                       borderRadius: '4px',
@@ -1336,7 +1342,8 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                       whiteSpace: 'nowrap',
                       marginLeft: '8px',
                       textDecoration: 'none',
-                      display: 'inline-block'
+                      display: 'inline-block',
+                      fontFamily: 'inherit'
                     }}
                   >
                     Open
