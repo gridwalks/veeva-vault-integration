@@ -96,10 +96,23 @@ export const handler = async (event) => {
         input: message,
       });
       queryEmbedding = embeddingResponse.data[0].embedding;
-      console.log(`Query embedding generated in ${Date.now() - embeddingStartTime}ms`);
+      
+      // Validate embedding
+      if (!Array.isArray(queryEmbedding) || queryEmbedding.length !== 1536) {
+        console.error('Invalid embedding generated:', {
+          isArray: Array.isArray(queryEmbedding),
+          length: queryEmbedding?.length,
+          type: typeof queryEmbedding
+        });
+        queryEmbedding = null;
+        vectorSearchFailed = true;
+      } else {
+        console.log(`Query embedding generated in ${Date.now() - embeddingStartTime}ms`);
+      }
     } catch (embeddingError) {
       console.error('Error generating query embedding:', embeddingError);
-      // Fall back to keyword search if embedding fails
+      queryEmbedding = null;
+      vectorSearchFailed = true;
     }
 
     // Get relevant chunks using semantic search
@@ -205,8 +218,13 @@ export const handler = async (event) => {
           relevantChunks.map(c => ({ doc: c.document_name, chunk: c.chunk_index, similarity: c.similarity.toFixed(3) }))
         );
       } catch (vectorError) {
-        console.error('Vector search failed:', vectorError.message);
-        console.warn('Falling back to keyword search. pgvector may not be enabled.');
+        console.error('Vector search failed:', {
+          message: vectorError.message,
+          code: vectorError.code,
+          detail: vectorError.detail,
+          hint: vectorError.hint
+        });
+        console.warn('Falling back to keyword search. pgvector may not be enabled or vector index may be corrupted.');
         vectorSearchFailed = true;
         queryEmbedding = null; // Force fallback to keyword search
       }
@@ -361,14 +379,36 @@ export const handler = async (event) => {
     }
 
     if (relevantDocuments.length === 0 && relevantChunks.length === 0 && relevantExternalResources.length === 0) {
+      console.log('No relevant content found for query:', {
+        message: message.substring(0, 100),
+        vectorSearchFailed,
+        documentIdsProvided: documentIds && documentIds.length > 0,
+        documentIdsCount: documentIds ? documentIds.length : 0
+      });
+      
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          response: "I couldn't find any relevant documents or external resources to answer your question. Please make sure documents have been indexed first.",
+          response: `I couldn't find any relevant documents or external resources to answer your question. 
+
+**Troubleshooting:**
+- ${vectorSearchFailed ? 'Vector search is not available (using keyword search fallback)' : 'Vector search completed but found no matches'}
+- ${documentIds && documentIds.length > 0 ? `You selected ${documentIds.length} document(s), but none contained relevant content` : 'No specific documents were selected'}
+- Please make sure documents have been indexed and contain relevant content
+- Try rephrasing your question or selecting different documents`,
           documents: [],
           externalResources: [],
-          conversationHistory: [...conversationHistory, { role: 'user', content: message }]
+          conversationHistory: [...conversationHistory, { role: 'user', content: message }],
+          metadata: {
+            vectorSearchFailed,
+            documentsUsed: 0,
+            chunksUsed: 0,
+            externalResourcesUsed: 0,
+            usingRAG: false,
+            responseTime: 0,
+            tokensUsed: 0
+          }
         })
       };
     }
@@ -387,7 +427,7 @@ ${chunk.chunk_text}
 
 ---`;
       }).join('\n\n');
-    } else {
+    } else if (relevantDocuments.length > 0) {
       // Fallback to document summaries
       console.log('Building context from document summaries (keyword search fallback)');
       documentContext = relevantDocuments.map(doc => {
@@ -413,6 +453,10 @@ Status: ${doc.status || 'Unknown'}`;
         context += '\n\n---';
         return context;
       }).join('\n\n');
+    } else {
+      // No documents or chunks found - create minimal context
+      console.log('No relevant content found, using minimal context');
+      documentContext = 'No relevant document content was found for this query.';
     }
 
     // Build external resources context
@@ -446,7 +490,8 @@ When answering questions:
 
 Relevant Document Sections:
 ${documentContext}${externalResourcesContext}`
-      : `You are an AI assistant that helps users understand and work with pharmaceutical documents from Veeva Vault. You have access to both AI-generated summaries and user-added manual summaries from an indexed document collection, as well as related external resources.
+      : relevantDocuments.length > 0
+      ? `You are an AI assistant that helps users understand and work with pharmaceutical documents from Veeva Vault. You have access to both AI-generated summaries and user-added manual summaries from an indexed document collection, as well as related external resources.
 
 When answering questions:
 1. Use the provided document context to give accurate, helpful answers
@@ -462,7 +507,12 @@ When answering questions:
 11. Always provide the external resource titles and URLs when referencing them
 
 Document Context:
-${documentContext}${externalResourcesContext}`;
+${documentContext}${externalResourcesContext}`
+      : `You are an AI assistant that helps users understand and work with pharmaceutical documents from Veeva Vault. 
+
+I don't have access to any specific documents or external resources for this query. Please make sure documents have been properly indexed and try rephrasing your question or selecting different documents.
+
+${externalResourcesContext}`;
 
     // Prepare conversation messages
     const messages = [
@@ -477,7 +527,10 @@ ${documentContext}${externalResourcesContext}`;
       chunkCount: relevantChunks.length,
       externalResourceCount: relevantExternalResources.length,
       usingRAG: relevantChunks.length > 0,
-      totalContextLength: systemPrompt.length + message.length
+      totalContextLength: systemPrompt.length + message.length,
+      systemPromptLength: systemPrompt.length,
+      documentContextLength: documentContext.length,
+      vectorSearchFailed
     });
 
     // Call OpenAI API
@@ -495,9 +548,11 @@ ${documentContext}${externalResourcesContext}`;
     console.log('OpenAI response received:', {
       responseTime: `${openaiDuration}ms`,
       responseLength: response.length,
+      responsePreview: response.substring(0, 200) + (response.length > 200 ? '...' : ''),
       tokensUsed: completion.usage?.total_tokens || 0,
       promptTokens: completion.usage?.prompt_tokens || 0,
-      completionTokens: completion.usage?.completion_tokens || 0
+      completionTokens: completion.usage?.completion_tokens || 0,
+      finishReason: completion.choices[0]?.finish_reason
     });
 
     const totalDuration = Date.now() - startTime;

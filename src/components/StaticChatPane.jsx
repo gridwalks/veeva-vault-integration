@@ -221,21 +221,22 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       
       // Handle different response formats
       if (data.conversationHistory && Array.isArray(data.conversationHistory)) {
-        // API returns full conversation history - clean up duplicates
+        // API returns full conversation history - use it directly
         console.log('Using API conversation history:', data.conversationHistory.length, 'messages');
         console.log('Raw conversation history:', data.conversationHistory.map((msg, i) => ({ index: i, role: msg.role, content: msg.content.substring(0, 50) + '...' })));
         
-        // Remove duplicate consecutive messages
+        // Only remove obvious duplicates (same role and content in consecutive messages)
         const cleanedHistory = [];
         for (let i = 0; i < data.conversationHistory.length; i++) {
           const message = data.conversationHistory[i];
           const prevMessage = cleanedHistory[cleanedHistory.length - 1];
           
-          // Skip if this message is identical to the previous one
+          // Only skip if this is an exact duplicate of the previous message
           if (prevMessage && 
               prevMessage.role === message.role && 
-              prevMessage.content === message.content) {
-            console.log(`Removing duplicate message at index ${i}:`, message.content.substring(0, 50) + '...');
+              prevMessage.content === message.content &&
+              prevMessage.content.trim().length > 0) {
+            console.log(`Removing exact duplicate message at index ${i}:`, message.content.substring(0, 50) + '...');
             continue;
           }
           
@@ -245,13 +246,15 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         console.log('Cleaned conversation history:', cleanedHistory.length, 'messages');
         console.log('Cleaned conversation history details:', cleanedHistory.map((msg, i) => ({ index: i, role: msg.role, content: msg.content.substring(0, 50) + '...' })));
         setConversationHistory(cleanedHistory);
-      } else if (data.response) {
+      } else if (data.response && data.response.trim().length > 0) {
         // API returns just the response, append to existing history
         console.log('Appending API response to existing history');
+        console.log('Response content:', data.response.substring(0, 100) + '...');
         setConversationHistory(prev => {
           // Remove the last message if it's a duplicate user message
           const lastMessage = prev[prev.length - 1];
           if (lastMessage && lastMessage.role === 'user' && lastMessage.content === userMessage) {
+            console.log('Removing duplicate user message before adding assistant response');
             prev = prev.slice(0, -1);
           }
           return [
@@ -260,8 +263,8 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
           ];
         });
       } else {
-        console.error('Unexpected API response format:', data);
-        throw new Error('Unexpected response format from chat API');
+        console.error('Unexpected API response format or empty response:', data);
+        throw new Error('Unexpected response format from chat API or empty response received');
       }
       
       setUsedDocuments(data.documents || []);
@@ -274,11 +277,13 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
 
       console.log('Chat response received:', {
         responseLength: data.response?.length || 0,
+        responsePreview: data.response ? data.response.substring(0, 100) + '...' : 'No response',
         documentsUsed: (data.documents || []).length,
         externalResourcesUsed: (data.externalResources || []).length,
         metadata: data.metadata,
         hasConversationHistory: !!data.conversationHistory,
-        hasResponse: !!data.response
+        hasResponse: !!data.response,
+        conversationHistoryLength: data.conversationHistory?.length || 0
       });
 
       // After answering, check if we should offer a workflow
