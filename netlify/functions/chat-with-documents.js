@@ -567,7 +567,7 @@ ${externalResourcesContext}`;
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        response,
+        response, // Keep for backward compatibility
         documents: relevantDocuments.map(doc => ({
           id: doc.veeva_document_id,
           name: doc.document_name,

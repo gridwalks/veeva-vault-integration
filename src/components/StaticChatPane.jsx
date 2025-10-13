@@ -219,8 +219,8 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       // Update conversation with AI response
       console.log('API Response data:', data);
       
-      // Handle different response formats
-      if (data.conversationHistory && Array.isArray(data.conversationHistory)) {
+      // Handle different response formats - prioritize conversationHistory
+      if (data.conversationHistory && Array.isArray(data.conversationHistory) && data.conversationHistory.length > 0) {
         // API returns full conversation history - use it directly
         console.log('Using API conversation history:', data.conversationHistory.length, 'messages');
         console.log('Raw conversation history:', data.conversationHistory.map((msg, i) => ({ index: i, role: msg.role, content: msg.content.substring(0, 50) + '...' })));
@@ -247,15 +247,18 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         console.log('Cleaned conversation history details:', cleanedHistory.map((msg, i) => ({ index: i, role: msg.role, content: msg.content.substring(0, 50) + '...' })));
         setConversationHistory(cleanedHistory);
       } else if (data.response && data.response.trim().length > 0) {
-        // API returns just the response, append to existing history
-        console.log('Appending API response to existing history');
+        // Fallback: API returns just the response, append to existing history
+        console.log('Fallback: Appending API response to existing history');
         console.log('Response content:', data.response.substring(0, 100) + '...');
         setConversationHistory(prev => {
           // Remove the last message if it's a duplicate user message
           const lastMessage = prev[prev.length - 1];
           if (lastMessage && lastMessage.role === 'user' && lastMessage.content === userMessage) {
             console.log('Removing duplicate user message before adding assistant response');
-            prev = prev.slice(0, -1);
+            return [
+              ...prev.slice(0, -1),
+              { role: 'assistant', content: data.response }
+            ];
           }
           return [
             ...prev,
@@ -326,13 +329,28 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       setError(err.message);
       
       // Add error message to conversation
-      setConversationHistory(prev => [
-        ...prev,
-        { 
-          role: 'assistant', 
-          content: `I'm sorry, I encountered an error: ${err.message}. Please try again.` 
+      setConversationHistory(prev => {
+        // Ensure we don't duplicate the user message
+        const lastMessage = prev[prev.length - 1];
+        if (lastMessage && lastMessage.role === 'user' && lastMessage.content === userMessage) {
+          return [
+            ...prev,
+            { 
+              role: 'assistant', 
+              content: `I'm sorry, I encountered an error: ${err.message}. Please try again.` 
+            }
+          ];
+        } else {
+          return [
+            ...prev,
+            { role: 'user', content: userMessage },
+            { 
+              role: 'assistant', 
+              content: `I'm sorry, I encountered an error: ${err.message}. Please try again.` 
+            }
+          ];
         }
-      ]);
+      });
     } finally {
       setIsLoading(false);
     }
