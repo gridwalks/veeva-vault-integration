@@ -5,6 +5,7 @@ import Header from "./components/Header.jsx";
 import AdminScreen from "./components/AdminScreen.jsx";
 import SelectedDocumentViewer from "./components/SelectedDocumentViewer.jsx";
 import AuthScreen from "./components/AuthScreen.jsx";
+import AdminDebug from "./components/AdminDebug.jsx";
 import { useInactivityLogout } from "./hooks/useInactivityLogout.js";
 import { useAdminRole } from "./hooks/useAdminRole.js";
 // import StatusPanel from "./components/StatusPanel.jsx";
@@ -134,38 +135,43 @@ export default function App() {
       {/* Main Content Area */}
       {currentScreen === "main" ? (
         /* Main Chat Interface */
-        <div style={{
-          display: 'flex',
-          height: 'calc(100vh - 60px)',
-          margin: '8px 12px',
-          gap: '12px'
-        }}>
-          {/* Left Panel - Chat */}
+        <div>
+          {/* Temporary Debug Component - Remove after fixing admin role */}
+          <AdminDebug />
+          
           <div style={{
-            flex: '1',
-            backgroundColor: '#ffffff',
-            border: '1px solid #e5e7eb',
-            borderRadius: '8px',
-            overflow: 'hidden',
-            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+            display: 'flex',
+            height: 'calc(100vh - 60px)',
+            margin: '8px 12px',
+            gap: '12px'
           }}>
-            <StaticChatPane 
-              selectedDocuments={selectedDocuments} 
-              onOpenDocumentInPane={handleOpenDocumentInPane}
-              userId={user?.sub}
-            />
-          </div>
+            {/* Left Panel - Chat */}
+            <div style={{
+              flex: '1',
+              backgroundColor: '#ffffff',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+            }}>
+              <StaticChatPane 
+                selectedDocuments={selectedDocuments} 
+                onOpenDocumentInPane={handleOpenDocumentInPane}
+                userId={user?.sub}
+              />
+            </div>
 
-                {/* Right Panel - Selected Documents Viewer */}
-                <div style={{
-                  flex: '1'
-                }}>
-                  <SelectedDocumentViewer 
-                    ref={documentViewerRef}
-                    selectedDocuments={selectedDocuments}
-                    onDocumentsSelected={setSelectedDocuments}
-                  />
-                </div>
+                  {/* Right Panel - Selected Documents Viewer */}
+                  <div style={{
+                    flex: '1'
+                  }}>
+                    <SelectedDocumentViewer 
+                      ref={documentViewerRef}
+                      selectedDocuments={selectedDocuments}
+                      onDocumentsSelected={setSelectedDocuments}
+                    />
+                  </div>
+          </div>
         </div>
       ) : (
         /* Admin Screen */

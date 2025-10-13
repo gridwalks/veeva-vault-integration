@@ -93,7 +93,7 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout, 
                 color: '#6b7280',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
-                admin
+                {isAdmin ? 'admin' : 'user'}
               </span>
             </div>
           </div>
