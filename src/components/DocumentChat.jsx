@@ -240,6 +240,48 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     const isAssistant = message.role === 'assistant';
     const isLastAssistantMessage = isAssistant && index === conversationHistory.length - 1;
 
+    const handleCopy = async () => {
+      try {
+        await navigator.clipboard.writeText(message.content);
+        console.log('Message copied to clipboard');
+      } catch (err) {
+        console.error('Failed to copy text: ', err);
+      }
+    };
+
+    const handleShare = async () => {
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: 'Chat Response',
+            text: message.content,
+          });
+        } catch (err) {
+          console.error('Error sharing:', err);
+        }
+      } else {
+        // Fallback: copy to clipboard
+        handleCopy();
+      }
+    };
+
+    const handleRegenerate = () => {
+      console.log('Regenerate message');
+      // You can implement regeneration logic here
+    };
+
+    const handleLike = () => {
+      console.log('Message liked');
+    };
+
+    const handleDislike = () => {
+      console.log('Message disliked');
+    };
+
+    const handleMore = () => {
+      console.log('More options clicked');
+    };
+
     return (
       <div
         key={index}
@@ -286,6 +328,211 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
             message.content
           )}
         </div>
+
+        {/* Action buttons for assistant messages */}
+        {isAssistant && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginTop: '8px',
+            padding: '4px 8px',
+            backgroundColor: 'rgba(0, 0, 0, 0.05)',
+            borderRadius: '6px',
+            opacity: 0.7,
+            transition: 'opacity 0.2s ease',
+            maxWidth: '80%'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+          onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+          >
+            {/* Copy Button */}
+            <button
+              onClick={handleCopy}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                color: '#6b7280',
+                transition: 'all 0.2s ease',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f3f4f6';
+                e.target.style.color = '#374151';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+                e.target.style.color = '#6b7280';
+              }}
+              title="Copy response"
+            >
+              <span style={{ fontSize: '14px' }}>📋</span>
+              Copy
+            </button>
+
+            {/* Thumbs Up Button */}
+            <button
+              onClick={handleLike}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                color: '#6b7280',
+                transition: 'all 0.2s ease',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f3f4f6';
+                e.target.style.color = '#374151';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+                e.target.style.color = '#6b7280';
+              }}
+              title="Like this response"
+            >
+              <span style={{ fontSize: '14px' }}>👍</span>
+              Like
+            </button>
+
+            {/* Thumbs Down Button */}
+            <button
+              onClick={handleDislike}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                color: '#6b7280',
+                transition: 'all 0.2s ease',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f3f4f6';
+                e.target.style.color = '#374151';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+                e.target.style.color = '#6b7280';
+              }}
+              title="Dislike this response"
+            >
+              <span style={{ fontSize: '14px' }}>👎</span>
+              Dislike
+            </button>
+
+            {/* Share Button */}
+            <button
+              onClick={handleShare}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                color: '#6b7280',
+                transition: 'all 0.2s ease',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f3f4f6';
+                e.target.style.color = '#374151';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+                e.target.style.color = '#6b7280';
+              }}
+              title="Share response"
+            >
+              <span style={{ fontSize: '14px' }}>📤</span>
+              Share
+            </button>
+
+            {/* Regenerate Button */}
+            <button
+              onClick={handleRegenerate}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                color: '#6b7280',
+                transition: 'all 0.2s ease',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f3f4f6';
+                e.target.style.color = '#374151';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+                e.target.style.color = '#6b7280';
+              }}
+              title="Regenerate response"
+            >
+              <span style={{ fontSize: '14px' }}>🔄</span>
+              Regenerate
+            </button>
+
+            {/* More Options Button */}
+            <button
+              onClick={handleMore}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                color: '#6b7280',
+                transition: 'all 0.2s ease',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f3f4f6';
+                e.target.style.color = '#374151';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+                e.target.style.color = '#6b7280';
+              }}
+              title="More options"
+            >
+              <span style={{ fontSize: '14px' }}>⋯</span>
+              More
+            </button>
+          </div>
+        )}
 
         {/* Document opening options for the last assistant message */}
         {isLastAssistantMessage && usedDocuments && usedDocuments.length > 0 && (
