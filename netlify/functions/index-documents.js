@@ -378,7 +378,8 @@ async function extractTextFromBuffer(fileBuffer, fileName = '', contentType = ''
 }
 
 // Function to generate embeddings and store chunks
-async function chunkAndEmbedDocument(documentText, documentId, veevaDocumentId, pool) {
+async function chunkAndEmbedDocument(documentText, documentId, veevaDocumentId, pool, startTime = Date.now()) {
+  const MAX_CHUNK_PROCESSING_TIME = 20000; // 20 seconds for chunk processing
   try {
     console.log(`Starting chunking process for document ${veevaDocumentId}...`, {
       textLength: documentText?.length || 0,
@@ -409,11 +410,18 @@ async function chunkAndEmbedDocument(documentText, documentId, veevaDocumentId, 
     await pool.query('DELETE FROM Veeva_Doc_Chat_document_chunks WHERE document_id = $1', [documentId]);
     console.log(`Deleted existing chunks for document ${documentId}`);
 
-    // Generate embeddings for each chunk in batches
-    const batchSize = 10; // OpenAI recommends batching embeddings
+    // Generate embeddings for each chunk in batches - smaller batches for faster processing
+    const batchSize = 5; // Reduced batch size for faster processing and better timeout handling
     let chunksCreated = 0;
 
     for (let i = 0; i < validChunks.length; i += batchSize) {
+      // Check if we're approaching timeout
+      const elapsedTime = Date.now() - startTime;
+      if (elapsedTime > MAX_CHUNK_PROCESSING_TIME) {
+        console.warn(`⏰ Chunk processing timeout warning: ${elapsedTime}ms elapsed, stopping chunk processing`);
+        break;
+      }
+      
       const batchChunks = validChunks.slice(i, Math.min(i + batchSize, validChunks.length));
       
       console.log(`Processing embedding batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(validChunks.length / batchSize)} (${batchChunks.length} chunks)`);
@@ -482,12 +490,14 @@ async function chunkAndEmbedDocument(documentText, documentId, veevaDocumentId, 
 
 export const handler = async (event) => {
   const startTime = Date.now();
+  const MAX_EXECUTION_TIME = 25000; // 25 seconds to leave buffer for response
   console.log('=== DOCUMENT INDEXING STARTED ===');
   console.log('Starting document indexing process...', {
     timestamp: new Date().toISOString(),
     queryParams: Object.fromEntries(new URL(event.rawUrl).searchParams),
     eventMethod: event.httpMethod,
-    eventPath: event.path
+    eventPath: event.path,
+    maxExecutionTime: MAX_EXECUTION_TIME
   });
 
   // Quick test response
@@ -624,10 +634,21 @@ export const handler = async (event) => {
     
     const results = [];
 
-    // Apply batch processing to avoid timeout
+    // Apply batch processing to avoid timeout - use smaller batches for better timeout handling
     const startIndex = batchOffset;
     const endIndex = Math.min(startIndex + batchSize, documents.length);
     const documentsToProcess = documents.slice(startIndex, endIndex);
+    
+    console.log(`📦 Batch processing configuration:`, {
+      totalDocuments: documents.length,
+      batchSize,
+      batchOffset,
+      startIndex,
+      endIndex,
+      documentsInThisBatch: documentsToProcess.length,
+      remainingAfterBatch: documents.length - endIndex,
+      maxExecutionTime: MAX_EXECUTION_TIME
+    });
 
     console.log(`Step 10: Processing documents in batch...`, {
       totalDocuments: documents.length,
@@ -649,9 +670,20 @@ export const handler = async (event) => {
     }
 
     for (let i = 0; i < documentsToProcess.length; i++) {
+      // Check if we're approaching timeout
+      const elapsedTime = Date.now() - startTime;
+      if (elapsedTime > MAX_EXECUTION_TIME) {
+        console.warn(`⏰ Timeout warning: ${elapsedTime}ms elapsed, stopping processing to avoid timeout`);
+        break;
+      }
+      
       const doc = documentsToProcess[i];
       const globalIndex = startIndex + i;
       const docStartTime = Date.now();
+      
+      // Progress tracking
+      const progressPercent = Math.round(((globalIndex + 1) / documents.length) * 100);
+      console.log(`📊 Progress: ${globalIndex + 1}/${documents.length} (${progressPercent}%) - ${elapsedTime}ms elapsed`);
       
       try {
         console.log(`=== PROCESSING DOCUMENT ${globalIndex + 1}/${documents.length} (Batch ${Math.floor(startIndex/batchSize) + 1}) ===`);
@@ -954,7 +986,8 @@ ${documentText.substring(0, 4000)}`
                 documentTextForChunking,
                 existing.id,
                 doc.id,
-                pool
+                pool,
+                startTime
               );
               console.log(`Chunking result:`, {
                 success: chunkResult.success,
@@ -1034,7 +1067,8 @@ ${documentText.substring(0, 4000)}`
                         documentText,
                         existing.id,
                         doc.id,
-                        pool
+                        pool,
+                        startTime
                       );
                       chunkingInfo.chunkingSuccess = chunkResult.success;
                       chunkingInfo.chunksCreated = chunkResult.chunksCreated || 0;
@@ -1330,7 +1364,8 @@ ${fallbackText.substring(0, 4000)}`
               documentText,
               newDocumentId, // Use the newly created document_index id
               doc.id,
-              pool
+              pool,
+              startTime
             );
             console.log(`Chunking result for new document:`, {
               success: chunkResult.success,
@@ -1379,11 +1414,13 @@ ${fallbackText.substring(0, 4000)}`
     }
 
     const totalDuration = Date.now() - startTime;
+    const wasTimeout = totalDuration > MAX_EXECUTION_TIME;
     const stats = {
       created: results.filter(r => r.action === 'created').length,
       updated: results.filter(r => r.action === 'updated').length,
       unchanged: results.filter(r => r.action === 'unchanged').length,
-      errors: results.filter(r => r.action === 'error').length
+      errors: results.filter(r => r.action === 'error').length,
+      timeout: wasTimeout
     };
 
     console.log('=== DOCUMENT INDEXING COMPLETED ===');
@@ -1402,6 +1439,10 @@ ${fallbackText.substring(0, 4000)}`
       stats,
       timestamp: new Date().toISOString()
     });
+    
+    if (wasTimeout) {
+      console.warn('⚠️ Processing stopped due to timeout - some documents may not have been processed');
+    }
     
     if (documents.length === 0) {
       console.log('=== TROUBLESHOOTING INFO ===');

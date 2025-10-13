@@ -49,13 +49,35 @@ export default function AdminScreen() {
         batchCount++;
         console.log(`Processing batch ${batchCount}...`, { batchOffset, batchSize });
         
-        const res = await indexDocuments({ 
-          name: q, 
-          limit: 100, 
-          force: forceRegenerate,
-          batchSize,
-          batchOffset 
-        });
+        // Retry logic for failed batches
+        let res;
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        while (retryCount < maxRetries) {
+          try {
+            res = await indexDocuments({ 
+              name: q, 
+              limit: 100, 
+              force: forceRegenerate,
+              batchSize,
+              batchOffset 
+            });
+            break; // Success, exit retry loop
+          } catch (error) {
+            retryCount++;
+            console.warn(`Batch ${batchCount} failed (attempt ${retryCount}/${maxRetries}):`, error.message);
+            
+            if (retryCount < maxRetries) {
+              const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff
+              console.log(`Retrying in ${delay}ms...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+              console.error(`Batch ${batchCount} failed after ${maxRetries} attempts:`, error);
+              throw error;
+            }
+          }
+        }
         
         console.log(`Batch ${batchCount} completed:`, {
           total: res.total,
