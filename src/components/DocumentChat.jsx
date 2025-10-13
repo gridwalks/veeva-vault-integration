@@ -278,9 +278,6 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       console.log('Message disliked');
     };
 
-    const handleMore = () => {
-      console.log('More options clicked');
-    };
 
     return (
       <div
@@ -358,7 +355,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '12px',
+                fontSize: '13px',
                 color: '#6b7280',
                 transition: 'all 0.2s ease',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -373,7 +370,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               }}
               title="Copy response"
             >
-              <span style={{ fontSize: '14px' }}>📋</span>
+              <span style={{ fontSize: '16px' }}>📋</span>
               Copy
             </button>
 
@@ -389,7 +386,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '12px',
+                fontSize: '13px',
                 color: '#6b7280',
                 transition: 'all 0.2s ease',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -404,7 +401,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               }}
               title="Like this response"
             >
-              <span style={{ fontSize: '14px' }}>👍</span>
+              <span style={{ fontSize: '16px' }}>👍</span>
               Like
             </button>
 
@@ -420,7 +417,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '12px',
+                fontSize: '13px',
                 color: '#6b7280',
                 transition: 'all 0.2s ease',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -435,7 +432,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               }}
               title="Dislike this response"
             >
-              <span style={{ fontSize: '14px' }}>👎</span>
+              <span style={{ fontSize: '16px' }}>👎</span>
               Dislike
             </button>
 
@@ -451,7 +448,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '12px',
+                fontSize: '13px',
                 color: '#6b7280',
                 transition: 'all 0.2s ease',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -466,7 +463,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               }}
               title="Share response"
             >
-              <span style={{ fontSize: '14px' }}>📤</span>
+              <span style={{ fontSize: '16px' }}>📤</span>
               Share
             </button>
 
@@ -482,7 +479,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '12px',
+                fontSize: '13px',
                 color: '#6b7280',
                 transition: 'all 0.2s ease',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -497,40 +494,10 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               }}
               title="Regenerate response"
             >
-              <span style={{ fontSize: '14px' }}>🔄</span>
+              <span style={{ fontSize: '16px' }}>🔄</span>
               Regenerate
             </button>
 
-            {/* More Options Button */}
-            <button
-              onClick={handleMore}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px 8px',
-                backgroundColor: 'transparent',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                color: '#6b7280',
-                transition: 'all 0.2s ease',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#f3f4f6';
-                e.target.style.color = '#374151';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = 'transparent';
-                e.target.style.color = '#6b7280';
-              }}
-              title="More options"
-            >
-              <span style={{ fontSize: '14px' }}>⋯</span>
-              More
-            </button>
           </div>
         )}
 
@@ -672,7 +639,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               {selectedDocuments.length > 0 && (
                 <p style={{ 
                   margin: '4px 0 0 0', 
-                  fontSize: '12px', 
+                  fontSize: '13px', 
                   color: '#666' 
                 }}>
                   {selectedDocuments.length} document{selectedDocuments.length !== 1 ? 's' : ''} selected
@@ -854,7 +821,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                   borderRadius: '8px',
                   resize: 'none',
                   fontSize: '14px',
-                  fontFamily: 'inherit',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   minHeight: '44px',
                   maxHeight: '120px'
                 }}
@@ -891,7 +858,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                   border: '1px solid #d1d5db',
                   borderRadius: '4px',
                   cursor: isUploading ? 'not-allowed' : 'pointer',
-                  fontSize: '12px',
+                  fontSize: '13px',
                   fontWeight: '500',
                   display: 'flex',
                   alignItems: 'center',
