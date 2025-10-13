@@ -45,22 +45,23 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversationHistory, isLoading]);
 
+  // Fetch uploaded documents function
+  const fetchUploadedDocuments = async () => {
+    setLoadingUploadedDocs(true);
+    try {
+      const response = await getUploadedDocuments({ limit: 100, userId });
+      console.log('Uploaded documents loaded:', response.items?.length || 0);
+      setUploadedDocuments(response.items || []);
+    } catch (error) {
+      console.error('Failed to load uploaded documents:', error);
+      // Don't show error to user, just log it
+    } finally {
+      setLoadingUploadedDocs(false);
+    }
+  };
+
   // Fetch uploaded documents on mount
   useEffect(() => {
-    const fetchUploadedDocuments = async () => {
-      setLoadingUploadedDocs(true);
-      try {
-        const response = await getUploadedDocuments({ limit: 100, userId });
-        console.log('Uploaded documents loaded:', response.items?.length || 0);
-        setUploadedDocuments(response.items || []);
-      } catch (error) {
-        console.error('Failed to load uploaded documents:', error);
-        // Don't show error to user, just log it
-      } finally {
-        setLoadingUploadedDocs(false);
-      }
-    };
-    
     fetchUploadedDocuments();
   }, []);
 
