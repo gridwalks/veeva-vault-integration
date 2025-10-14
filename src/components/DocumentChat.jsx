@@ -899,11 +899,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
           )}
 
           {/* Input */}
-          <div style={{
-            padding: '16px 20px',
-            borderTop: '1px solid #eee',
-            backgroundColor: '#f8f9fa'
-          }}>
+          <div className="p-4">
             <ChatPromptBox
               onSend={handleChatPromptSend}
               placeholder="Ask a question about your documents..."

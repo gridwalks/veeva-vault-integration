@@ -1781,13 +1781,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         )}
 
         {/* Input */}
-        <div style={{
-          padding: '10px 14px',
-          borderTop: '1px solid #e5e7eb',
-          backgroundColor: '#f8fafc',
-          borderBottomLeftRadius: '8px',
-          borderBottomRightRadius: '8px'
-        }}>
+        <div className="p-3">
           <ChatPromptBox
             onSend={handleChatPromptSend}
             placeholder={workflowState.isActive ? "Answer the workflow question above..." : "Ask a question about your documents..."}
