@@ -1008,7 +1008,6 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               title="Copy response"
             >
               <img src="/copy-icon.png" alt="Copy" style={{ width: '16px', height: '16px' }} />
-              Copy
             </button>
 
             {/* Thumbs Up Button */}
@@ -1039,7 +1038,6 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               title="Like this response"
             >
               <img src="/like-icon.png" alt="Like" style={{ width: '16px', height: '16px' }} />
-              Like
             </button>
 
             {/* Thumbs Down Button */}
@@ -1070,7 +1068,6 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               title="Dislike this response"
             >
               <img src="/dislike-icon.png" alt="Dislike" style={{ width: '16px', height: '16px' }} />
-              Dislike
             </button>
 
             {/* Share Button */}
@@ -1101,7 +1098,6 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               title="Share response"
             >
               <img src="/share-icon.png" alt="Share" style={{ width: '16px', height: '16px' }} />
-              Share
             </button>
 
             {/* Regenerate Button */}
@@ -1132,7 +1128,6 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               title="Regenerate response"
             >
               <img src="/share-icon.png" alt="Regenerate" style={{ width: '16px', height: '16px' }} />
-              Regenerate
             </button>
 
           </div>
