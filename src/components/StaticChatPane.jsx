@@ -1238,6 +1238,11 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               fontFamily: 'inherit'
             }}>
               📄 Documents referenced in this response:
+              {usedDocuments.length > 5 && (
+                <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: '4px' }}>
+                  (showing 5 of {usedDocuments.length})
+                </span>
+              )}
             </div>
             
             <div style={{
@@ -1246,7 +1251,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               gap: '6px',
               fontFamily: 'inherit'
             }}>
-              {usedDocuments.map((doc, docIndex) => (
+              {usedDocuments.slice(0, 5).map((doc, docIndex) => (
                 <div key={docIndex} style={{
                   display: 'flex',
                   justifyContent: 'space-between',

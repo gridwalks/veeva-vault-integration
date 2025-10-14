@@ -595,6 +595,11 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               fontFamily: 'inherit'
             }}>
               📄 Documents referenced in this response:
+              {usedDocuments.length > 5 && (
+                <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: '4px' }}>
+                  (showing 5 of {usedDocuments.length})
+                </span>
+              )}
             </div>
             
             <div style={{
@@ -603,7 +608,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               gap: '6px',
               fontFamily: 'inherit'
             }}>
-              {usedDocuments.map((doc, docIndex) => (
+              {usedDocuments.slice(0, 5).map((doc, docIndex) => (
                 <div key={docIndex} style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -783,9 +788,11 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               fontSize: '12px',
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}>
-              <strong style={{fontFamily: 'inherit'}}>Using {usedDocuments.length} document{usedDocuments.length !== 1 ? 's' : ''}:</strong>
+              <strong style={{fontFamily: 'inherit'}}>
+                Using {usedDocuments.length > 5 ? `5 of ${usedDocuments.length}` : usedDocuments.length} document{usedDocuments.length !== 1 ? 's' : ''}:
+              </strong>
               <div style={{ marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '8px', fontFamily: 'inherit' }}>
-                {usedDocuments.map((doc, index) => (
+                {usedDocuments.slice(0, 5).map((doc, index) => (
                   <span
                     key={index}
                     style={{
