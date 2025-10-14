@@ -289,6 +289,19 @@ export const handler = async (event) => {
         .filter(c => c.source_type === 'upload' && c.upload_document_id)
         .map(c => c.upload_document_id))];
       
+      console.log('Semantic search results:', {
+        totalChunks: relevantChunks.length,
+        uniqueVeevaDocIds: uniqueVeevaDocIds,
+        uniqueUploadedDocIds: uniqueUploadedDocIds,
+        chunkDetails: relevantChunks.map(c => ({
+          docId: c.veeva_document_id || c.upload_document_id,
+          docName: c.document_name,
+          docNumber: c.document_number,
+          similarity: c.similarity,
+          source: c.source_type
+        }))
+      });
+      
       // Fetch Veeva document metadata
       if (uniqueVeevaDocIds.length > 0) {
         const veevaDocPlaceholders = uniqueVeevaDocIds.map((_, index) => `$${index + 1}`).join(',');
@@ -364,10 +377,19 @@ export const handler = async (event) => {
           LIMIT 10
         `;
         
+        console.log('Keyword search query:', query);
+        console.log('Search parameters:', searchParams);
+        console.log('Search conditions:', searchConditions);
+        
         const result = await pool.query(query, [...searchParams, searchParams, searchParams, searchParams]);
         const keywordSearchDocuments = result.rows;
         
         console.log(`Found ${keywordSearchDocuments.length} relevant documents based on keyword search`);
+        console.log('Keyword search documents:', keywordSearchDocuments.map(doc => ({
+          id: doc.veeva_document_id,
+          number: doc.document_number,
+          name: doc.document_name
+        })));
         
         // Merge with existing documents from semantic search, avoiding duplicates
         const existingDocIds = new Set(relevantDocuments.map(doc => doc.veeva_document_id || doc.document_id));
@@ -375,6 +397,12 @@ export const handler = async (event) => {
         relevantDocuments.push(...newDocuments);
         
         console.log(`Added ${newDocuments.length} new documents from keyword search (${relevantDocuments.length} total)`);
+        console.log('Final relevant documents:', relevantDocuments.map(doc => ({
+          id: doc.veeva_document_id || doc.document_id,
+          number: doc.document_number,
+          name: doc.document_name,
+          source: doc.source_type || 'unknown'
+        })));
     } else if (documentIds && documentIds.length > 0) {
       // Get specific documents by IDs
       const placeholders = documentIds.map((_, index) => `$${index + 1}`).join(',');
