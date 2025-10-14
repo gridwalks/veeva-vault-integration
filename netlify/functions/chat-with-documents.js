@@ -316,29 +316,31 @@ export const handler = async (event) => {
         const uploadedDocResult = await pool.query(uploadedDocQuery, uniqueUploadedDocIds);
         relevantDocuments.push(...uploadedDocResult.rows);
       }
-    } else {
-      // Fallback to keyword search if embedding generation failed
-      console.log('Falling back to keyword search...');
-      const searchTerms = message.toLowerCase().split(' ').filter(term => {
-        // Keep terms longer than 3 characters
-        if (term.length > 3) return true;
-        
-        // Keep terms that look like document numbers (contain numbers, hyphens, or are alphanumeric)
-        if (/^[a-z0-9\-_]+$/i.test(term)) return true;
-        
-        // Keep single letters that might be important (like "A", "B", "C" in document codes)
-        if (term.length === 1 && /^[a-z]$/i.test(term)) return true;
-        
-        return false;
-      });
+    }
+    
+    // Always run keyword search for document numbers, even if semantic search worked
+    // This ensures we catch exact document number matches that semantic search might miss
+    console.log('Running keyword search for document numbers...');
+    const searchTerms = message.toLowerCase().split(' ').filter(term => {
+      // Keep terms longer than 3 characters
+      if (term.length > 3) return true;
       
-      console.log('Search terms after filtering:', {
-        originalMessage: message,
-        allTerms: message.toLowerCase().split(' '),
-        filteredTerms: searchTerms
-      });
+      // Keep terms that look like document numbers (contain numbers, hyphens, or are alphanumeric)
+      if (/^[a-z0-9\-_]+$/i.test(term)) return true;
       
-      if (searchTerms.length > 0 && veevaDocumentIds.length === 0 && uploadedDocumentIds.length === 0) {
+      // Keep single letters that might be important (like "A", "B", "C" in document codes)
+      if (term.length === 1 && /^[a-z]$/i.test(term)) return true;
+      
+      return false;
+    });
+    
+    console.log('Search terms after filtering:', {
+      originalMessage: message,
+      allTerms: message.toLowerCase().split(' '),
+      filteredTerms: searchTerms
+    });
+    
+    if (searchTerms.length > 0 && veevaDocumentIds.length === 0 && uploadedDocumentIds.length === 0) {
         // Create a search query that looks for terms in document names, summaries, manual summaries, types, and document numbers
         const searchConditions = searchTerms.map((term, index) => 
           `(document_name ILIKE $${index + 1} OR summary ILIKE $${index + 1} OR manual_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1} OR document_number ILIKE $${index + 1})`
@@ -347,7 +349,8 @@ export const handler = async (event) => {
         const searchParams = searchTerms.map(term => `%${term}%`);
         const query = `
           SELECT veeva_document_id, document_number, document_name, 
-                 major_version, minor_version, document_type, status, summary, manual_summary
+                 major_version, minor_version, document_type, status, summary, manual_summary,
+                 'veeva' as source_type
           FROM Veeva_Doc_Chat_document_index 
           WHERE ${searchConditions}
           ORDER BY 
@@ -362,39 +365,47 @@ export const handler = async (event) => {
         `;
         
         const result = await pool.query(query, [...searchParams, searchParams, searchParams, searchParams]);
-        relevantDocuments = result.rows;
+        const keywordSearchDocuments = result.rows;
         
-        console.log(`Found ${relevantDocuments.length} relevant documents based on keyword search`);
-      } else if (documentIds && documentIds.length > 0) {
-        // Get specific documents by IDs
-        const placeholders = documentIds.map((_, index) => `$${index + 1}`).join(',');
-        const query = `
-          SELECT veeva_document_id, document_number, document_name, 
-                 major_version, minor_version, document_type, status, summary, manual_summary
-          FROM Veeva_Doc_Chat_document_index 
-          WHERE veeva_document_id IN (${placeholders})
-          ORDER BY document_name
-        `;
+        console.log(`Found ${keywordSearchDocuments.length} relevant documents based on keyword search`);
         
-        const result = await pool.query(query, documentIds);
-        relevantDocuments = result.rows;
+        // Merge with existing documents from semantic search, avoiding duplicates
+        const existingDocIds = new Set(relevantDocuments.map(doc => doc.veeva_document_id || doc.document_id));
+        const newDocuments = keywordSearchDocuments.filter(doc => !existingDocIds.has(doc.veeva_document_id));
+        relevantDocuments.push(...newDocuments);
         
-        console.log(`Retrieved ${relevantDocuments.length} specific documents for chat`);
-      } else {
-        // If no search terms, get the most recent documents
-        const query = `
-          SELECT veeva_document_id, document_number, document_name, 
-                 major_version, minor_version, document_type, status, summary, manual_summary
-          FROM Veeva_Doc_Chat_document_index 
-          ORDER BY updated_at DESC
-          LIMIT 5
-        `;
-        
-        const result = await pool.query(query);
-        relevantDocuments = result.rows;
-        
-        console.log(`Retrieved ${relevantDocuments.length} recent documents for chat`);
-      }
+        console.log(`Added ${newDocuments.length} new documents from keyword search (${relevantDocuments.length} total)`);
+    } else if (documentIds && documentIds.length > 0) {
+      // Get specific documents by IDs
+      const placeholders = documentIds.map((_, index) => `$${index + 1}`).join(',');
+      const query = `
+        SELECT veeva_document_id, document_number, document_name, 
+               major_version, minor_version, document_type, status, summary, manual_summary,
+               'veeva' as source_type
+        FROM Veeva_Doc_Chat_document_index 
+        WHERE veeva_document_id IN (${placeholders})
+        ORDER BY document_name
+      `;
+      
+      const result = await pool.query(query, documentIds);
+      relevantDocuments = result.rows;
+      
+      console.log(`Retrieved ${relevantDocuments.length} specific documents for chat`);
+    } else if (searchTerms.length === 0) {
+      // If no search terms, get the most recent documents
+      const query = `
+        SELECT veeva_document_id, document_number, document_name, 
+               major_version, minor_version, document_type, status, summary, manual_summary,
+               'veeva' as source_type
+        FROM Veeva_Doc_Chat_document_index 
+        ORDER BY updated_at DESC
+        LIMIT 5
+      `;
+      
+      const result = await pool.query(query);
+      relevantDocuments = result.rows;
+      
+      console.log(`Retrieved ${relevantDocuments.length} recent documents for chat`);
     }
 
     // Search for relevant external resources
@@ -403,7 +414,18 @@ export const handler = async (event) => {
       // Extract keywords from the user message for external resource search
       const keywords = message.toLowerCase()
         .split(/\s+/)
-        .filter(word => word.length > 3) // Filter out short words
+        .filter(word => {
+          // Keep words longer than 3 characters
+          if (word.length > 3) return true;
+          
+          // Keep words that look like document numbers (contain numbers, hyphens, or are alphanumeric)
+          if (/^[a-z0-9\-_]+$/i.test(word)) return true;
+          
+          // Keep single letters that might be important (like "A", "B", "C" in document codes)
+          if (word.length === 1 && /^[a-z]$/i.test(word)) return true;
+          
+          return false;
+        })
         .slice(0, 5); // Take first 5 keywords
       
       if (keywords.length > 0) {
