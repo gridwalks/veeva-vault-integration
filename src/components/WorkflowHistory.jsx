@@ -412,7 +412,7 @@ export default function WorkflowHistory() {
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
         }}>
           <div style={{ marginBottom: '16px' }}>
-            <img src="/copy-icon.svg" alt="Copy" style={{ width: '48px', height: '48px' }} />
+            <img src="/copy-icon.png" alt="Copy" style={{ width: '48px', height: '48px' }} />
           </div>
           <div style={{ fontSize: '14px', marginBottom: '8px' }}>
             {instances.length === 0 ? 'No workflow history yet' : 'No workflows match your filters'}

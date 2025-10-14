@@ -16,7 +16,7 @@ export default function LeftMenu({ currentScreen, onScreenChange, onChatOpen, on
     },
     {
       id: 'workflow-history',
-      icon: '/copy-icon.svg',
+      icon: '/copy-icon.png',
       label: 'Workflow History',
       onClick: () => onWorkflowHistoryOpen && onWorkflowHistoryOpen()
     }
