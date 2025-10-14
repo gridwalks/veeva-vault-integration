@@ -317,9 +317,9 @@ export const handler = async (event) => {
       const searchTerms = message.toLowerCase().split(' ').filter(term => term.length > 3);
       
       if (searchTerms.length > 0 && veevaDocumentIds.length === 0 && uploadedDocumentIds.length === 0) {
-        // Create a search query that looks for terms in document names, summaries, manual summaries, and types
+        // Create a search query that looks for terms in document names, summaries, manual summaries, types, and document numbers
         const searchConditions = searchTerms.map((term, index) => 
-          `(document_name ILIKE $${index + 1} OR summary ILIKE $${index + 1} OR manual_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1})`
+          `(document_name ILIKE $${index + 1} OR summary ILIKE $${index + 1} OR manual_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1} OR document_number ILIKE $${index + 1})`
         ).join(' OR ');
         
         const searchParams = searchTerms.map(term => `%${term}%`);
