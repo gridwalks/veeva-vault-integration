@@ -918,7 +918,41 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                         fontFamily: 'inherit'
                       }}
                     />
-                  )
+                  ),
+                  table: ({ children }) => <table style={{ 
+                    borderCollapse: 'collapse', 
+                    width: '100%', 
+                    margin: '12px 0',
+                    fontFamily: 'inherit',
+                    fontSize: '13px',
+                    backgroundColor: 'white',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    border: '1px solid #e5e7eb'
+                  }}>{children}</table>,
+                  thead: ({ children }) => <thead style={{ backgroundColor: '#f8f9fa' }}>{children}</thead>,
+                  tbody: ({ children }) => <tbody>{children}</tbody>,
+                  th: ({ children }) => <th style={{ 
+                    border: '1px solid #e5e7eb', 
+                    padding: '12px 8px', 
+                    backgroundColor: '#f8f9fa',
+                    fontWeight: '600',
+                    textAlign: 'left',
+                    fontFamily: 'inherit',
+                    fontSize: '12px',
+                    color: '#495057'
+                  }}>{children}</th>,
+                  td: ({ children }) => <td style={{ 
+                    border: '1px solid #e5e7eb', 
+                    padding: '12px 8px',
+                    fontFamily: 'inherit',
+                    fontSize: '12px',
+                    verticalAlign: 'top'
+                  }}>{children}</td>,
+                  tr: ({ children, ...props }) => <tr style={{
+                    '&:nth-child(even)': { backgroundColor: '#f8f9fa' }
+                  }}>{children}</tr>
                 }}
               >
                 {message.content}

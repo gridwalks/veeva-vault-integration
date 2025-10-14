@@ -368,12 +368,13 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                     backgroundColor: 'white',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                     borderRadius: '6px',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    border: '1px solid #e5e7eb'
                   }}>{children}</table>,
                   thead: ({ children }) => <thead style={{ backgroundColor: '#f8f9fa' }}>{children}</thead>,
                   tbody: ({ children }) => <tbody>{children}</tbody>,
                   th: ({ children }) => <th style={{ 
-                    border: '1px solid #dee2e6', 
+                    border: '1px solid #e5e7eb', 
                     padding: '12px 8px', 
                     backgroundColor: '#f8f9fa',
                     fontWeight: '600',
@@ -383,7 +384,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                     color: '#495057'
                   }}>{children}</th>,
                   td: ({ children }) => <td style={{ 
-                    border: '1px solid #dee2e6', 
+                    border: '1px solid #e5e7eb', 
                     padding: '12px 8px',
                     fontFamily: 'inherit',
                     fontSize: '12px',
