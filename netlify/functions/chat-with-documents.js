@@ -403,6 +403,14 @@ export const handler = async (event) => {
           name: doc.document_name,
           source: doc.source_type || 'unknown'
         })));
+        
+        // For documents found by keyword search but not semantic search, 
+        // we need to add their content to the context so the AI can respond about them
+        if (newDocuments.length > 0) {
+          console.log('Adding keyword-only documents to context for AI response...');
+          // These documents will be included in the documentContext via the relevantDocuments array
+          // The AI will use their summaries and metadata to respond
+        }
     } else if (documentIds && documentIds.length > 0) {
       // Get specific documents by IDs
       const placeholders = documentIds.map((_, index) => `$${index + 1}`).join(',');
@@ -537,7 +545,7 @@ export const handler = async (event) => {
     if (relevantChunks.length > 0) {
       // Use RAG approach with semantic chunks
       console.log('Building context from relevant chunks (RAG)');
-      documentContext = relevantChunks.map((chunk, index) => {
+      const chunkContext = relevantChunks.map((chunk, index) => {
         return `**Relevant Section ${index + 1}** from "${chunk.document_name}" (${chunk.document_number} v${chunk.major_version}.${chunk.minor_version})
 Similarity: ${(chunk.similarity * 100).toFixed(1)}%
 
@@ -545,6 +553,44 @@ ${chunk.chunk_text}
 
 ---`;
       }).join('\n\n');
+      
+      // Also include document summaries for any documents that weren't found by semantic search
+      const documentsWithChunks = new Set(relevantChunks.map(c => c.veeva_document_id || c.upload_document_id));
+      const documentsWithoutChunks = relevantDocuments.filter(doc => {
+        const docId = doc.veeva_document_id || doc.document_id;
+        return docId && !documentsWithChunks.has(docId);
+      });
+      
+      if (documentsWithoutChunks.length > 0) {
+        console.log(`Adding ${documentsWithoutChunks.length} documents found by keyword search but not semantic search`);
+        const summaryContext = documentsWithoutChunks.map(doc => {
+          let context = `**${doc.document_name}** (${doc.document_number} v${doc.major_version}.${doc.minor_version})
+Type: ${doc.document_type || 'Unknown'}
+Status: ${doc.status || 'Unknown'}`;
+
+          // Add AI summary if available
+          if (doc.summary) {
+            context += `\nAI Summary: ${doc.summary}`;
+          }
+
+          // Add manual summary if available
+          if (doc.manual_summary) {
+            context += `\nManual Summary: ${doc.manual_summary}`;
+          }
+
+          // If no summaries available
+          if (!doc.summary && !doc.manual_summary) {
+            context += `\nSummary: No summary available`;
+          }
+
+          context += '\n\n---';
+          return context;
+        }).join('\n\n');
+        
+        documentContext = chunkContext + '\n\n' + summaryContext;
+      } else {
+        documentContext = chunkContext;
+      }
     } else if (relevantDocuments.length > 0) {
       // Fallback to document summaries
       console.log('Building context from document summaries (keyword search fallback)');
