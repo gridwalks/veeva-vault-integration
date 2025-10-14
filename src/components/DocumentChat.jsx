@@ -567,7 +567,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               }}
               title="Regenerate response"
             >
-              <img src="/share-icon.png" alt="Regenerate" style={{ width: '16px', height: '16px' }} />
+              <img src="/cycle-icon.png" alt="Regenerate" style={{ width: '16px', height: '16px' }} />
             </button>
 
           </div>
