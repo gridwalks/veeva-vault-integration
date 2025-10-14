@@ -6,7 +6,7 @@ import ChatPromptBox from './ChatPromptBox.jsx';
 import { chatWithDocuments, createQAInteraction, getUploadedDocuments } from '../api';
 import { getSessionId } from '../utils/sessionManager';
 
-export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], onOpenDocumentInPane }) {
+export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], onOpenDocumentInPane, onDocumentsSelected }) {
   const [conversationHistory, setConversationHistory] = useState([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -18,6 +18,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [userId, setUserId] = useState(null);
+  const [notification, setNotification] = useState(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -54,7 +55,21 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     if (files.length === 0) return;
 
     setIsUploading(true);
-    setUploadProgress({ fileName: files[0].name, progress: 0 });
+    
+    // Initialize batch upload progress
+    const batchProgress = {
+      totalFiles: files.length,
+      completedFiles: 0,
+      currentFile: files[0]?.name || '',
+      progress: 0,
+      files: files.map(file => ({
+        name: file.name,
+        size: file.size,
+        status: 'pending', // pending, uploading, success, error
+        error: null
+      }))
+    };
+    setUploadProgress(batchProgress);
 
     try {
       const formData = new FormData();
@@ -64,6 +79,12 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       formData.append('fileCount', files.length.toString());
       formData.append('uploadType', 'chat_upload');
       formData.append('userId', userId);
+
+      // Update progress to show uploading
+      setUploadProgress(prev => ({
+        ...prev,
+        files: prev.files.map(f => ({ ...f, status: 'uploading' }))
+      }));
 
       const response = await fetch('/api/upload-documents', {
         method: 'POST',
@@ -79,23 +100,62 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       if (result.success) {
         // Reload uploaded documents
         await loadUploadedDocuments(userId);
-        setUploadProgress({ fileName: files[0].name, progress: 100, success: true });
         
-        // Auto-select the uploaded documents
+        // Update progress to show success
+        const successCount = result.results.filter(r => r.success).length;
+        setUploadProgress(prev => ({
+          ...prev,
+          completedFiles: successCount,
+          progress: 100,
+          files: prev.files.map((f, index) => ({
+            ...f,
+            status: result.results[index]?.success ? 'success' : 'error',
+            error: result.results[index]?.success ? null : result.results[index]?.error
+          }))
+        }));
+        
+        // Auto-select the uploaded documents for comparison
         const newDocumentIds = result.results
           .filter(r => r.success)
           .map(r => r.documentId);
         
         if (newDocumentIds.length > 0) {
-          // Add to selected documents (this would need to be handled by parent component)
           console.log('Uploaded documents ready for selection:', newDocumentIds);
+          
+          // Get the uploaded documents data for auto-selection
+          const uploadedDocsData = result.results
+            .filter(r => r.success)
+            .map(r => ({
+              id: r.documentId,
+              name: r.documentName || r.fileName,
+              type: r.documentType || 'uploaded_document',
+              source: 'upload'
+            }));
+          
+          // Auto-select uploaded documents if callback is provided
+          if (onDocumentsSelected && uploadedDocsData.length > 0) {
+            onDocumentsSelected(uploadedDocsData);
+            console.log('Auto-selected uploaded documents for comparison:', uploadedDocsData);
+            
+            // Show notification
+            setNotification({
+              type: 'success',
+              message: `✓ ${uploadedDocsData.length} document${uploadedDocsData.length !== 1 ? 's' : ''} uploaded and ready for comparison`
+            });
+            
+            // Clear notification after 3 seconds
+            setTimeout(() => setNotification(null), 3000);
+          }
         }
       } else {
         throw new Error(result.error || 'Upload failed');
       }
     } catch (error) {
       console.error('Upload error:', error);
-      setUploadProgress({ fileName: files[0].name, progress: 0, error: error.message });
+      setUploadProgress(prev => ({
+        ...prev,
+        files: prev.files.map(f => ({ ...f, status: 'error', error: error.message }))
+      }));
     } finally {
       setIsUploading(false);
       // Clear file input
@@ -901,6 +961,36 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
             </div>
           )}
 
+          {/* Notification */}
+          {notification && (
+            <div style={{
+              padding: '12px 20px',
+              backgroundColor: notification.type === 'success' ? '#d4edda' : '#f8d7da',
+              color: notification.type === 'success' ? '#155724' : '#721c24',
+              borderTop: `1px solid ${notification.type === 'success' ? '#c3e6cb' : '#f5c6cb'}`,
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <span>{notification.message}</span>
+              <button
+                onClick={() => setNotification(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '18px',
+                  cursor: 'pointer',
+                  color: 'inherit',
+                  opacity: 0.7
+                }}
+                title="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
           {/* Input */}
           <div className="p-4">
             <ChatPromptBox
@@ -909,18 +999,65 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               disabled={isLoading}
             />
             
-            {/* Upload Progress Display */}
-            {uploadProgress && (
-              <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
-                {uploadProgress.success ? (
-                  <span style={{ color: '#10b981' }}>✓ {uploadProgress.fileName} uploaded</span>
-                ) : uploadProgress.error ? (
-                  <span style={{ color: '#ef4444' }}>✗ {uploadProgress.error}</span>
-                ) : (
-                  <span>Uploading {uploadProgress.fileName}...</span>
-                )}
-              </div>
-            )}
+             {/* Upload Progress Display */}
+             {uploadProgress && (
+               <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
+                 {uploadProgress.files ? (
+                   // Batch upload progress
+                   <div className="space-y-2">
+                     <div className="flex items-center justify-between">
+                       <span>
+                         {uploadProgress.completedFiles > 0 ? '✓' : '⟳'} 
+                         Uploading {uploadProgress.completedFiles} of {uploadProgress.totalFiles} files...
+                       </span>
+                       <span>{uploadProgress.progress}%</span>
+                     </div>
+                     
+                     {/* Progress bar */}
+                     <div className="w-full bg-gray-200 rounded-full h-2">
+                       <div 
+                         className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                         style={{ width: `${uploadProgress.progress}%` }}
+                       ></div>
+                     </div>
+                     
+                     {/* Individual file status */}
+                     <div className="space-y-1 max-h-20 overflow-y-auto">
+                       {uploadProgress.files.map((file, index) => (
+                         <div key={index} className="flex items-center gap-2 text-xs">
+                           <span className="w-4">
+                             {file.status === 'success' ? '✓' : 
+                              file.status === 'error' ? '✗' : 
+                              file.status === 'uploading' ? '⟳' : '⏳'}
+                           </span>
+                           <span className={`flex-1 truncate ${
+                             file.status === 'success' ? 'text-green-600' :
+                             file.status === 'error' ? 'text-red-600' :
+                             file.status === 'uploading' ? 'text-blue-600' : 'text-gray-500'
+                           }`}>
+                             {file.name}
+                           </span>
+                           {file.error && (
+                             <span className="text-red-500 text-xs" title={file.error}>
+                               Error
+                             </span>
+                           )}
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+                 ) : (
+                   // Legacy single file progress
+                   uploadProgress.success ? (
+                     <span style={{ color: '#10b981' }}>✓ {uploadProgress.fileName} uploaded</span>
+                   ) : uploadProgress.error ? (
+                     <span style={{ color: '#ef4444' }}>✗ {uploadProgress.error}</span>
+                   ) : (
+                     <span>Uploading {uploadProgress.fileName}...</span>
+                   )
+                 )}
+               </div>
+             )}
           </div>
         </div>
       </div>
