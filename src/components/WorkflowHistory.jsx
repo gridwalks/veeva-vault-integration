@@ -219,7 +219,7 @@ export default function WorkflowHistory() {
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}
         >
-          {loading ? 'Refreshing...' : '🔄 Refresh'}
+          {loading ? 'Refreshing...' : <><img src="/share-icon.png" alt="Refresh" style={{ width: '16px', height: '16px', marginRight: '8px' }} />Refresh</>}
         </button>
       </div>
 

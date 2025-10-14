@@ -477,7 +477,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               }}
               title="Like this response"
             >
-              <span style={{ fontSize: '16px' }}>👍</span>
+              <img src="/like-icon.png" alt="Like" style={{ width: '16px', height: '16px' }} />
               Like
             </button>
 
@@ -508,7 +508,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               }}
               title="Dislike this response"
             >
-              <span style={{ fontSize: '16px' }}>👎</span>
+              <img src="/dislike-icon.png" alt="Dislike" style={{ width: '16px', height: '16px' }} />
               Dislike
             </button>
 
@@ -539,7 +539,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               }}
               title="Share response"
             >
-              <span style={{ fontSize: '16px' }}>📤</span>
+              <img src="/share-icon.png" alt="Share" style={{ width: '16px', height: '16px' }} />
               Share
             </button>
 
@@ -570,7 +570,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               }}
               title="Regenerate response"
             >
-              <span style={{ fontSize: '16px' }}>🔄</span>
+              <img src="/share-icon.png" alt="Regenerate" style={{ width: '16px', height: '16px' }} />
               Regenerate
             </button>
 

@@ -1004,7 +1004,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               }}
               title="Like this response"
             >
-              <span style={{ fontSize: '16px' }}>👍</span>
+              <img src="/like-icon.png" alt="Like" style={{ width: '16px', height: '16px' }} />
               Like
             </button>
 
@@ -1035,7 +1035,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               }}
               title="Dislike this response"
             >
-              <span style={{ fontSize: '16px' }}>👎</span>
+              <img src="/dislike-icon.png" alt="Dislike" style={{ width: '16px', height: '16px' }} />
               Dislike
             </button>
 
@@ -1066,7 +1066,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               }}
               title="Share response"
             >
-              <span style={{ fontSize: '16px' }}>📤</span>
+              <img src="/share-icon.png" alt="Share" style={{ width: '16px', height: '16px' }} />
               Share
             </button>
 
@@ -1097,7 +1097,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               }}
               title="Regenerate response"
             >
-              <span style={{ fontSize: '16px' }}>🔄</span>
+              <img src="/share-icon.png" alt="Regenerate" style={{ width: '16px', height: '16px' }} />
               Regenerate
             </button>
 
@@ -1427,7 +1427,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                     display: 'inline-block',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                   }}>
-                    🔄 {workflowState.template.name} - Step {workflowState.currentStep?.stepOrder || 1}
+                    <img src="/share-icon.png" alt="Workflow" style={{ width: '16px', height: '16px', marginRight: '8px' }} />{workflowState.template.name} - Step {workflowState.currentStep?.stepOrder || 1}
                   </div>
                 )}
               </div>
