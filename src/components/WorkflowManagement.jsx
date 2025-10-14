@@ -1270,7 +1270,7 @@ export default function WorkflowManagement() {
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}>
               <div style={{ marginBottom: '12px' }}>
-                <img src="/assets/copy-icon.svg" alt="Copy" style={{ width: '32px', height: '32px' }} />
+                <img src="/copy-icon.svg" alt="Copy" style={{ width: '32px', height: '32px' }} />
               </div>
               <p style={{ margin: '0', fontSize: '14px' }}>No workflow templates created yet</p>
             </div>

@@ -973,7 +973,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
               }}
               title="Copy response"
             >
-              <img src="/assets/copy-icon.svg" alt="Copy" style={{ width: '16px', height: '16px' }} />
+              <img src="/copy-icon.svg" alt="Copy" style={{ width: '16px', height: '16px' }} />
               Copy
             </button>
 
