@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import DocumentViewer from './DocumentViewer.jsx';
+import ChatPromptBox from './ChatPromptBox.jsx';
 import { chatWithDocuments, createQAInteraction, getUploadedDocuments } from '../api';
 import { getSessionId } from '../utils/sessionManager';
 
@@ -115,13 +116,18 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversationHistory, isLoading]);
 
-  const sendMessage = async () => {
-    if (!currentMessage.trim() || isLoading) return;
+  const sendMessage = async (message, file = null) => {
+    if (!message.trim() || isLoading) return;
 
-    const userMessage = currentMessage.trim();
+    const userMessage = message.trim();
     setCurrentMessage('');
     setIsLoading(true);
     setError(null);
+
+    // Handle file upload if file is provided
+    if (file) {
+      await handleFileUpload({ target: { files: [file] } });
+    }
 
     // Add user message to conversation
     const newHistory = [...conversationHistory, { role: 'user', content: userMessage }];
@@ -168,8 +174,12 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      sendMessage(currentMessage);
     }
+  };
+
+  const handleChatPromptSend = ({ message, file }) => {
+    sendMessage(message, file);
   };
 
   const clearConversation = () => {
@@ -894,97 +904,24 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
             borderTop: '1px solid #eee',
             backgroundColor: '#f8f9fa'
           }}>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <textarea
-                ref={inputRef}
-                value={currentMessage}
-                onChange={(e) => setCurrentMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Ask a question about your documents..."
-                disabled={isLoading}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  resize: 'none',
-                  fontSize: '13px',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  minHeight: '44px',
-                  maxHeight: '120px'
-                }}
-                rows={1}
-              />
-              <button
-                onClick={sendMessage}
-                disabled={!currentMessage.trim() || isLoading}
-                style={{
-                  padding: '12px 20px',
-                  backgroundColor: (!currentMessage.trim() || isLoading) ? '#ccc' : '#007bff',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: (!currentMessage.trim() || isLoading) ? 'not-allowed' : 'pointer',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  minWidth: '80px'
-                }}
-              >
-                {isLoading ? '...' : 'Send'}
-              </button>
-            </div>
+            <ChatPromptBox
+              onSend={handleChatPromptSend}
+              placeholder="Ask a question about your documents..."
+              disabled={isLoading}
+            />
             
-            {/* Upload Section */}
-            <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                onClick={triggerFileUpload}
-                disabled={isUploading}
-                style={{
-                  padding: '6px 12px',
-                  backgroundColor: isUploading ? '#f3f4f6' : '#f8f9fa',
-                  color: isUploading ? '#9ca3af' : '#374151',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  cursor: isUploading ? 'not-allowed' : 'pointer',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                📎 Upload Document
-              </button>
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept=".pdf,.doc,.docx,.txt,.csv"
-                onChange={handleFileUpload}
-                style={{ display: 'none' }}
-              />
-              
-              {uploadProgress && (
-                <div style={{ fontSize: '12px', color: '#666' }}>
-                  {uploadProgress.success ? (
-                    <span style={{ color: '#10b981' }}>✓ {uploadProgress.fileName} uploaded</span>
-                  ) : uploadProgress.error ? (
-                    <span style={{ color: '#ef4444' }}>✗ {uploadProgress.error}</span>
-                  ) : (
-                    <span>Uploading {uploadProgress.fileName}...</span>
-                  )}
-                </div>
-              )}
-            </div>
-            <div style={{
-              marginTop: '8px',
-              fontSize: '12px',
-              color: '#666',
-              textAlign: 'center'
-            }}>
-              Press Enter to send, Shift+Enter for new line
-            </div>
+            {/* Upload Progress Display */}
+            {uploadProgress && (
+              <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
+                {uploadProgress.success ? (
+                  <span style={{ color: '#10b981' }}>✓ {uploadProgress.fileName} uploaded</span>
+                ) : uploadProgress.error ? (
+                  <span style={{ color: '#ef4444' }}>✗ {uploadProgress.error}</span>
+                ) : (
+                  <span>Uploading {uploadProgress.fileName}...</span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

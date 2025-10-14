@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import DocumentViewer from './DocumentViewer.jsx';
+import ChatPromptBox from './ChatPromptBox.jsx';
 import { createQAInteraction, getUploadedDocuments, downloadUploadedDocumentUrl } from '../api';
 
 export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane, userId }) {
@@ -127,13 +128,18 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     }
   };
 
-  const sendMessage = async () => {
-    if (!currentMessage.trim() || isLoading) return;
+  const sendMessage = async (message, file = null) => {
+    if (!message.trim() || isLoading) return;
 
-    const userMessage = currentMessage.trim();
+    const userMessage = message.trim();
     setCurrentMessage('');
     setIsLoading(true);
     setError(null);
+
+    // Handle file upload if file is provided
+    if (file) {
+      await handleFileUpload({ target: { files: [file] } });
+    }
 
     // Add user message to conversation
     const newHistory = [...conversationHistory, { role: 'user', content: userMessage }];
@@ -360,8 +366,12 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      sendMessage(currentMessage);
     }
+  };
+
+  const handleChatPromptSend = ({ message, file }) => {
+    sendMessage(message, file);
   };
 
   const clearConversation = () => {
@@ -1778,135 +1788,24 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
           borderBottomLeftRadius: '8px',
           borderBottomRightRadius: '8px'
         }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <textarea
-              ref={inputRef}
-              value={currentMessage}
-              onChange={(e) => setCurrentMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#4338ca';
-                e.target.style.boxShadow = '0 0 0 2px rgba(67, 56, 202, 0.1)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
-                e.target.style.boxShadow = 'none';
-              }}
-              placeholder={workflowState.isActive ? "Answer the workflow question above..." : "Ask a question about your documents..."}
-              disabled={isLoading}
-              style={{
-                flex: 1,
-                padding: '8px 10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                resize: 'none',
-                fontSize: '13px',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                minHeight: '36px',
-                maxHeight: '100px',
-                backgroundColor: '#ffffff',
-                color: '#374151',
-                outline: 'none',
-                transition: 'border-color 0.2s ease'
-              }}
-              rows={1}
-            />
-            <button
-              onClick={sendMessage}
-              disabled={!currentMessage.trim() || isLoading}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: (!currentMessage.trim() || isLoading) ? '#9ca3af' : '#4338ca',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: (!currentMessage.trim() || isLoading) ? 'not-allowed' : 'pointer',
-                fontSize: '13px',
-                fontWeight: '500',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                minWidth: '70px',
-                transition: 'background-color 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                if (currentMessage.trim() && !isLoading) {
-                  e.target.style.backgroundColor = '#312e81';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (currentMessage.trim() && !isLoading) {
-                  e.target.style.backgroundColor = '#4338ca';
-                }
-              }}
-            >
-              {isLoading ? '...' : 'Send'}
-            </button>
-          </div>
+          <ChatPromptBox
+            onSend={handleChatPromptSend}
+            placeholder={workflowState.isActive ? "Answer the workflow question above..." : "Ask a question about your documents..."}
+            disabled={isLoading}
+          />
           
-          {/* Upload Section */}
-          <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              onClick={triggerFileUpload}
-              disabled={isUploading}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: isUploading ? '#f3f4f6' : '#e5e7eb',
-                color: isUploading ? '#9ca3af' : '#374151',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                cursor: isUploading ? 'not-allowed' : 'pointer',
-                fontSize: '11px',
-                fontWeight: '500',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                transition: 'background-color 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                if (!isUploading) {
-                  e.target.style.backgroundColor = '#d1d5db';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isUploading) {
-                  e.target.style.backgroundColor = '#e5e7eb';
-                }
-              }}
-            >
-              📎 Upload Document
-            </button>
-            
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".pdf,.doc,.docx,.txt,.csv"
-              onChange={handleFileUpload}
-              style={{ display: 'none' }}
-            />
-            
-            {uploadProgress && (
-              <div style={{ fontSize: '11px', color: '#6b7280' }}>
-                {uploadProgress.success ? (
-                  <span style={{ color: '#10b981' }}>✓ {uploadProgress.fileName} uploaded</span>
-                ) : uploadProgress.error ? (
-                  <span style={{ color: '#ef4444' }}>✗ {uploadProgress.error}</span>
-                ) : (
-                  <span>Uploading {uploadProgress.fileName}...</span>
-                )}
-              </div>
-            )}
-          </div>
-          
-          <div style={{
-            marginTop: '4px',
-            fontSize: '10px',
-            color: '#6b7280',
-            textAlign: 'center',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          }}>
-            Press Enter to send, Shift+Enter for new line
-          </div>
+          {/* Upload Progress Display */}
+          {uploadProgress && (
+            <div style={{ marginTop: '8px', fontSize: '11px', color: '#6b7280' }}>
+              {uploadProgress.success ? (
+                <span style={{ color: '#10b981' }}>✓ {uploadProgress.fileName} uploaded</span>
+              ) : uploadProgress.error ? (
+                <span style={{ color: '#ef4444' }}>✗ {uploadProgress.error}</span>
+              ) : (
+                <span>Uploading {uploadProgress.fileName}...</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
