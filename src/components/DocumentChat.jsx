@@ -446,7 +446,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               }}
               title="Copy response"
             >
-              <span style={{ fontSize: '16px' }}>📋</span>
+              <img src="/assets/copy-icon.svg" alt="Copy" style={{ width: '16px', height: '16px' }} />
               Copy
             </button>
 

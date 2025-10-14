@@ -16,7 +16,7 @@ export default function LeftMenu({ currentScreen, onScreenChange, onChatOpen, on
     },
     {
       id: 'workflow-history',
-      icon: '📋',
+      icon: '/assets/copy-icon.svg',
       label: 'Workflow History',
       onClick: () => onWorkflowHistoryOpen && onWorkflowHistoryOpen()
     }
@@ -105,7 +105,11 @@ export default function LeftMenu({ currentScreen, onScreenChange, onChatOpen, on
                 }
               }}
             >
-              <span style={{ fontSize: '16px' }}>{item.icon}</span>
+              {item.icon.startsWith('/') ? (
+                <img src={item.icon} alt={item.label} style={{ width: '16px', height: '16px' }} />
+              ) : (
+                <span style={{ fontSize: '16px' }}>{item.icon}</span>
+              )}
               <span>{item.label}</span>
             </button>
           );
