@@ -116,7 +116,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversationHistory, isLoading]);
 
-  const sendMessage = async (message, file = null) => {
+  const sendMessage = async (message, files = []) => {
     if (!message.trim() || isLoading) return;
 
     const userMessage = message.trim();
@@ -124,9 +124,9 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     setIsLoading(true);
     setError(null);
 
-    // Handle file upload if file is provided
-    if (file) {
-      await handleFileUpload({ target: { files: [file] } });
+    // Handle file upload if files are provided
+    if (files && files.length > 0) {
+      await handleFileUpload({ target: { files } });
     }
 
     // Add user message to conversation
@@ -178,8 +178,8 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     }
   };
 
-  const handleChatPromptSend = ({ message, file }) => {
-    sendMessage(message, file);
+  const handleChatPromptSend = ({ message, files }) => {
+    sendMessage(message, files);
   };
 
   const clearConversation = () => {

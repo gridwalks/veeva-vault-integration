@@ -7,7 +7,7 @@ export default function ChatPromptBox({
   className = ""
 }) {
   const [message, setMessage] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -27,25 +27,25 @@ export default function ChatPromptBox({
   };
 
   const handleSend = () => {
-    if (!message.trim() && !selectedFile) return;
+    if (!message.trim() && selectedFiles.length === 0) return;
     
     onSend({ 
       message: message.trim(), 
-      file: selectedFile 
+      files: selectedFiles 
     });
     
     // Reset form
     setMessage('');
-    setSelectedFile(null);
+    setSelectedFiles([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
   const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+      setSelectedFiles(prevFiles => [...prevFiles, ...files]);
     }
   };
 
@@ -55,14 +55,48 @@ export default function ChatPromptBox({
     }
   };
 
-  const removeFile = () => {
-    setSelectedFile(null);
+  const removeFile = (indexToRemove) => {
+    setSelectedFiles(prevFiles => prevFiles.filter((_, index) => index !== indexToRemove));
+  };
+
+  const clearAllFiles = () => {
+    setSelectedFiles([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const isEnabled = message.trim() || selectedFile;
+  const isEnabled = message.trim() || selectedFiles.length > 0;
+
+  // Helper functions for file display
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const getFileIcon = (fileName) => {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'pdf':
+        return '📄';
+      case 'doc':
+      case 'docx':
+        return '📝';
+      case 'txt':
+        return '📃';
+      case 'csv':
+        return '📊';
+      default:
+        return '📎';
+    }
+  };
+
+  const getTotalSize = () => {
+    return selectedFiles.reduce((total, file) => total + file.size, 0);
+  };
 
   return (
     <div className={`${className}`}>
@@ -113,30 +147,59 @@ export default function ChatPromptBox({
       <input
         ref={fileInputRef}
         type="file"
+        multiple
         accept=".pdf,.doc,.docx,.txt,.csv"
         onChange={handleFileSelect}
         className="hidden"
       />
 
-      {/* Selected file display */}
-      {selectedFile && (
-        <div className="mt-2 flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <span className="text-xs text-gray-700 flex-1 truncate">
-            {selectedFile.name}
-          </span>
-          <button
-            type="button"
-            onClick={removeFile}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-            title="Remove file"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+      {/* Selected files display */}
+      {selectedFiles.length > 0 && (
+        <div className="mt-2 space-y-2">
+          {/* File count and total size header */}
+          <div className="flex items-center justify-between text-xs text-gray-600">
+            <span className="flex items-center gap-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+              </svg>
+              {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected ({formatFileSize(getTotalSize())})
+            </span>
+            {selectedFiles.length > 1 && (
+              <button
+                type="button"
+                onClick={clearAllFiles}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                title="Clear all files"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+          
+          {/* Individual file list */}
+          <div className="max-h-32 overflow-y-auto space-y-1">
+            {selectedFiles.map((file, index) => (
+              <div key={`${file.name}-${index}`} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                <span className="text-sm">{getFileIcon(file.name)}</span>
+                <span className="text-xs text-gray-700 flex-1 truncate">
+                  {file.name}
+                </span>
+                <span className="text-xs text-gray-500">
+                  {formatFileSize(file.size)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeFile(index)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  title="Remove file"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
