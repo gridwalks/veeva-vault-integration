@@ -1,8 +1,13 @@
 import { getPool, initDatabase } from "./db.js";
 import OpenAI from "openai";
+import Groq from "groq-sdk";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+});
+
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
 });
 
 // Helper function to handle CORS
@@ -222,8 +227,8 @@ async function detectWorkflow(pool, requestBody) {
         const workflowNames = templates.map(t => t.name).join(', ');
         const workflowDescriptions = templates.map(t => `${t.name}: ${t.description}`).join('\n');
         
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4",
+        const completion = await groq.chat.completions.create({
+          model: "openai/gpt-oss-20b",
           messages: [
             {
               role: "system",
@@ -481,13 +486,13 @@ Output ONLY the synthesized text, without any preamble or meta-commentary.`;
 
     const userPrompt = `Please synthesize the following question-and-answer pairs:\n\n${qaContext}`;
 
-    console.log('Sending to OpenAI for synthesis...');
+    console.log('Sending to Groq for synthesis...');
     console.log('System prompt length:', systemPrompt.length);
     console.log('User prompt length:', userPrompt.length);
 
-    // Call OpenAI API
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+    // Call Groq API
+    const completion = await groq.chat.completions.create({
+      model: "openai/gpt-oss-20b",
       messages: [
         {
           role: "system",
@@ -856,8 +861,8 @@ async function completeWorkflow(pool, requestBody) {
         // Run both AI calls in parallel to reduce execution time
         const [aiResponse, summaryResponse] = await Promise.all([
         // First call: Polish the document
-        openai.chat.completions.create({
-          model: "gpt-3.5-turbo",
+        groq.chat.completions.create({
+          model: "openai/gpt-oss-20b",
           messages: [
             {
               role: "system",
@@ -882,8 +887,8 @@ Return ONLY the improved document text, without any explanations or comments.`
         }),
         
         // Second call: Generate improvement suggestions (based on original document structure)
-        openai.chat.completions.create({
-          model: "gpt-3.5-turbo",
+        groq.chat.completions.create({
+          model: "openai/gpt-oss-20b",
           messages: [
             {
               role: "system",
@@ -1037,8 +1042,8 @@ async function repolishWorkflowDocument(pool, requestBody) {
       
       const [aiResponse, summaryResponse] = await Promise.all([
         // Polish the edited document
-        openai.chat.completions.create({
-          model: "gpt-3.5-turbo",
+        groq.chat.completions.create({
+          model: "openai/gpt-oss-20b",
           messages: [
             {
               role: "system",
@@ -1063,8 +1068,8 @@ Return ONLY the improved document text, without any explanations or comments.`
         }),
         
         // Generate improvement suggestions
-        openai.chat.completions.create({
-          model: "gpt-3.5-turbo",
+        groq.chat.completions.create({
+          model: "openai/gpt-oss-20b",
           messages: [
             {
               role: "system",
@@ -1195,8 +1200,8 @@ async function refineWorkflowDocument(pool, requestBody) {
       
       const [aiResponse, summaryResponse] = await Promise.all([
         // Refine the document based on user instructions
-        openai.chat.completions.create({
-          model: "gpt-3.5-turbo",
+        groq.chat.completions.create({
+          model: "openai/gpt-oss-20b",
           messages: [
             {
               role: "system",
@@ -1222,8 +1227,8 @@ Please refine the document according to these instructions and return ONLY the i
         }),
         
         // Generate improvement summary
-        openai.chat.completions.create({
-          model: "gpt-3.5-turbo",
+        groq.chat.completions.create({
+          model: "openai/gpt-oss-20b",
           messages: [
             {
               role: "system",

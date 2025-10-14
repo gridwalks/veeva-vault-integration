@@ -1,6 +1,7 @@
 import { getSessionId } from "./vault-auth.js";
 import { getPool, initDatabase } from "./db.js";
 import OpenAI from 'openai';
+import Groq from 'groq-sdk';
 import mammoth from 'mammoth';
 import { parseDocument } from 'docx-parser';
 import { chunkText, validateChunks, generateChunkPreview } from './chunking-utils.js';
@@ -64,6 +65,10 @@ function ensureFilenameHasExtension(fileName, contentType = '') {
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+});
+
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
 });
 
 function looksLikeDocxBuffer(buffer) {
@@ -831,8 +836,8 @@ export const handler = async (event) => {
                     });
                     const openaiStartTime = Date.now();
                     
-                    const completion = await openai.chat.completions.create({
-                      model: "gpt-3.5-turbo",
+                    const completion = await groq.chat.completions.create({
+                      model: "openai/gpt-oss-20b",
                       messages: [
                         {
                           role: "system",
@@ -863,15 +868,15 @@ ${documentText.substring(0, 4000)}`
                       temperature: 0.2,
                     });
 
-                    const openaiDuration = Date.now() - openaiStartTime;
+                    const groqDuration = Date.now() - openaiStartTime;
                     updatedSummary = completion.choices[0]?.message?.content || null;
-                    console.log(`OpenAI API response received for document: ${doc.id}`, {
-                      responseTime: `${openaiDuration}ms`,
+                    console.log(`Groq API response received for document: ${doc.id}`, {
+                      responseTime: `${groqDuration}ms`,
                       summaryLength: updatedSummary?.length || 0,
                       tokensUsed: completion.usage?.total_tokens || 0,
                       promptTokens: completion.usage?.prompt_tokens || 0,
                       completionTokens: completion.usage?.completion_tokens || 0,
-                      totalProcessingTime: extractionDuration + openaiDuration,
+                      totalProcessingTime: extractionDuration + groqDuration,
                       summaryPreview: updatedSummary ? updatedSummary.substring(0, 150) + '...' : 'No summary'
                     });
                     
@@ -1186,8 +1191,8 @@ ${documentText.substring(0, 4000)}`
                 });
                 const openaiStartTime = Date.now();
                 
-                const completion = await openai.chat.completions.create({
-                  model: "gpt-3.5-turbo",
+                const completion = await groq.chat.completions.create({
+                  model: "openai/gpt-oss-20b",
                   messages: [
                     {
                       role: "system",
@@ -1218,15 +1223,15 @@ ${documentText.substring(0, 4000)}`
                   temperature: 0.2,
                 });
 
-                const openaiDuration = Date.now() - openaiStartTime;
+                const groqDuration = Date.now() - openaiStartTime;
                 summary = completion.choices[0]?.message?.content || null;
-                console.log(`OpenAI API response received for new document: ${doc.id}`, {
-                  responseTime: `${openaiDuration}ms`,
+                console.log(`Groq API response received for new document: ${doc.id}`, {
+                  responseTime: `${groqDuration}ms`,
                   summaryLength: summary?.length || 0,
                   tokensUsed: completion.usage?.total_tokens || 0,
                   promptTokens: completion.usage?.prompt_tokens || 0,
                   completionTokens: completion.usage?.completion_tokens || 0,
-                  totalProcessingTime: extractionDuration + openaiDuration,
+                  totalProcessingTime: extractionDuration + groqDuration,
                   summaryPreview: summary ? summary.substring(0, 150) + '...' : 'No summary'
                 });
                 
@@ -1252,8 +1257,8 @@ ${documentText.substring(0, 4000)}`
                       extractionMethod: 'fallback_plain_text'
                     });
                     
-                    const completion = await openai.chat.completions.create({
-                      model: "gpt-3.5-turbo",
+                    const completion = await groq.chat.completions.create({
+                      model: "openai/gpt-oss-20b",
                       messages: [
                         {
                           role: "system",
@@ -1285,7 +1290,7 @@ ${fallbackText.substring(0, 4000)}`
                     });
 
                     summary = completion.choices[0]?.message?.content || null;
-                    console.log(`OpenAI API response received for fallback document: ${doc.id}`, {
+                    console.log(`Groq API response received for fallback document: ${doc.id}`, {
                       summaryLength: summary?.length || 0,
                       tokensUsed: completion.usage?.total_tokens || 0,
                       promptTokens: completion.usage?.prompt_tokens || 0,

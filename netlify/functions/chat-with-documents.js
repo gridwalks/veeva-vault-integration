@@ -1,8 +1,13 @@
 import { getPool, initDatabase } from "./db.js";
 import OpenAI from "openai";
+import Groq from "groq-sdk";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+});
+
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
 });
 
 // Function to detect comparison intent in user messages
@@ -314,7 +319,24 @@ export const handler = async (event) => {
     } else {
       // Fallback to keyword search if embedding generation failed
       console.log('Falling back to keyword search...');
-      const searchTerms = message.toLowerCase().split(' ').filter(term => term.length > 3);
+      const searchTerms = message.toLowerCase().split(' ').filter(term => {
+        // Keep terms longer than 3 characters
+        if (term.length > 3) return true;
+        
+        // Keep terms that look like document numbers (contain numbers, hyphens, or are alphanumeric)
+        if (/^[a-z0-9\-_]+$/i.test(term)) return true;
+        
+        // Keep single letters that might be important (like "A", "B", "C" in document codes)
+        if (term.length === 1 && /^[a-z]$/i.test(term)) return true;
+        
+        return false;
+      });
+      
+      console.log('Search terms after filtering:', {
+        originalMessage: message,
+        allTerms: message.toLowerCase().split(' '),
+        filteredTerms: searchTerms
+      });
       
       if (searchTerms.length > 0 && veevaDocumentIds.length === 0 && uploadedDocumentIds.length === 0) {
         // Create a search query that looks for terms in document names, summaries, manual summaries, types, and document numbers
@@ -609,20 +631,20 @@ ${externalResourcesContext}`;
       vectorSearchFailed
     });
 
-    // Call OpenAI API
-    const openaiStartTime = Date.now();
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+    // Call Groq API
+    const groqStartTime = Date.now();
+    const completion = await groq.chat.completions.create({
+      model: "openai/gpt-oss-20b",
       messages: messages,
       max_tokens: 800,
       temperature: 0.3,
     });
 
-    const openaiDuration = Date.now() - openaiStartTime;
+    const groqDuration = Date.now() - groqStartTime;
     const response = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
 
-    console.log('OpenAI response received:', {
-      responseTime: `${openaiDuration}ms`,
+    console.log('Groq response received:', {
+      responseTime: `${groqDuration}ms`,
       responseLength: response.length,
       responsePreview: response.substring(0, 200) + (response.length > 200 ? '...' : ''),
       tokensUsed: completion.usage?.total_tokens || 0,
@@ -702,7 +724,7 @@ ${externalResourcesContext}`;
           chunksUsed: relevantChunks.length,
           externalResourcesUsed: relevantExternalResources.length,
           usingRAG: relevantChunks.length > 0,
-          responseTime: openaiDuration,
+          responseTime: groqDuration,
           tokensUsed: completion.usage?.total_tokens || 0,
           isComparisonQuery: isComparisonQuery
         }
@@ -725,8 +747,8 @@ ${externalResourcesContext}`;
     let userMessage = "Failed to process chat request";
     let details = error.message;
 
-    if (error.message && error.message.includes('OpenAI')) {
-      userMessage = "Failed to connect to OpenAI API. Please check your API key configuration.";
+    if (error.message && (error.message.includes('OpenAI') || error.message.includes('Groq'))) {
+      userMessage = "Failed to connect to AI API. Please check your API key configuration.";
     } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
       userMessage = "Failed to connect to the database. Please check your database configuration.";
     } else if (error.message && error.message.includes('vector')) {
