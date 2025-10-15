@@ -152,15 +152,18 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     try {
       const allDocumentIds = [
         ...selectedDocuments.map(doc => doc.veeva_document_id),
-        ...attachedDocuments.map(doc => doc.id)
+        ...attachedDocuments.map(doc => doc.id),
+        ...newUploadedDocumentIds.map(id => `uploaded_${id}`)
       ];
       
       console.log('Sending chat request with document IDs:', {
         selectedDocuments: selectedDocuments.map(doc => doc.veeva_document_id),
         attachedDocuments: attachedDocuments.map(doc => doc.id),
+        newUploadedDocumentIds: newUploadedDocumentIds.map(id => `uploaded_${id}`),
         allDocumentIds,
         message: userMessage.substring(0, 100) + '...',
         attachedDocumentsLength: attachedDocuments.length,
+        newUploadedLength: newUploadedDocumentIds.length,
         selectedDocumentsLength: selectedDocuments.length
       });
       

@@ -191,10 +191,11 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
 
     try {
       // Proceed with normal chat (will detect workflow after answering)
-      // Combine Veeva document IDs and attached document IDs
+      // Combine Veeva document IDs and attached document IDs (including newly uploaded ones)
       const veevaDocIds = selectedDocuments.map(doc => doc.veeva_document_id);
       const attachedDocIds = attachedDocuments.map(doc => doc.id);
-      const allDocumentIds = [...veevaDocIds, ...attachedDocIds];
+      const newUploadedDocIds = newUploadedDocumentIds.map(id => `uploaded_${id}`);
+      const allDocumentIds = [...veevaDocIds, ...attachedDocIds, ...newUploadedDocIds];
       
       // Check if user is asking for comparison but hasn't selected any documents
       const isComparisonQuery = userMessage.toLowerCase().includes('compare') || 
@@ -237,6 +238,8 @@ The documents will be automatically included in the comparison analysis.
         message: userMessage,
         documentIds: requestBody.documentIds,
         selectedDocumentsCount: selectedDocuments.length,
+        attachedDocumentsCount: attachedDocuments.length,
+        newUploadedCount: newUploadedDocumentIds.length,
         conversationHistoryLength: newHistory.length
       });
       
