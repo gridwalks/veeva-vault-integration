@@ -191,6 +191,34 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       const uploadedDocIds = selectedUploadedDocs.map(id => `uploaded_${id}`);
       const allDocumentIds = [...veevaDocIds, ...uploadedDocIds];
       
+      // Check if user is asking for comparison but hasn't selected any documents
+      const isComparisonQuery = userMessage.toLowerCase().includes('compare') || 
+                               userMessage.toLowerCase().includes('comparison') ||
+                               userMessage.toLowerCase().includes('review') ||
+                               userMessage.toLowerCase().includes('errors based on');
+      
+      if (isComparisonQuery && allDocumentIds.length === 0) {
+        // Add a helpful message about selecting documents
+        const helpfulMessage = {
+          role: 'assistant',
+          content: `I'd be happy to help you compare documents! However, I don't see any documents selected for comparison.
+
+**To compare documents, please:**
+
+1. **Click the + button** (📎) next to the text input to attach your files, OR
+2. **Select from uploaded documents** using the "Uploaded Documents" panel on the right
+3. **Type your comparison question** and click send
+
+The documents will be automatically included in the comparison analysis.
+
+**Supported file types:** PDF, DOC, DOCX, TXT, CSV`
+        };
+        
+        setConversationHistory(prev => [...prev, helpfulMessage]);
+        setIsLoading(false);
+        return;
+      }
+      
       const requestBody = {
         message: userMessage,
         documentIds: allDocumentIds,
@@ -1449,6 +1477,55 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                 }}>
                   Document Chat Agent
                 </h3>
+                {selectedDocuments.length > 0 ? (
+                  <p style={{ 
+                    margin: '2px 0 0 0', 
+                    fontSize: '11px', 
+                    color: '#666' 
+                  }}>
+                    {selectedDocuments.length} Veeva document{selectedDocuments.length !== 1 ? 's' : ''} selected
+                    {selectedDocuments.length >= 2 && (
+                      <span style={{ 
+                        marginLeft: '6px', 
+                        padding: '1px 4px', 
+                        backgroundColor: '#e3f2fd', 
+                        color: '#1976d2', 
+                        borderRadius: '8px', 
+                        fontSize: '10px',
+                        fontWeight: '500'
+                      }}>
+                        🔍 Comparison Ready
+                      </span>
+                    )}
+                  </p>
+                ) : selectedUploadedDocs.length > 0 ? (
+                  <p style={{ 
+                    margin: '2px 0 0 0', 
+                    fontSize: '11px', 
+                    color: '#666' 
+                  }}>
+                    {selectedUploadedDocs.length} uploaded document{selectedUploadedDocs.length !== 1 ? 's' : ''} selected
+                    <span style={{ 
+                      marginLeft: '6px', 
+                      padding: '1px 4px', 
+                      backgroundColor: '#e8f5e8', 
+                      color: '#2e7d32', 
+                      borderRadius: '8px', 
+                      fontSize: '10px',
+                      fontWeight: '500'
+                    }}>
+                      📄 Ready
+                    </span>
+                  </p>
+                ) : (
+                  <p style={{ 
+                    margin: '2px 0 0 0', 
+                    fontSize: '11px', 
+                    color: '#999' 
+                  }}>
+                    No documents selected • Click + to upload files or select from uploaded documents
+                  </p>
+                )}
                 {workflowState.isActive && workflowState.template && (
                   <div style={{
                     marginTop: '4px',
@@ -1818,7 +1895,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         <div className="p-3">
           <ChatPromptBox
             onSend={handleChatPromptSend}
-            placeholder={workflowState.isActive ? "Answer the workflow question above..." : "Ask a question about your documents..."}
+            placeholder={workflowState.isActive ? "Answer the workflow question above..." : "Ask a question about your documents or click + to upload files for comparison..."}
             disabled={isLoading}
           />
           
