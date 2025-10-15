@@ -66,6 +66,17 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
 
       const result = await response.json();
       
+      console.log('Upload API response:', {
+        success: result.success,
+        resultsCount: result.results?.length || 0,
+        results: result.results?.map(r => ({
+          success: r.success,
+          documentId: r.documentId,
+          fileName: r.fileName,
+          error: r.error
+        })) || []
+      });
+      
       if (result.success) {
         setUploadProgress({ fileName: files[0].name, progress: 100, success: true });
         
@@ -74,8 +85,10 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
           .filter(r => r.success)
           .map(r => r.documentId);
         
+        console.log('Successfully uploaded document IDs:', newDocumentIds);
         return newDocumentIds;
       } else {
+        console.error('Upload failed:', result.error);
         throw new Error(result.error || 'Upload failed');
       }
     } catch (error) {
@@ -125,15 +138,30 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       // Wait for files to be fully processed
       newUploadedDocumentIds = await handleFileUpload(files);
       
+      console.log('File upload results:', {
+        filesUploaded: files.length,
+        successfulUploads: newUploadedDocumentIds.length,
+        uploadedIds: newUploadedDocumentIds
+      });
+      
       // Add uploaded documents to attached documents for session persistence
       if (newUploadedDocumentIds.length > 0) {
-        const newAttachedDocs = newUploadedDocumentIds.map(id => ({
+        const newAttachedDocs = newUploadedDocumentIds.map((id, index) => ({
           id: `uploaded_${id}`,
-          name: files.find(f => f.name)?.name || 'Uploaded Document',
+          name: files[index]?.name || 'Uploaded Document',
           type: 'uploaded_document',
           source: 'upload'
         }));
         setAttachedDocuments(prev => [...prev, ...newAttachedDocs]);
+      }
+      
+      // If not all files uploaded successfully, show error
+      if (newUploadedDocumentIds.length !== files.length) {
+        const errorMessage = {
+          role: 'assistant',
+          content: `⚠️ Warning: Only ${newUploadedDocumentIds.length} of ${files.length} files uploaded successfully. Some files may have failed to process.`
+        };
+        setConversationHistory(prev => [...prev, errorMessage]);
       }
       
       // Remove the processing message and add confirmation
