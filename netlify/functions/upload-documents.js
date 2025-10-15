@@ -373,10 +373,7 @@ async function chunkAndEmbedDocument(documentText, documentId, fileName, userId)
     }
     
     // Chunk the text
-    const chunks = chunkText(documentText, {
-      maxChunkSize: 1000,
-      overlap: 200
-    });
+    const chunks = chunkText(documentText, 8192, 400);
 
     if (chunks.length === 0) {
       console.log(`No valid chunks created for ${fileName}`);
