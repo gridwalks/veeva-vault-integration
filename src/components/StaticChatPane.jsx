@@ -175,7 +175,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         const failedCount = files.length - newUploadedDocumentIds.length;
         const errorMessage = {
           role: 'assistant',
-          content: `⚠️ Warning: Only ${newUploadedDocumentIds.length} of ${files.length} files uploaded successfully. ${failedCount} file${failedCount !== 1 ? 's' : ''} failed to process. Please check the file format and try again.`
+          content: `⚠️ Warning: Only ${newUploadedDocumentIds.length} of ${files.length} files uploaded successfully. ${failedCount} file${failedCount !== 1 ? 's' : ''} failed to process. This is usually due to file size limits (files over 1MB may not process correctly). Please try with smaller files.`
         };
         setConversationHistory(prev => [...prev, errorMessage]);
       }
