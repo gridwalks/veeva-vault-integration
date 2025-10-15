@@ -185,7 +185,7 @@ async function generateSummary(text, fileName) {
     console.log(`Generating summary for ${fileName}: ${text.length} chars -> ${truncatedText.length} chars`);
     
     const response = await groq.chat.completions.create({
-      model: "openai/gpt-oss-20b",
+      model: "llama-3.1-70b-versatile",
       messages: [
         {
           role: "system",

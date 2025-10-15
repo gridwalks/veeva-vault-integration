@@ -766,7 +766,7 @@ ${externalResourcesContext}`;
     
     try {
       completion = await groq.chat.completions.create({
-        model: "openai/gpt-oss-20b",
+        model: "llama-3.1-70b-versatile",
         messages: messages,
         max_tokens: 2000,
         temperature: 0.3,
