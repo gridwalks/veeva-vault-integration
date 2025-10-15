@@ -111,10 +111,19 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     const newHistory = [...conversationHistory, { role: 'user', content: userMessage }];
     setConversationHistory(newHistory);
 
-    // Handle file upload if files are provided
+    // Handle file upload if files are provided - WAIT for completion
     let newUploadedDocumentIds = [];
     if (files && files.length > 0) {
       setIsProcessingAttachments(true);
+      
+      // Show processing message
+      const processingMessage = {
+        role: 'assistant',
+        content: `📎 Processing ${files.length} file${files.length !== 1 ? 's' : ''} you attached. This will take a moment...`
+      };
+      setConversationHistory(prev => [...prev, processingMessage]);
+      
+      // Wait for files to be fully processed
       newUploadedDocumentIds = await handleFileUpload(files);
       
       // Add uploaded documents to attached documents for session persistence
@@ -127,6 +136,18 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         }));
         setAttachedDocuments(prev => [...prev, ...newAttachedDocs]);
       }
+      
+      // Remove the processing message and add confirmation
+      setConversationHistory(prev => {
+        const withoutProcessing = prev.filter(msg => !msg.content.includes('Processing'));
+        return [
+          ...withoutProcessing,
+          {
+            role: 'assistant',
+            content: `✅ Files processed successfully! Now I can answer your question about the ${newUploadedDocumentIds.length} document${newUploadedDocumentIds.length !== 1 ? 's' : ''} you attached.`
+          }
+        ];
+      });
     }
 
     // Check for exit workflow command
@@ -166,15 +187,6 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         return;
       }
       // If unclear response, let it fall through to normal chat
-    }
-
-    // Show immediate response if files are being processed
-    if (files && files.length > 0) {
-      const processingMessage = {
-        role: 'assistant',
-        content: `📎 I'm processing ${files.length} file${files.length !== 1 ? 's' : ''} you attached. This will take a moment...`
-      };
-      setConversationHistory(prev => [...prev, processingMessage]);
     }
 
     try {
@@ -300,14 +312,6 @@ The documents will be automatically included in the comparison analysis.
         throw new Error('Unexpected response format from chat API or empty response received');
       }
 
-      // Add follow-up message if files were processed
-      if (files && files.length > 0 && newUploadedDocumentIds.length > 0) {
-        const followUpMessage = {
-          role: 'assistant',
-          content: `✅ Files processed successfully! I can now answer questions about the ${newUploadedDocumentIds.length} document${newUploadedDocumentIds.length !== 1 ? 's' : ''} you attached.`
-        };
-        setConversationHistory(prev => [...prev, followUpMessage]);
-      }
       
       setUsedDocuments(data.documents || []);
       setUsedExternalResources(data.externalResources || []);

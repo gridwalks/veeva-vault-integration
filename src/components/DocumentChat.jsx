@@ -110,10 +110,19 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     const newHistory = [...conversationHistory, { role: 'user', content: userMessage }];
     setConversationHistory(newHistory);
 
-    // Handle file upload if files are provided
+    // Handle file upload if files are provided - WAIT for completion
     let newUploadedDocumentIds = [];
     if (files && files.length > 0) {
       setIsProcessingAttachments(true);
+      
+      // Show processing message
+      const processingMessage = {
+        role: 'assistant',
+        content: `📎 Processing ${files.length} file${files.length !== 1 ? 's' : ''} you attached. This will take a moment...`
+      };
+      setConversationHistory(prev => [...prev, processingMessage]);
+      
+      // Wait for files to be fully processed
       newUploadedDocumentIds = await handleFileUpload(files);
       
       // Add uploaded documents to attached documents for session persistence
@@ -126,15 +135,18 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
         }));
         setAttachedDocuments(prev => [...prev, ...newAttachedDocs]);
       }
-    }
-
-    // Show immediate response if files are being processed
-    if (files && files.length > 0) {
-      const processingMessage = {
-        role: 'assistant',
-        content: `📎 I'm processing ${files.length} file${files.length !== 1 ? 's' : ''} you attached. This will take a moment...`
-      };
-      setConversationHistory(prev => [...prev, processingMessage]);
+      
+      // Remove the processing message and add confirmation
+      setConversationHistory(prev => {
+        const withoutProcessing = prev.filter(msg => !msg.content.includes('Processing'));
+        return [
+          ...withoutProcessing,
+          {
+            role: 'assistant',
+            content: `✅ Files processed successfully! Now I can answer your question about the ${newUploadedDocumentIds.length} document${newUploadedDocumentIds.length !== 1 ? 's' : ''} you attached.`
+          }
+        ];
+      });
     }
 
     try {
@@ -193,14 +205,6 @@ The files will upload automatically and I'll be able to perform a detailed compa
       setConversationHistory(data.conversationHistory);
       setUsedDocuments(data.documents);
 
-      // Add follow-up message if files were processed
-      if (files && files.length > 0 && newUploadedDocumentIds.length > 0) {
-        const followUpMessage = {
-          role: 'assistant',
-          content: `✅ Files processed successfully! I can now answer questions about the ${newUploadedDocumentIds.length} document${newUploadedDocumentIds.length !== 1 ? 's' : ''} you attached.`
-        };
-        setConversationHistory(prev => [...prev, followUpMessage]);
-      }
 
       // Capture Q&A interaction for storage
       await captureQAInteraction(userMessage, data.response, data.documents);
