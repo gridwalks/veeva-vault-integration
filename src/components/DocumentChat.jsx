@@ -219,6 +219,34 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
         selectedDocumentsLength: selectedDocuments.length
       });
       
+      // Check if user is asking for comparison but hasn't uploaded any documents
+      const isComparisonQuery = userMessage.toLowerCase().includes('compare') || 
+                               userMessage.toLowerCase().includes('comparison') ||
+                               userMessage.toLowerCase().includes('review') ||
+                               userMessage.toLowerCase().includes('errors based on');
+      
+      if (isComparisonQuery && allDocumentIds.length === 0) {
+        // Add a helpful message about uploading documents
+        const helpfulMessage = {
+          role: 'assistant',
+          content: `I'd be happy to help you compare documents! However, I don't see any documents selected for comparison.
+
+**To compare documents, please:**
+
+1. **Click the + button** (📎) next to the text input to attach your files
+2. **Select multiple files** (e.g., SRD.docx, Risk Assessment.pdf)
+3. **Type your comparison question** and click send
+
+The files will upload automatically and I'll be able to perform a detailed comparison analysis for you.
+
+**Supported file types:** PDF, DOC, DOCX, TXT, CSV`
+        };
+        
+        setConversationHistory(prev => [...prev, helpfulMessage]);
+        setIsLoading(false);
+        return;
+      }
+      
       const data = await chatWithDocuments({
         message: userMessage,
         documentIds: allDocumentIds,
@@ -806,7 +834,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
               }}>
                 Chat with Documents
               </h3>
-              {selectedDocuments.length > 0 && (
+              {selectedDocuments.length > 0 ? (
                 <p style={{ 
                   margin: '4px 0 0 0', 
                   fontSize: '13px', 
@@ -826,6 +854,33 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                       🔍 Comparison Ready
                     </span>
                   )}
+                </p>
+              ) : uploadedDocumentIds.length > 0 ? (
+                <p style={{ 
+                  margin: '4px 0 0 0', 
+                  fontSize: '13px', 
+                  color: '#666' 
+                }}>
+                  {uploadedDocumentIds.length} uploaded document{uploadedDocumentIds.length !== 1 ? 's' : ''} ready for comparison
+                  <span style={{ 
+                    marginLeft: '8px', 
+                    padding: '2px 6px', 
+                    backgroundColor: '#e8f5e8', 
+                    color: '#2e7d32', 
+                    borderRadius: '12px', 
+                    fontSize: '11px',
+                    fontWeight: '500'
+                  }}>
+                    📄 Ready
+                  </span>
+                </p>
+              ) : (
+                <p style={{ 
+                  margin: '4px 0 0 0', 
+                  fontSize: '13px', 
+                  color: '#999' 
+                }}>
+                  No documents selected • Click + to upload files for comparison
                 </p>
               )}
             </div>
@@ -1021,7 +1076,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
           <div className="p-4">
             <ChatPromptBox
               onSend={handleChatPromptSend}
-              placeholder="Ask a question about your documents..."
+              placeholder="Ask a question about your documents or click + to upload files for comparison..."
               disabled={isLoading}
             />
             
