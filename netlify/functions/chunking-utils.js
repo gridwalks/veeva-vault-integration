@@ -16,7 +16,7 @@ export function estimateTokenCount(text) {
  * @param {number} overlapTokens - Number of tokens to overlap between chunks (default: 50)
  * @returns {Array<{text: string, tokenCount: number, index: number}>} Array of chunks
  */
-export function chunkText(text, maxTokensPerChunk = 512, overlapTokens = 50) {
+export function chunkText(text, maxTokensPerChunk = 8192, overlapTokens = 200) {
   if (!text || text.trim().length === 0) {
     return [];
   }
