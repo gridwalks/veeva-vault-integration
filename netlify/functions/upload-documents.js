@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import { OpenAI } from 'openai';
+import Groq from 'groq-sdk';
 import mammoth from 'mammoth';
 import { parseDocument } from 'docx-parser';
 import { chunkText } from './chunking-utils.js';
@@ -12,6 +13,10 @@ const pool = new Pool({
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+});
+
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
 });
 
 // Helper function to parse multipart form data
@@ -173,8 +178,8 @@ async function extractTextFromFile(fileBuffer, fileName) {
 // Helper function to generate AI summary
 async function generateSummary(text, fileName) {
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+    const response = await groq.chat.completions.create({
+      model: "openai/gpt-oss-20b",
       messages: [
         {
           role: "system",
@@ -182,7 +187,7 @@ async function generateSummary(text, fileName) {
         },
         {
           role: "user",
-          content: `Please create a concise summary of the following document "${fileName}":\n\n${text.substring(0, 4000)}`
+          content: `Please create a concise summary of the following document "${fileName}":\n\n${text.substring(0, 16000)}`
         }
       ],
       max_tokens: 500,
