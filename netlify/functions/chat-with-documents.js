@@ -764,7 +764,7 @@ ${externalResourcesContext}`;
     const completion = await groq.chat.completions.create({
       model: "openai/gpt-oss-20b",
       messages: messages,
-      max_tokens: 800,
+      max_tokens: 2000,
       temperature: 0.3,
     });
 

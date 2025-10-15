@@ -384,13 +384,24 @@ async function chunkAndEmbedDocument(documentText, documentId, fileName, userId)
       await createChunksTable();
     }
     
-    // Chunk the text
-    const chunks = chunkText(documentText, 8192, 400);
+        // Chunk the text
+        console.log(`=== CHUNKING DEBUG ===`);
+        console.log(`Document text length: ${documentText.length} chars`);
+        console.log(`Starting chunking with 8192 tokens per chunk...`);
+        
+        const chunks = chunkText(documentText, 8192, 400);
+        console.log(`Created ${chunks.length} chunks for ${fileName}`);
 
-    if (chunks.length === 0) {
-      console.log(`No valid chunks created for ${fileName}`);
-      return { chunksCreated: 0, error: 'No valid chunks created' };
-    }
+        if (chunks.length === 0) {
+          console.log(`No valid chunks created for ${fileName}`);
+          return { chunksCreated: 0, error: 'No valid chunks created' };
+        }
+        
+        console.log(`Chunk details:`, chunks.map((chunk, index) => ({
+          index,
+          textLength: chunk.text.length,
+          tokenCount: chunk.tokenCount
+        })).slice(0, 5)); // Show first 5 chunks
 
     // Delete existing chunks for this document
     await pool.query('DELETE FROM qms_chat_document_chunks WHERE document_id = $1', [documentId]);
@@ -600,12 +611,17 @@ export const handler = async (event) => {
         );
 
         // Generate AI summary (skip for large files to avoid token limits)
+        console.log(`=== FILE PROCESSING DEBUG ===`);
+        console.log(`File: ${file.fileName}, Text length: ${extractedText.length} chars`);
+        console.log(`Summary generation: ${extractedText.length > 20000 ? 'SKIPPED' : 'PROCEEDING'}`);
+        
         let summary = '';
         if (extractedText.length > 20000) {
           console.log(`Skipping AI summary generation for large file: ${file.fileName} (${extractedText.length} chars)`);
           // Create a basic text-based summary instead
           const firstParagraph = extractedText.split('\n\n')[0] || extractedText.substring(0, 500);
           summary = `Large document: ${file.fileName} (${extractedText.length} characters)\n\nFirst section: ${firstParagraph.substring(0, 200)}...`;
+          console.log(`Created basic summary for large file: ${summary.length} chars`);
         } else {
           try {
             console.log(`Generating AI summary for: ${file.fileName}`);
@@ -618,11 +634,15 @@ export const handler = async (event) => {
             // Fallback to basic text summary
             const firstParagraph = extractedText.split('\n\n')[0] || extractedText.substring(0, 500);
             summary = `Document: ${file.fileName} (${extractedText.length} characters)\n\nFirst section: ${firstParagraph.substring(0, 200)}...`;
+            console.log(`Created fallback summary: ${summary.length} chars`);
           }
         }
 
         // Store document in database
+        console.log(`=== DATABASE STORAGE DEBUG ===`);
         console.log(`Storing document in database: ${file.fileName}`);
+        console.log(`Document details: ${extractedText.length} chars, ${file.size} bytes`);
+        
         const storeStartTime = Date.now();
         const documentId = await storeDocument(
           file.fileName,
