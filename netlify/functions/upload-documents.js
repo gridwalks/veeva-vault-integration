@@ -202,9 +202,17 @@ async function generateSummary(text, fileName) {
 
     return response.choices[0].message.content.trim();
   } catch (error) {
-    console.error('Error generating summary:', error);
+    console.error('Error generating summary:', {
+      fileName,
+      textLength: text.length,
+      truncatedLength: Math.min(3000, text.length),
+      errorMessage: error.message,
+      errorStatus: error.status,
+      errorCode: error.code,
+      errorType: error.type
+    });
     // If summary generation fails, return a basic summary instead of failing the entire upload
-    return `Document: ${fileName} (${text.length} characters) - Summary generation failed`;
+    return `Document: ${fileName} (${text.length} characters) - Summary generation failed: ${error.message}`;
   }
 }
 

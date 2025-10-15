@@ -761,25 +761,47 @@ ${externalResourcesContext}`;
 
     // Call Groq API
     const groqStartTime = Date.now();
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.1-70b-versatile",
-      messages: messages,
-      max_tokens: 2000,
-      temperature: 0.3,
-    });
+    let completion;
+    let response;
+    
+    try {
+      completion = await groq.chat.completions.create({
+        model: "llama-3.1-70b-versatile",
+        messages: messages,
+        max_tokens: 2000,
+        temperature: 0.3,
+      });
 
-    const groqDuration = Date.now() - groqStartTime;
-    const response = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
-
-    console.log('Groq response received:', {
-      responseTime: `${groqDuration}ms`,
-      responseLength: response.length,
-      responsePreview: response.substring(0, 200) + (response.length > 200 ? '...' : ''),
-      tokensUsed: completion.usage?.total_tokens || 0,
-      promptTokens: completion.usage?.prompt_tokens || 0,
-      completionTokens: completion.usage?.completion_tokens || 0,
-      finishReason: completion.choices[0]?.finish_reason
-    });
+      const groqDuration = Date.now() - groqStartTime;
+      response = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
+      
+      console.log('Groq response received:', {
+        responseTime: `${groqDuration}ms`,
+        responseLength: response.length,
+        responsePreview: response.substring(0, 200) + (response.length > 200 ? '...' : ''),
+        tokensUsed: completion.usage?.total_tokens || 0,
+        promptTokens: completion.usage?.prompt_tokens || 0,
+        completionTokens: completion.usage?.completion_tokens || 0,
+        finishReason: completion.choices[0]?.finish_reason
+      });
+    } catch (groqError) {
+      console.error('Groq API error:', {
+        message: groqError.message,
+        status: groqError.status,
+        code: groqError.code,
+        type: groqError.type
+      });
+      
+      return {
+        statusCode: 500,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          error: "AI service temporarily unavailable",
+          details: groqError.message,
+          response: "I'm sorry, I encountered an error while processing your request. Please try again in a moment."
+        })
+      };
+    }
 
     // Store comparison history if this was a comparison query
     if (isComparisonQuery && relevantDocuments.length > 0) {
