@@ -4,7 +4,9 @@ export default function ChatPromptBox({
   onSend, 
   placeholder = "How can I help?", 
   disabled = false,
-  className = ""
+  className = "",
+  onFilesChange,
+  clearFiles
 }) {
   const [message, setMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -18,6 +20,25 @@ export default function ChatPromptBox({
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
   }, [message]);
+
+  // Notify parent when files change
+  useEffect(() => {
+    if (onFilesChange) {
+      onFilesChange(selectedFiles);
+    }
+  }, [selectedFiles, onFilesChange]);
+
+  // Expose clearFiles method to parent
+  useEffect(() => {
+    if (clearFiles) {
+      clearFiles.current = () => {
+        setSelectedFiles([]);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      };
+    }
+  }, [clearFiles]);
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {

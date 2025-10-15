@@ -7,10 +7,8 @@ import { createQAInteraction, getUploadedDocuments, downloadUploadedDocumentUrl 
 
 export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane, userId }) {
   const [conversationHistory, setConversationHistory] = useState([]);
-  const [uploadedDocuments, setUploadedDocuments] = useState([]);
-  const [selectedUploadedDocs, setSelectedUploadedDocs] = useState([]);
-  const [loadingUploadedDocs, setLoadingUploadedDocs] = useState(false);
-  const [showUploadedDocsPanel, setShowUploadedDocsPanel] = useState(false);
+  const [attachedDocuments, setAttachedDocuments] = useState([]);
+  const [isProcessingAttachments, setIsProcessingAttachments] = useState(false);
   
   // Debug conversation history changes
   useEffect(() => {
@@ -31,6 +29,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
+  const chatPromptBoxRef = useRef(null);
   
   // Workflow state
   const [workflowState, setWorkflowState] = useState({
@@ -46,29 +45,9 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversationHistory, isLoading]);
 
-  // Fetch uploaded documents function
-  const fetchUploadedDocuments = async () => {
-    setLoadingUploadedDocs(true);
-    try {
-      const response = await getUploadedDocuments({ limit: 100, userId });
-      console.log('Uploaded documents loaded:', response.items?.length || 0);
-      setUploadedDocuments(response.items || []);
-    } catch (error) {
-      console.error('Failed to load uploaded documents:', error);
-      // Don't show error to user, just log it
-    } finally {
-      setLoadingUploadedDocs(false);
-    }
-  };
 
-  // Fetch uploaded documents on mount
-  useEffect(() => {
-    fetchUploadedDocuments();
-  }, []);
-
-  const handleFileUpload = async (event) => {
-    const files = Array.from(event.target.files);
-    if (files.length === 0) return;
+  const handleFileUpload = async (files) => {
+    if (!files || files.length === 0) return [];
 
     setIsUploading(true);
     setUploadProgress({ fileName: files[0].name, progress: 0 });
@@ -94,31 +73,23 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       const result = await response.json();
       
       if (result.success) {
-        // Reload uploaded documents
-        await fetchUploadedDocuments();
         setUploadProgress({ fileName: files[0].name, progress: 100, success: true });
         
-        // Auto-select the uploaded documents
+        // Return uploaded document IDs for immediate use
         const newDocumentIds = result.results
           .filter(r => r.success)
           .map(r => r.documentId);
         
-        if (newDocumentIds.length > 0) {
-          // Add to selected uploaded documents
-          setSelectedUploadedDocs(prev => [...prev, ...newDocumentIds]);
-        }
+        return newDocumentIds;
       } else {
         throw new Error(result.error || 'Upload failed');
       }
     } catch (error) {
       console.error('Upload error:', error);
       setUploadProgress({ fileName: files[0].name, progress: 0, error: error.message });
+      return [];
     } finally {
       setIsUploading(false);
-      // Clear file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
     }
   };
 
@@ -128,7 +99,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     }
   };
 
-  const sendMessage = async (message, file = null) => {
+  const sendMessage = async (message, files = []) => {
     if (!message.trim() || isLoading) return;
 
     const userMessage = message.trim();
@@ -136,14 +107,27 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     setIsLoading(true);
     setError(null);
 
-    // Handle file upload if file is provided
-    if (file) {
-      await handleFileUpload({ target: { files: [file] } });
-    }
-
     // Add user message to conversation
     const newHistory = [...conversationHistory, { role: 'user', content: userMessage }];
     setConversationHistory(newHistory);
+
+    // Handle file upload if files are provided
+    let newUploadedDocumentIds = [];
+    if (files && files.length > 0) {
+      setIsProcessingAttachments(true);
+      newUploadedDocumentIds = await handleFileUpload(files);
+      
+      // Add uploaded documents to attached documents for session persistence
+      if (newUploadedDocumentIds.length > 0) {
+        const newAttachedDocs = newUploadedDocumentIds.map(id => ({
+          id: `uploaded_${id}`,
+          name: files.find(f => f.name)?.name || 'Uploaded Document',
+          type: 'uploaded_document',
+          source: 'upload'
+        }));
+        setAttachedDocuments(prev => [...prev, ...newAttachedDocs]);
+      }
+    }
 
     // Check for exit workflow command
     if (userMessage.toLowerCase().includes('exit workflow')) {
@@ -184,12 +168,21 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       // If unclear response, let it fall through to normal chat
     }
 
+    // Show immediate response if files are being processed
+    if (files && files.length > 0) {
+      const processingMessage = {
+        role: 'assistant',
+        content: `📎 I'm processing ${files.length} file${files.length !== 1 ? 's' : ''} you attached. This will take a moment...`
+      };
+      setConversationHistory(prev => [...prev, processingMessage]);
+    }
+
     try {
       // Proceed with normal chat (will detect workflow after answering)
-      // Combine Veeva document IDs and uploaded document IDs
+      // Combine Veeva document IDs and attached document IDs
       const veevaDocIds = selectedDocuments.map(doc => doc.veeva_document_id);
-      const uploadedDocIds = selectedUploadedDocs.map(id => `uploaded_${id}`);
-      const allDocumentIds = [...veevaDocIds, ...uploadedDocIds];
+      const attachedDocIds = attachedDocuments.map(doc => doc.id);
+      const allDocumentIds = [...veevaDocIds, ...attachedDocIds];
       
       // Check if user is asking for comparison but hasn't selected any documents
       const isComparisonQuery = userMessage.toLowerCase().includes('compare') || 
@@ -205,9 +198,8 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
 
 **To compare documents, please:**
 
-1. **Click the + button** (📎) next to the text input to attach your files, OR
-2. **Select from uploaded documents** using the "Uploaded Documents" panel on the right
-3. **Type your comparison question** and click send
+1. **Click the + button** (📎) next to the text input to attach your files
+2. **Type your comparison question** and click send
 
 The documents will be automatically included in the comparison analysis.
 
@@ -304,6 +296,15 @@ The documents will be automatically included in the comparison analysis.
         console.error('Unexpected API response format or empty response:', data);
         throw new Error('Unexpected response format from chat API or empty response received');
       }
+
+      // Add follow-up message if files were processed
+      if (files && files.length > 0 && newUploadedDocumentIds.length > 0) {
+        const followUpMessage = {
+          role: 'assistant',
+          content: `✅ Files processed successfully! I can now answer questions about the ${newUploadedDocumentIds.length} document${newUploadedDocumentIds.length !== 1 ? 's' : ''} you attached.`
+        };
+        setConversationHistory(prev => [...prev, followUpMessage]);
+      }
       
       setUsedDocuments(data.documents || []);
       setUsedExternalResources(data.externalResources || []);
@@ -388,6 +389,7 @@ The documents will be automatically included in the comparison analysis.
       });
     } finally {
       setIsLoading(false);
+      setIsProcessingAttachments(false);
     }
   };
 
@@ -398,14 +400,19 @@ The documents will be automatically included in the comparison analysis.
     }
   };
 
-  const handleChatPromptSend = ({ message, file }) => {
-    sendMessage(message, file);
+  const handleChatPromptSend = ({ message, files }) => {
+    sendMessage(message, files);
   };
 
   const clearConversation = () => {
     setConversationHistory([]);
     setUsedDocuments([]);
     setError(null);
+    setAttachedDocuments([]);
+    // Clear files from ChatPromptBox
+    if (chatPromptBoxRef.current) {
+      chatPromptBoxRef.current();
+    }
   };
 
   const handleOpenDocument = (document) => {
@@ -1430,15 +1437,6 @@ The documents will be automatically included in the comparison analysis.
     );
   };
 
-  const toggleUploadedDoc = (docId) => {
-    setSelectedUploadedDocs(prev => {
-      if (prev.includes(docId)) {
-        return prev.filter(id => id !== docId);
-      } else {
-        return [...prev, docId];
-      }
-    });
-  };
 
   return (
     <>
@@ -1477,14 +1475,16 @@ The documents will be automatically included in the comparison analysis.
                 }}>
                   Document Chat Agent
                 </h3>
-                {selectedDocuments.length > 0 ? (
+                {selectedDocuments.length > 0 || attachedDocuments.length > 0 ? (
                   <p style={{ 
                     margin: '2px 0 0 0', 
                     fontSize: '11px', 
                     color: '#666' 
                   }}>
-                    {selectedDocuments.length} Veeva document{selectedDocuments.length !== 1 ? 's' : ''} selected
-                    {selectedDocuments.length >= 2 && (
+                    {selectedDocuments.length > 0 && `${selectedDocuments.length} Veeva document${selectedDocuments.length !== 1 ? 's' : ''}`}
+                    {selectedDocuments.length > 0 && attachedDocuments.length > 0 && ', '}
+                    {attachedDocuments.length > 0 && `${attachedDocuments.length} attached file${attachedDocuments.length !== 1 ? 's' : ''}`}
+                    {(selectedDocuments.length + attachedDocuments.length) >= 2 && (
                       <span style={{ 
                         marginLeft: '6px', 
                         padding: '1px 4px', 
@@ -1497,25 +1497,19 @@ The documents will be automatically included in the comparison analysis.
                         🔍 Comparison Ready
                       </span>
                     )}
-                  </p>
-                ) : selectedUploadedDocs.length > 0 ? (
-                  <p style={{ 
-                    margin: '2px 0 0 0', 
-                    fontSize: '11px', 
-                    color: '#666' 
-                  }}>
-                    {selectedUploadedDocs.length} uploaded document{selectedUploadedDocs.length !== 1 ? 's' : ''} selected
-                    <span style={{ 
-                      marginLeft: '6px', 
-                      padding: '1px 4px', 
-                      backgroundColor: '#e8f5e8', 
-                      color: '#2e7d32', 
-                      borderRadius: '8px', 
-                      fontSize: '10px',
-                      fontWeight: '500'
-                    }}>
-                      📄 Ready
-                    </span>
+                    {attachedDocuments.length > 0 && (
+                      <span style={{ 
+                        marginLeft: '6px', 
+                        padding: '1px 4px', 
+                        backgroundColor: '#e8f5e8', 
+                        color: '#2e7d32', 
+                        borderRadius: '8px', 
+                        fontSize: '10px',
+                        fontWeight: '500'
+                      }}>
+                        📎 Attached
+                      </span>
+                    )}
                   </p>
                 ) : (
                   <p style={{ 
@@ -1523,7 +1517,7 @@ The documents will be automatically included in the comparison analysis.
                     fontSize: '11px', 
                     color: '#999' 
                   }}>
-                    No documents selected • Click + to upload files or select from uploaded documents
+                    No documents selected • Click + to attach files for comparison
                   </p>
                 )}
                 {workflowState.isActive && workflowState.template && (
@@ -1544,232 +1538,6 @@ The documents will be automatically included in the comparison analysis.
               </div>
             </div>
             
-            {/* Uploaded Documents Button */}
-            <div style={{ position: 'relative' }}>
-              <button
-                onClick={() => setShowUploadedDocsPanel(!showUploadedDocsPanel)}
-                style={{
-                  padding: '6px 12px',
-                  backgroundColor: selectedUploadedDocs.length > 0 ? '#3b82f6' : '#e5e7eb',
-                  color: selectedUploadedDocs.length > 0 ? '#ffffff' : '#374151',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '11px',
-                  fontWeight: '500',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  transition: 'background-color 0.2s ease',
-                  whiteSpace: 'nowrap',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-                onMouseEnter={(e) => {
-                  if (selectedUploadedDocs.length > 0) {
-                    e.target.style.backgroundColor = '#2563eb';
-                  } else {
-                    e.target.style.backgroundColor = '#d1d5db';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (selectedUploadedDocs.length > 0) {
-                    e.target.style.backgroundColor = '#3b82f6';
-                  } else {
-                    e.target.style.backgroundColor = '#e5e7eb';
-                  }
-                }}
-                title={`${uploadedDocuments.length} uploaded documents available`}
-              >
-                📄 Uploaded ({selectedUploadedDocs.length}/{uploadedDocuments.length})
-              </button>
-              
-              {/* Uploaded Documents Panel */}
-              {showUploadedDocsPanel && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  right: 0,
-                  marginTop: '8px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                  width: '320px',
-                  maxHeight: '400px',
-                  zIndex: 1000,
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
-                  <div style={{
-                    padding: '12px',
-                    borderBottom: '1px solid #e5e7eb',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    backgroundColor: '#f8fafc'
-                  }}>
-                    <h4 style={{
-                      margin: 0,
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      color: '#374151',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                    }}>
-                      Uploaded Documents
-                    </h4>
-                    <button
-                      onClick={() => setShowUploadedDocsPanel(false)}
-                      style={{
-                        padding: '4px',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: '#6b7280',
-                        fontSize: '16px',
-                        lineHeight: 1
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  
-                  <div style={{
-                    flex: 1,
-                    overflowY: 'auto',
-                    padding: '8px'
-                  }}>
-                    {loadingUploadedDocs ? (
-                      <div style={{
-                        padding: '20px',
-                        textAlign: 'center',
-                        color: '#6b7280',
-                        fontSize: '12px',
-                        fontFamily: 'inherit'
-                      }}>
-                        Loading documents...
-                      </div>
-                    ) : uploadedDocuments.length === 0 ? (
-                      <div style={{
-                        padding: '20px',
-                        textAlign: 'center',
-                        color: '#6b7280',
-                        fontSize: '12px',
-                        fontFamily: 'inherit'
-                      }}>
-                        No uploaded documents yet
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontFamily: 'inherit' }}>
-                        {uploadedDocuments.map(doc => (
-                          <label
-                            key={doc.id}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'start',
-                              gap: '8px',
-                              padding: '8px',
-                              backgroundColor: selectedUploadedDocs.includes(doc.id) ? '#eff6ff' : '#ffffff',
-                              border: selectedUploadedDocs.includes(doc.id) ? '1px solid #3b82f6' : '1px solid #e5e7eb',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!selectedUploadedDocs.includes(doc.id)) {
-                                e.currentTarget.style.backgroundColor = '#f9fafb';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!selectedUploadedDocs.includes(doc.id)) {
-                                e.currentTarget.style.backgroundColor = '#ffffff';
-                              }
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedUploadedDocs.includes(doc.id)}
-                              onChange={() => toggleUploadedDoc(doc.id)}
-                              style={{
-                                marginTop: '2px',
-                                cursor: 'pointer'
-                              }}
-                            />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{
-                                fontSize: '13px',
-                                fontWeight: '500',
-                                color: '#374151',
-                                marginBottom: '2px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                fontFamily: 'inherit'
-                              }}>
-                                {doc.document_name}
-                              </div>
-                              {doc.ai_summary && (
-                                <div style={{
-                                  fontSize: '10px',
-                                  color: '#6b7280',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: 'vertical',
-                                  fontFamily: 'inherit'
-                                }}>
-                                  {doc.ai_summary}
-                                </div>
-                              )}
-                              <div style={{
-                                fontSize: '9px',
-                                color: '#9ca3af',
-                                marginTop: '2px'
-                              }}>
-                                {doc.chunk_count} chunks • {new Date(doc.created_at).toLocaleDateString()}
-                              </div>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  
-                  {selectedUploadedDocs.length > 0 && (
-                    <div style={{
-                      padding: '10px',
-                      borderTop: '1px solid #e5e7eb',
-                      backgroundColor: '#f8fafc',
-                      fontSize: '11px',
-                      color: '#6b7280',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
-                      <span>{selectedUploadedDocs.length} selected</span>
-                      <button
-                        onClick={() => setSelectedUploadedDocs([])}
-                        style={{
-                          padding: '4px 8px',
-                          backgroundColor: 'transparent',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '3px',
-                          cursor: 'pointer',
-                          fontSize: '10px',
-                          color: '#374151',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                        }}
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
             
             {conversationHistory.length > 0 && (
               <button
@@ -1894,9 +1662,13 @@ The documents will be automatically included in the comparison analysis.
         {/* Input */}
         <div className="p-3">
           <ChatPromptBox
+            ref={chatPromptBoxRef}
             onSend={handleChatPromptSend}
-            placeholder={workflowState.isActive ? "Answer the workflow question above..." : "Ask a question about your documents or click + to upload files for comparison..."}
-            disabled={isLoading}
+            onFilesChange={(files) => {
+              // Optional: Handle file changes if needed
+            }}
+            placeholder={workflowState.isActive ? "Answer the workflow question above..." : "Ask a question about your documents or click + to attach files for comparison..."}
+            disabled={isLoading || isProcessingAttachments}
           />
           
           {/* Upload Progress Display */}

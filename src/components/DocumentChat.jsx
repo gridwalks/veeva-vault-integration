@@ -14,8 +14,8 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
   const [usedDocuments, setUsedDocuments] = useState([]);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
-  const [uploadedDocuments, setUploadedDocuments] = useState([]);
-  const [uploadedDocumentIds, setUploadedDocumentIds] = useState([]);
+  const [attachedDocuments, setAttachedDocuments] = useState([]);
+  const [isProcessingAttachments, setIsProcessingAttachments] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [userId, setUserId] = useState(null);
@@ -23,15 +23,13 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
+  const chatPromptBoxRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
       // Initialize user session
       const sessionId = getSessionId();
       setUserId(sessionId);
-      
-      // Load user's uploaded documents
-      loadUploadedDocuments(sessionId);
       
       // Focus input when chat opens
       setTimeout(() => {
@@ -42,35 +40,11 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     }
   }, [isOpen]);
 
-  const loadUploadedDocuments = async (sessionId) => {
-    try {
-      const data = await getUploadedDocuments({ userId: sessionId });
-      setUploadedDocuments(data.items || []);
-    } catch (error) {
-      console.error('Error loading uploaded documents:', error);
-    }
-  };
-
-  const handleFileUpload = async (event) => {
-    const files = Array.from(event.target.files);
-    if (files.length === 0) return;
+  const handleFileUpload = async (files) => {
+    if (!files || files.length === 0) return [];
 
     setIsUploading(true);
-    
-    // Initialize batch upload progress
-    const batchProgress = {
-      totalFiles: files.length,
-      completedFiles: 0,
-      currentFile: files[0]?.name || '',
-      progress: 0,
-      files: files.map(file => ({
-        name: file.name,
-        size: file.size,
-        status: 'pending', // pending, uploading, success, error
-        error: null
-      }))
-    };
-    setUploadProgress(batchProgress);
+    setUploadProgress({ fileName: files[0].name, progress: 0 });
 
     try {
       const formData = new FormData();
@@ -80,12 +54,6 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       formData.append('fileCount', files.length.toString());
       formData.append('uploadType', 'chat_upload');
       formData.append('userId', userId);
-
-      // Update progress to show uploading
-      setUploadProgress(prev => ({
-        ...prev,
-        files: prev.files.map(f => ({ ...f, status: 'uploading' }))
-      }));
 
       const response = await fetch('/api/upload-documents', {
         method: 'POST',
@@ -99,75 +67,23 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       const result = await response.json();
       
       if (result.success) {
-        // Reload uploaded documents
-        await loadUploadedDocuments(userId);
+        setUploadProgress({ fileName: files[0].name, progress: 100, success: true });
         
-        // Update progress to show success
-        const successCount = result.results.filter(r => r.success).length;
-        setUploadProgress(prev => ({
-          ...prev,
-          completedFiles: successCount,
-          progress: 100,
-          files: prev.files.map((f, index) => ({
-            ...f,
-            status: result.results[index]?.success ? 'success' : 'error',
-            error: result.results[index]?.success ? null : result.results[index]?.error
-          }))
-        }));
-        
-        // Auto-select the uploaded documents for comparison
+        // Return uploaded document IDs for immediate use
         const newDocumentIds = result.results
           .filter(r => r.success)
           .map(r => r.documentId);
         
-        if (newDocumentIds.length > 0) {
-          console.log('Uploaded documents ready for selection:', newDocumentIds);
-          
-          // Get the uploaded documents data for auto-selection
-          const uploadedDocsData = result.results
-            .filter(r => r.success)
-            .map(r => ({
-              id: r.documentId,
-              name: r.documentName || r.fileName,
-              type: r.documentType || 'uploaded_document',
-              source: 'upload'
-            }));
-          
-          // Auto-select uploaded documents if callback is provided
-          if (onDocumentsSelected && uploadedDocsData.length > 0) {
-            onDocumentsSelected(uploadedDocsData);
-            console.log('Auto-selected uploaded documents for comparison:', uploadedDocsData);
-            
-            // Store uploaded document IDs for chat requests
-            const newUploadedIds = uploadedDocsData.map(doc => `uploaded_${doc.id}`);
-            setUploadedDocumentIds(prev => [...prev, ...newUploadedIds]);
-            console.log('Stored uploaded document IDs for chat:', newUploadedIds);
-            
-            // Show notification
-            setNotification({
-              type: 'success',
-              message: `✓ ${uploadedDocsData.length} document${uploadedDocsData.length !== 1 ? 's' : ''} uploaded and ready for comparison`
-            });
-            
-            // Clear notification after 3 seconds
-            setTimeout(() => setNotification(null), 3000);
-          }
-        }
+        return newDocumentIds;
       } else {
         throw new Error(result.error || 'Upload failed');
       }
     } catch (error) {
       console.error('Upload error:', error);
-      setUploadProgress(prev => ({
-        ...prev,
-        files: prev.files.map(f => ({ ...f, status: 'error', error: error.message }))
-      }));
+      setUploadProgress({ fileName: files[0].name, progress: 0, error: error.message });
+      return [];
     } finally {
       setIsUploading(false);
-      // Clear file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
     }
   };
 
@@ -190,32 +106,49 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     setIsLoading(true);
     setError(null);
 
-    // Handle file upload if files are provided
-    if (files && files.length > 0) {
-      console.log('Files provided, uploading before sending message...');
-      await handleFileUpload({ target: { files } });
-      console.log('File upload completed, proceeding with chat message');
-      
-      // Small delay to ensure database is updated
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-
     // Add user message to conversation
     const newHistory = [...conversationHistory, { role: 'user', content: userMessage }];
     setConversationHistory(newHistory);
 
+    // Handle file upload if files are provided
+    let newUploadedDocumentIds = [];
+    if (files && files.length > 0) {
+      setIsProcessingAttachments(true);
+      newUploadedDocumentIds = await handleFileUpload(files);
+      
+      // Add uploaded documents to attached documents for session persistence
+      if (newUploadedDocumentIds.length > 0) {
+        const newAttachedDocs = newUploadedDocumentIds.map(id => ({
+          id: `uploaded_${id}`,
+          name: files.find(f => f.name)?.name || 'Uploaded Document',
+          type: 'uploaded_document',
+          source: 'upload'
+        }));
+        setAttachedDocuments(prev => [...prev, ...newAttachedDocs]);
+      }
+    }
+
+    // Show immediate response if files are being processed
+    if (files && files.length > 0) {
+      const processingMessage = {
+        role: 'assistant',
+        content: `📎 I'm processing ${files.length} file${files.length !== 1 ? 's' : ''} you attached. This will take a moment...`
+      };
+      setConversationHistory(prev => [...prev, processingMessage]);
+    }
+
     try {
       const allDocumentIds = [
         ...selectedDocuments.map(doc => doc.veeva_document_id),
-        ...uploadedDocumentIds
+        ...attachedDocuments.map(doc => doc.id)
       ];
       
       console.log('Sending chat request with document IDs:', {
         selectedDocuments: selectedDocuments.map(doc => doc.veeva_document_id),
-        uploadedDocumentIds,
+        attachedDocuments: attachedDocuments.map(doc => doc.id),
         allDocumentIds,
         message: userMessage.substring(0, 100) + '...',
-        uploadedDocumentIdsLength: uploadedDocumentIds.length,
+        attachedDocumentsLength: attachedDocuments.length,
         selectedDocumentsLength: selectedDocuments.length
       });
       
@@ -234,8 +167,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
 **To compare documents, please:**
 
 1. **Click the + button** (📎) next to the text input to attach your files
-2. **Select multiple files** (e.g., SRD.docx, Risk Assessment.pdf)
-3. **Type your comparison question** and click send
+2. **Type your comparison question** and click send
 
 The files will upload automatically and I'll be able to perform a detailed comparison analysis for you.
 
@@ -257,6 +189,15 @@ The files will upload automatically and I'll be able to perform a detailed compa
       // Update conversation with AI response
       setConversationHistory(data.conversationHistory);
       setUsedDocuments(data.documents);
+
+      // Add follow-up message if files were processed
+      if (files && files.length > 0 && newUploadedDocumentIds.length > 0) {
+        const followUpMessage = {
+          role: 'assistant',
+          content: `✅ Files processed successfully! I can now answer questions about the ${newUploadedDocumentIds.length} document${newUploadedDocumentIds.length !== 1 ? 's' : ''} you attached.`
+        };
+        setConversationHistory(prev => [...prev, followUpMessage]);
+      }
 
       // Capture Q&A interaction for storage
       await captureQAInteraction(userMessage, data.response, data.documents);
@@ -281,6 +222,7 @@ The files will upload automatically and I'll be able to perform a detailed compa
       ]);
     } finally {
       setIsLoading(false);
+      setIsProcessingAttachments(false);
     }
   };
 
@@ -299,7 +241,11 @@ The files will upload automatically and I'll be able to perform a detailed compa
     setConversationHistory([]);
     setUsedDocuments([]);
     setError(null);
-    setUploadedDocumentIds([]); // Clear uploaded document IDs when conversation is cleared
+    setAttachedDocuments([]);
+    // Clear files from ChatPromptBox
+    if (chatPromptBoxRef.current) {
+      chatPromptBoxRef.current();
+    }
   };
 
   const handleOpenDocument = (document) => {
@@ -834,14 +780,16 @@ The files will upload automatically and I'll be able to perform a detailed compa
               }}>
                 Chat with Documents
               </h3>
-              {selectedDocuments.length > 0 ? (
+              {selectedDocuments.length > 0 || attachedDocuments.length > 0 ? (
                 <p style={{ 
                   margin: '4px 0 0 0', 
                   fontSize: '13px', 
                   color: '#666' 
                 }}>
-                  {selectedDocuments.length} document{selectedDocuments.length !== 1 ? 's' : ''} selected
-                  {selectedDocuments.length >= 2 && (
+                  {selectedDocuments.length > 0 && `${selectedDocuments.length} Veeva document${selectedDocuments.length !== 1 ? 's' : ''}`}
+                  {selectedDocuments.length > 0 && attachedDocuments.length > 0 && ', '}
+                  {attachedDocuments.length > 0 && `${attachedDocuments.length} attached file${attachedDocuments.length !== 1 ? 's' : ''}`}
+                  {(selectedDocuments.length + attachedDocuments.length) >= 2 && (
                     <span style={{ 
                       marginLeft: '8px', 
                       padding: '2px 6px', 
@@ -854,25 +802,19 @@ The files will upload automatically and I'll be able to perform a detailed compa
                       🔍 Comparison Ready
                     </span>
                   )}
-                </p>
-              ) : uploadedDocumentIds.length > 0 ? (
-                <p style={{ 
-                  margin: '4px 0 0 0', 
-                  fontSize: '13px', 
-                  color: '#666' 
-                }}>
-                  {uploadedDocumentIds.length} uploaded document{uploadedDocumentIds.length !== 1 ? 's' : ''} ready for comparison
-                  <span style={{ 
-                    marginLeft: '8px', 
-                    padding: '2px 6px', 
-                    backgroundColor: '#e8f5e8', 
-                    color: '#2e7d32', 
-                    borderRadius: '12px', 
-                    fontSize: '11px',
-                    fontWeight: '500'
-                  }}>
-                    📄 Ready
-                  </span>
+                  {attachedDocuments.length > 0 && (
+                    <span style={{ 
+                      marginLeft: '8px', 
+                      padding: '2px 6px', 
+                      backgroundColor: '#e8f5e8', 
+                      color: '#2e7d32', 
+                      borderRadius: '12px', 
+                      fontSize: '11px',
+                      fontWeight: '500'
+                    }}>
+                      📎 Attached
+                    </span>
+                  )}
                 </p>
               ) : (
                 <p style={{ 
@@ -880,7 +822,7 @@ The files will upload automatically and I'll be able to perform a detailed compa
                   fontSize: '13px', 
                   color: '#999' 
                 }}>
-                  No documents selected • Click + to upload files for comparison
+                  No documents selected • Click + to attach files for comparison
                 </p>
               )}
             </div>
@@ -1075,9 +1017,13 @@ The files will upload automatically and I'll be able to perform a detailed compa
           {/* Input */}
           <div className="p-4">
             <ChatPromptBox
+              ref={chatPromptBoxRef}
               onSend={handleChatPromptSend}
-              placeholder="Ask a question about your documents or click + to upload files for comparison..."
-              disabled={isLoading}
+              onFilesChange={(files) => {
+                // Optional: Handle file changes if needed
+              }}
+              placeholder="Ask a question about your documents or click + to attach files for comparison..."
+              disabled={isLoading || isProcessingAttachments}
             />
             
              {/* Upload Progress Display */}
