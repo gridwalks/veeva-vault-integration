@@ -192,7 +192,12 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
 
     // Handle file upload if files are provided
     if (files && files.length > 0) {
+      console.log('Files provided, uploading before sending message...');
       await handleFileUpload({ target: { files } });
+      console.log('File upload completed, proceeding with chat message');
+      
+      // Small delay to ensure database is updated
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     // Add user message to conversation
@@ -209,7 +214,9 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
         selectedDocuments: selectedDocuments.map(doc => doc.veeva_document_id),
         uploadedDocumentIds,
         allDocumentIds,
-        message: userMessage.substring(0, 100) + '...'
+        message: userMessage.substring(0, 100) + '...',
+        uploadedDocumentIdsLength: uploadedDocumentIds.length,
+        selectedDocumentsLength: selectedDocuments.length
       });
       
       const data = await chatWithDocuments({

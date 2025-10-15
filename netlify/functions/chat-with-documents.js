@@ -124,8 +124,11 @@ export const handler = async (event) => {
 
     console.log('Chat request details:', {
       message: message.substring(0, 100) + '...',
+      originalDocumentIds: documentIds,
       veevaDocumentIds: veevaDocumentIds.length > 0 ? veevaDocumentIds : 'none',
       uploadedDocumentIds: uploadedDocumentIds.length > 0 ? uploadedDocumentIds : 'none',
+      veevaCount: veevaDocumentIds.length,
+      uploadedCount: uploadedDocumentIds.length,
       historyLength: conversationHistory.length
     });
 
@@ -252,9 +255,38 @@ export const handler = async (event) => {
             ORDER BY c.embedding <=> $1::vector
             LIMIT ${chunkLimit}
           `;
+          
+          console.log('Executing uploaded document query:', {
+            query: uploadedQuery,
+            params: [embeddingStr, ...uploadedDocumentIds, userId],
+            uploadedDocumentIds,
+            userId,
+            chunkLimit
+          });
+          
           const uploadedResult = await pool.query(uploadedQuery, [embeddingStr, ...uploadedDocumentIds, userId]);
           uploadedChunks = uploadedResult.rows;
           console.log(`Found ${uploadedChunks.length} uploaded document chunks for user ${userId} (comparison mode: ${isComparisonQuery})`);
+          
+          if (uploadedChunks.length === 0) {
+            console.log('No uploaded chunks found. Checking if documents exist in database...');
+            const docCheckQuery = `
+              SELECT id, document_name, user_id 
+              FROM qms_chat_documents 
+              WHERE id IN (${uploadedPlaceholders}) AND user_id = $${uploadedDocumentIds.length + 1}
+            `;
+            const docCheckResult = await pool.query(docCheckQuery, [...uploadedDocumentIds, userId]);
+            console.log('Document check result:', docCheckResult.rows);
+            
+            const chunkCheckQuery = `
+              SELECT COUNT(*) as chunk_count, document_id 
+              FROM qms_chat_document_chunks 
+              WHERE document_id IN (${uploadedPlaceholders}) AND user_id = $${uploadedDocumentIds.length + 1}
+              GROUP BY document_id
+            `;
+            const chunkCheckResult = await pool.query(chunkCheckQuery, [...uploadedDocumentIds, userId]);
+            console.log('Chunk check result:', chunkCheckResult.rows);
+          }
         }
         
         // Combine and sort by similarity
