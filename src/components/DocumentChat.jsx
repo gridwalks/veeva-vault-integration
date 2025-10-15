@@ -6,6 +6,20 @@ import ChatPromptBox from './ChatPromptBox.jsx';
 import { chatWithDocuments, createQAInteraction, getUploadedDocuments } from '../api';
 import { getSessionId } from '../utils/sessionManager';
 
+// Helper function to estimate token count (rough approximation)
+const estimateTokens = (text) => {
+  // Rough estimation: 1 token ≈ 4 characters for English text
+  // This is a conservative estimate - actual tokenization varies
+  return Math.ceil(text.length / 4);
+};
+
+// Helper function to estimate conversation history tokens
+const estimateConversationTokens = (conversationHistory) => {
+  return conversationHistory.reduce((total, message) => {
+    return total + estimateTokens(message.content || '');
+  }, 0);
+};
+
 export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], onOpenDocumentInPane, onDocumentsSelected }) {
   const [conversationHistory, setConversationHistory] = useState([]);
   const [currentMessage, setCurrentMessage] = useState('');
@@ -155,7 +169,12 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       console.log('File upload results:', {
         filesUploaded: files.length,
         successfulUploads: newUploadedDocumentIds.length,
-        uploadedIds: newUploadedDocumentIds
+        uploadedIds: newUploadedDocumentIds,
+        fileSizes: files.map(f => ({
+          name: f.name,
+          sizeBytes: f.size,
+          estimatedTokens: estimateTokens(f.name) // File name tokens
+        }))
       });
       
       // Add uploaded documents to attached documents for session persistence
@@ -198,6 +217,35 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
         ...attachedDocuments.map(doc => doc.id),
         ...newUploadedDocumentIds.map(id => `uploaded_${id}`)
       ];
+      
+      // Log token count information for debugging
+      const messageTokens = estimateTokens(userMessage);
+      const conversationTokens = estimateConversationTokens(newHistory);
+      const totalEstimatedTokens = messageTokens + conversationTokens;
+      
+      console.log('Token count estimation:', {
+        userMessage: {
+          text: userMessage.substring(0, 100) + '...',
+          tokens: messageTokens
+        },
+        conversationHistory: {
+          messageCount: newHistory.length,
+          tokens: conversationTokens
+        },
+        totalEstimatedTokens: totalEstimatedTokens,
+        documentCount: allDocumentIds.length,
+        contextWindowLimit: 8192,
+        approachingLimit: totalEstimatedTokens > 6000, // Warning threshold
+        overLimit: totalEstimatedTokens > 8192
+      });
+      
+      if (totalEstimatedTokens > 6000) {
+        console.warn('⚠️ High token count detected! This may cause context window issues.');
+      }
+      
+      if (totalEstimatedTokens > 8192) {
+        console.error('❌ Token count exceeds context window limit! Request will likely fail.');
+      }
       
       console.log('Sending chat request with document IDs:', {
         selectedDocuments: selectedDocuments.map(doc => doc.veeva_document_id),
