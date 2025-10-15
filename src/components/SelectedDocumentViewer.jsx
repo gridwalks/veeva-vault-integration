@@ -417,7 +417,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
             color: '#374151',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}>
-            Selected Documents
+            Workspace
           </h3>
         </div>
 
@@ -803,7 +803,9 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                         textAlign: 'center',
                         padding: '40px'
                       }}>
-                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>📄</div>
+                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>
+                          <img src="/work-space-icon.png" alt="Document" style={{ width: '48px', height: '48px' }} />
+                        </div>
                         <h4 style={{
                           margin: '0 0 8px 0',
                           color: '#374151',
@@ -860,7 +862,9 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
               textAlign: 'center',
               color: '#6b7280'
             }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📄</div>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>
+                <img src="/work-space-icon.png" alt="Document" style={{ width: '48px', height: '48px' }} />
+              </div>
               <h4 style={{
                 margin: '0 0 8px 0',
                 color: '#374151',
