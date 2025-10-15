@@ -15,6 +15,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
+  const [uploadedDocumentIds, setUploadedDocumentIds] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [userId, setUserId] = useState(null);
@@ -137,6 +138,11 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
             onDocumentsSelected(uploadedDocsData);
             console.log('Auto-selected uploaded documents for comparison:', uploadedDocsData);
             
+            // Store uploaded document IDs for chat requests
+            const newUploadedIds = uploadedDocsData.map(doc => `uploaded_${doc.id}`);
+            setUploadedDocumentIds(prev => [...prev, ...newUploadedIds]);
+            console.log('Stored uploaded document IDs for chat:', newUploadedIds);
+            
             // Show notification
             setNotification({
               type: 'success',
@@ -194,9 +200,21 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     setConversationHistory(newHistory);
 
     try {
+      const allDocumentIds = [
+        ...selectedDocuments.map(doc => doc.veeva_document_id),
+        ...uploadedDocumentIds
+      ];
+      
+      console.log('Sending chat request with document IDs:', {
+        selectedDocuments: selectedDocuments.map(doc => doc.veeva_document_id),
+        uploadedDocumentIds,
+        allDocumentIds,
+        message: userMessage.substring(0, 100) + '...'
+      });
+      
       const data = await chatWithDocuments({
         message: userMessage,
-        documentIds: selectedDocuments.map(doc => doc.veeva_document_id),
+        documentIds: allDocumentIds,
         conversationHistory: newHistory,
         userId: userId
       });
@@ -246,6 +264,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     setConversationHistory([]);
     setUsedDocuments([]);
     setError(null);
+    setUploadedDocumentIds([]); // Clear uploaded document IDs when conversation is cleared
   };
 
   const handleOpenDocument = (document) => {
