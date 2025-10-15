@@ -178,8 +178,8 @@ async function extractTextFromFile(fileBuffer, fileName) {
 // Helper function to generate AI summary
 async function generateSummary(text, fileName) {
   try {
-    // For very large files, use a more conservative approach
-    const maxTextLength = Math.min(6000, text.length);
+    // Very conservative approach - only use first 3000 characters
+    const maxTextLength = Math.min(3000, text.length);
     const truncatedText = text.substring(0, maxTextLength);
     
     console.log(`Generating summary for ${fileName}: ${text.length} chars -> ${truncatedText.length} chars`);
@@ -189,22 +189,22 @@ async function generateSummary(text, fileName) {
       messages: [
         {
           role: "system",
-          content: "You are a helpful assistant that creates concise, informative summaries of documents. Focus on key points, main topics, and important information."
+          content: "Create a brief summary of the document."
         },
         {
           role: "user",
-          content: `Please create a concise summary of the following document "${fileName}":\n\n${truncatedText}`
+          content: `Summarize: ${fileName}\n\n${truncatedText}`
         }
       ],
-      max_tokens: 500,
-      temperature: 0.3
+      max_tokens: 200,
+      temperature: 0.1
     });
 
     return response.choices[0].message.content.trim();
   } catch (error) {
     console.error('Error generating summary:', error);
     // If summary generation fails, return a basic summary instead of failing the entire upload
-    return `Document: ${fileName} (${text.length} characters) - Summary generation skipped due to size constraints`;
+    return `Document: ${fileName} (${text.length} characters) - Summary generation failed`;
   }
 }
 
@@ -599,17 +599,26 @@ export const handler = async (event) => {
           file.fileName
         );
 
-        // Generate AI summary (skip for very large files to avoid token limits)
+        // Generate AI summary (skip for large files to avoid token limits)
         let summary = '';
-        if (extractedText.length > 50000) {
-          console.log(`Skipping summary generation for large file: ${file.fileName} (${extractedText.length} chars)`);
-          summary = `Large document: ${file.fileName} (${extractedText.length} characters) - Summary generation skipped due to size constraints`;
+        if (extractedText.length > 20000) {
+          console.log(`Skipping AI summary generation for large file: ${file.fileName} (${extractedText.length} chars)`);
+          // Create a basic text-based summary instead
+          const firstParagraph = extractedText.split('\n\n')[0] || extractedText.substring(0, 500);
+          summary = `Large document: ${file.fileName} (${extractedText.length} characters)\n\nFirst section: ${firstParagraph.substring(0, 200)}...`;
         } else {
-          console.log(`Generating AI summary for: ${file.fileName}`);
-          const summaryStartTime = Date.now();
-          summary = await generateSummary(extractedText, file.fileName);
-          const summaryDuration = Date.now() - summaryStartTime;
-          console.log(`AI summary generated in ${summaryDuration}ms for: ${file.fileName}`);
+          try {
+            console.log(`Generating AI summary for: ${file.fileName}`);
+            const summaryStartTime = Date.now();
+            summary = await generateSummary(extractedText, file.fileName);
+            const summaryDuration = Date.now() - summaryStartTime;
+            console.log(`AI summary generated in ${summaryDuration}ms for: ${file.fileName}`);
+          } catch (summaryError) {
+            console.error(`Summary generation failed for ${file.fileName}:`, summaryError);
+            // Fallback to basic text summary
+            const firstParagraph = extractedText.split('\n\n')[0] || extractedText.substring(0, 500);
+            summary = `Document: ${file.fileName} (${extractedText.length} characters)\n\nFirst section: ${firstParagraph.substring(0, 200)}...`;
+          }
         }
 
         // Store document in database
