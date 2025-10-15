@@ -190,7 +190,10 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
                                userMessage.toLowerCase().includes('review') ||
                                userMessage.toLowerCase().includes('errors based on');
       
-      if (isComparisonQuery && allDocumentIds.length === 0) {
+      // Check if user has documents (either attached or in current message)
+      const hasDocuments = allDocumentIds.length > 0 || (files && files.length > 0);
+      
+      if (isComparisonQuery && !hasDocuments) {
         // Add a helpful message about selecting documents
         const helpfulMessage = {
           role: 'assistant',
