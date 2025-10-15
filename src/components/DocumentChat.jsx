@@ -235,16 +235,16 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
         },
         totalEstimatedTokens: totalEstimatedTokens,
         documentCount: allDocumentIds.length,
-        contextWindowLimit: 8192,
-        approachingLimit: totalEstimatedTokens > 6000, // Warning threshold
-        overLimit: totalEstimatedTokens > 8192
+        contextWindowLimit: 131072,
+        approachingLimit: totalEstimatedTokens > 100000, // Warning threshold
+        overLimit: totalEstimatedTokens > 131072
       });
       
-      if (totalEstimatedTokens > 6000) {
+      if (totalEstimatedTokens > 100000) {
         console.warn('⚠️ High token count detected! This may cause context window issues.');
       }
       
-      if (totalEstimatedTokens > 8192) {
+      if (totalEstimatedTokens > 131072) {
         console.error('❌ Token count exceeds context window limit! Request will likely fail.');
       }
       

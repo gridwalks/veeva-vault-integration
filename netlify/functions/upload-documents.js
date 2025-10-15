@@ -178,6 +178,12 @@ async function extractTextFromFile(fileBuffer, fileName) {
 // Helper function to generate AI summary
 async function generateSummary(text, fileName) {
   try {
+    // For very large files, use a more conservative approach
+    const maxTextLength = Math.min(6000, text.length);
+    const truncatedText = text.substring(0, maxTextLength);
+    
+    console.log(`Generating summary for ${fileName}: ${text.length} chars -> ${truncatedText.length} chars`);
+    
     const response = await groq.chat.completions.create({
       model: "openai/gpt-oss-20b",
       messages: [
@@ -187,7 +193,7 @@ async function generateSummary(text, fileName) {
         },
         {
           role: "user",
-          content: `Please create a concise summary of the following document "${fileName}":\n\n${text.substring(0, 16000)}`
+          content: `Please create a concise summary of the following document "${fileName}":\n\n${truncatedText}`
         }
       ],
       max_tokens: 500,
@@ -197,7 +203,8 @@ async function generateSummary(text, fileName) {
     return response.choices[0].message.content.trim();
   } catch (error) {
     console.error('Error generating summary:', error);
-    return `Summary generation failed for ${fileName}`;
+    // If summary generation fails, return a basic summary instead of failing the entire upload
+    return `Document: ${fileName} (${text.length} characters) - Summary generation skipped due to size constraints`;
   }
 }
 
@@ -592,12 +599,18 @@ export const handler = async (event) => {
           file.fileName
         );
 
-        // Generate AI summary
-        console.log(`Generating AI summary for: ${file.fileName}`);
-        const summaryStartTime = Date.now();
-        const summary = await generateSummary(extractedText, file.fileName);
-        const summaryDuration = Date.now() - summaryStartTime;
-        console.log(`AI summary generated in ${summaryDuration}ms for: ${file.fileName}`);
+        // Generate AI summary (skip for very large files to avoid token limits)
+        let summary = '';
+        if (extractedText.length > 50000) {
+          console.log(`Skipping summary generation for large file: ${file.fileName} (${extractedText.length} chars)`);
+          summary = `Large document: ${file.fileName} (${extractedText.length} characters) - Summary generation skipped due to size constraints`;
+        } else {
+          console.log(`Generating AI summary for: ${file.fileName}`);
+          const summaryStartTime = Date.now();
+          summary = await generateSummary(extractedText, file.fileName);
+          const summaryDuration = Date.now() - summaryStartTime;
+          console.log(`AI summary generated in ${summaryDuration}ms for: ${file.fileName}`);
+        }
 
         // Store document in database
         console.log(`Storing document in database: ${file.fileName}`);
