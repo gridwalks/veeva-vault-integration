@@ -79,6 +79,18 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
         })) || []
       });
       
+      // Log individual file results for debugging
+      if (result.results && result.results.length > 0) {
+        result.results.forEach((r, index) => {
+          console.log(`File ${index + 1} (${files[index]?.name}):`, {
+            success: r.success,
+            documentId: r.documentId,
+            error: r.error,
+            fileSize: files[index]?.size
+          });
+        });
+      }
+      
       if (result.success) {
         setUploadProgress({ fileName: files[0].name, progress: 100, success: true });
         
