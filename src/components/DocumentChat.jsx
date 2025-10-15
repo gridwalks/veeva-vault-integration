@@ -69,11 +69,13 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       console.log('Upload API response:', {
         success: result.success,
         resultsCount: result.results?.length || 0,
-        results: result.results?.map(r => ({
+        results: result.results?.map((r, index) => ({
+          fileIndex: index,
+          fileName: files[index]?.name || 'Unknown',
           success: r.success,
           documentId: r.documentId,
-          fileName: r.fileName,
-          error: r.error
+          error: r.error,
+          fileSize: files[index]?.size || 0
         })) || []
       });
       
@@ -155,11 +157,12 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
         setAttachedDocuments(prev => [...prev, ...newAttachedDocs]);
       }
       
-      // If not all files uploaded successfully, show error
+      // If not all files uploaded successfully, show detailed error
       if (newUploadedDocumentIds.length !== files.length) {
+        const failedCount = files.length - newUploadedDocumentIds.length;
         const errorMessage = {
           role: 'assistant',
-          content: `⚠️ Warning: Only ${newUploadedDocumentIds.length} of ${files.length} files uploaded successfully. Some files may have failed to process.`
+          content: `⚠️ Warning: Only ${newUploadedDocumentIds.length} of ${files.length} files uploaded successfully. ${failedCount} file${failedCount !== 1 ? 's' : ''} failed to process. Please check the file format and try again.`
         };
         setConversationHistory(prev => [...prev, errorMessage]);
       }
