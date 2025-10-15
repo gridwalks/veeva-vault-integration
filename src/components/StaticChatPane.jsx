@@ -9,6 +9,7 @@ import { createQAInteraction, getUploadedDocuments, downloadUploadedDocumentUrl 
 const estimateTokens = (text) => {
   // Rough estimation: 1 token ≈ 4 characters for English text
   // This is a conservative estimate - actual tokenization varies
+  // Note: With 8192 token chunks, large documents are better supported
   return Math.ceil(text.length / 4);
 };
 
@@ -194,7 +195,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
         const failedCount = files.length - newUploadedDocumentIds.length;
         const errorMessage = {
           role: 'assistant',
-          content: `⚠️ Warning: Only ${newUploadedDocumentIds.length} of ${files.length} files uploaded successfully. ${failedCount} file${failedCount !== 1 ? 's' : ''} failed to process. This is usually due to file size limits (files over 1MB may not process correctly). Please try with smaller files.`
+          content: `⚠️ Warning: Only ${newUploadedDocumentIds.length} of ${files.length} files uploaded successfully. ${failedCount} file${failedCount !== 1 ? 's' : ''} failed to process. This is usually due to file size limits (files over 5MB may not process correctly) or content complexity. Please try with smaller files.`
         };
         setConversationHistory(prev => [...prev, errorMessage]);
       }

@@ -66,11 +66,11 @@ export default function ChatPromptBox({
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
     if (files.length > 0) {
-      // Check file sizes (warn if > 1MB)
-      const largeFiles = files.filter(file => file.size > 1024 * 1024); // 1MB limit
+      // Check file sizes (warn if > 5MB)
+      const largeFiles = files.filter(file => file.size > 5 * 1024 * 1024); // 5MB limit
       if (largeFiles.length > 0) {
         const largeFileNames = largeFiles.map(f => f.name).join(', ');
-        alert(`Warning: The following files are large and may not process correctly:\n${largeFileNames}\n\nConsider using smaller files or splitting them into parts.`);
+        alert(`Warning: The following files are very large and may take longer to process:\n${largeFileNames}\n\nFiles over 5MB may still fail due to content complexity.`);
       }
       
       setSelectedFiles(prevFiles => [...prevFiles, ...files]);

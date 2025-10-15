@@ -184,7 +184,7 @@ export const handler = async (event) => {
         if (veevaDocumentIds.length > 0) {
           const veevaPlaceholders = veevaDocumentIds.map((_, index) => `$${index + 2}`).join(',');
           // Increase chunk limit for comparison mode to get more comprehensive content
-          const chunkLimit = isComparisonQuery ? 15 : 5;
+          const chunkLimit = isComparisonQuery ? 10 : 5;
           const veevaQuery = `
             SELECT 
               dc.chunk_text,
@@ -236,7 +236,7 @@ export const handler = async (event) => {
         if (uploadedDocumentIds.length > 0) {
           const uploadedPlaceholders = uploadedDocumentIds.map((_, index) => `$${index + 2}`).join(',');
           // Increase chunk limit for comparison mode to get more comprehensive content
-          const chunkLimit = isComparisonQuery ? 15 : 5;
+          const chunkLimit = isComparisonQuery ? 10 : 5;
           const uploadedQuery = `
             SELECT 
               c.chunk_text,
