@@ -614,7 +614,7 @@ export const handler = async (event) => {
          subtype__v = 'Policy')
     `;
 
-    if (nameLike) vql += ` AND name__v CONTAINS '${nameLike.replace(/'/g, "''")}' `;
+    if (nameLike) vql += ` AND (name__v CONTAINS '${nameLike.replace(/'/g, "''")}' OR document_number__v CONTAINS '${nameLike.replace(/'/g, "''")}') `;
     vql += " ORDER BY name__v ";
 
     console.log('VQL Query:', vql);
