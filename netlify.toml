@@ -5,7 +5,9 @@
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["@netlify/blobs"]
-  node_version = "18"
+
+[build.environment]
+  NODE_VERSION = "18"
 
 [[redirects]]
   from = "/api/*"
