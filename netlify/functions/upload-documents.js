@@ -178,14 +178,14 @@ async function extractTextFromFile(fileBuffer, fileName) {
 // Helper function to generate AI summary
 async function generateSummary(text, fileName) {
   try {
-    // Very conservative approach - only use first 3000 characters
-    const maxTextLength = Math.min(3000, text.length);
+    // Very conservative approach - only use first 1000 characters
+    const maxTextLength = Math.min(1000, text.length);
     const truncatedText = text.substring(0, maxTextLength);
     
     console.log(`Generating summary for ${fileName}: ${text.length} chars -> ${truncatedText.length} chars`);
     
     const response = await groq.chat.completions.create({
-      model: "llama-3.1-70b-instruct",
+      model: "openai/gpt-oss-20b",
       messages: [
         {
           role: "system",
@@ -621,14 +621,13 @@ export const handler = async (event) => {
         // Generate AI summary (skip for large files to avoid token limits)
         console.log(`=== FILE PROCESSING DEBUG ===`);
         console.log(`File: ${file.fileName}, Text length: ${extractedText.length} chars`);
-        console.log(`Summary generation: ${extractedText.length > 20000 ? 'SKIPPED' : 'PROCEEDING'}`);
+        console.log(`Summary generation: ${extractedText.length > 10000 ? 'SKIPPED' : 'PROCEEDING'}`);
         
         let summary = '';
-        if (extractedText.length > 20000) {
+        if (extractedText.length > 10000) {
           console.log(`Skipping AI summary generation for large file: ${file.fileName} (${extractedText.length} chars)`);
           // Create a basic text-based summary instead
-          const firstParagraph = extractedText.split('\n\n')[0] || extractedText.substring(0, 500);
-          summary = `Large document: ${file.fileName} (${extractedText.length} characters)\n\nFirst section: ${firstParagraph.substring(0, 200)}...`;
+          summary = `Document: ${file.fileName} (${extractedText.length} characters)`;
           console.log(`Created basic summary for large file: ${summary.length} chars`);
         } else {
           try {
