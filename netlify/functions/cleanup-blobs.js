@@ -1,0 +1,93 @@
+import { getStore } from '@netlify/blobs';
+import { writeBlobAudit } from './blob-audit.js';
+
+const STORE_NAME = 'chat-uploads';
+const MAX_BLOB_AGE_MS = 48 * 60 * 60 * 1000; // 48 hours
+
+function parseTimestamp(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export const handler = async () => {
+  const store = getStore(STORE_NAME);
+  const cutoff = Date.now() - MAX_BLOB_AGE_MS;
+
+  try {
+    const listResult = await store.list?.();
+    const blobs = Array.isArray(listResult?.blobs) ? listResult.blobs : Array.isArray(listResult) ? listResult : [];
+
+    let deleted = 0;
+    const skipped = [];
+
+    for (const blob of blobs) {
+      const createdAt = parseTimestamp(blob?.metadata?.createdAt) || parseTimestamp(blob?.createdAt) || parseTimestamp(blob?.uploadedAt);
+
+      if (!createdAt) {
+        skipped.push({ key: blob?.key, reason: 'missing_created_at' });
+        continue;
+      }
+
+      if (createdAt.getTime() > cutoff) {
+        continue;
+      }
+
+      try {
+        if (typeof store.delete === 'function') {
+          await store.delete(blob.key);
+        } else if (typeof store.del === 'function') {
+          await store.del(blob.key);
+        } else {
+          throw new Error('Blob store does not support deletion');
+        }
+
+        deleted += 1;
+        await writeBlobAudit({
+          action: 'cleanup',
+          blobKey: blob.key,
+          status: 'success',
+          metadata: {
+            createdAt: createdAt.toISOString(),
+            deletedAt: new Date().toISOString()
+          }
+        });
+      } catch (deleteError) {
+        console.error('Cleanup failed for blob:', blob?.key, deleteError);
+        await writeBlobAudit({
+          action: 'cleanup',
+          blobKey: blob?.key,
+          status: 'error',
+          metadata: {
+            createdAt: createdAt.toISOString()
+          },
+          errorMessage: deleteError.message
+        });
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        deleted,
+        scanned: blobs.length,
+        skipped
+      })
+    };
+  } catch (error) {
+    console.error('Failed to clean up blobs:', error);
+    await writeBlobAudit({
+      action: 'cleanup',
+      blobKey: null,
+      status: 'error',
+      errorMessage: error.message
+    });
+
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Failed to clean up blobs' })
+    };
+  }
+};
