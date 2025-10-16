@@ -29,7 +29,7 @@ export const handler = async (event) => {
       SELECT id, document_number__v, name__v, status__v, major_version_number__v, minor_version_number__v, type__v
       FROM documents
         WHERE status__v = STEADYSTATE() AND
-        subtype__v = 'Standard Operating Procedure'
+        subtype__v IN ('Standard Operating Procedure', 'Policy', 'Work Instruction')
     `;
 
     if (nameLike) vql += ` AND name__v CONTAINS '${nameLike.replace(/'/g, "''")}' `;

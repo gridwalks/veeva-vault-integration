@@ -58,18 +58,18 @@ export const handler = async (event) => {
       responseDetails: data.responseDetails
     });
 
-    // Test 3: SOP query (same as indexing)
-    console.log('Test 3: Testing SOP query...');
-    const sopVql = `
+    // Test 3: Document query (same as indexing)
+    console.log('Test 3: Testing document query...');
+    const documentVql = `
       SELECT id, document_number__v, name__v, status__v, major_version_number__v, minor_version_number__v, type__v
       FROM documents
         WHERE status__v = STEADYSTATE() AND
-        subtype__v = 'Standard Operating Procedure'
+        subtype__v IN ('Standard Operating Procedure', 'Policy', 'Work Instruction')
       LIMIT 5
     `;
     
-    const sopBody = new URLSearchParams({ q: sopVql });
-    const sopRes = await fetch(`https://${domain}/api/${v}/query`, {
+    const documentBody = new URLSearchParams({ q: documentVql });
+    const documentRes = await fetch(`https://${domain}/api/${v}/query`, {
       method: "POST",
       headers: {
         "Authorization": sessionId,
@@ -78,22 +78,22 @@ export const handler = async (event) => {
         "X-VaultAPI-DescribeQuery": "true",
         "X-VaultAPI-PageSize": "5",
       },
-      body: sopBody,
+      body: documentBody,
     });
 
-    console.log('Test 3: SOP query response:', {
-      status: sopRes.status,
-      statusText: sopRes.statusText,
-      ok: sopRes.ok
+    console.log('Test 3: Document query response:', {
+      status: documentRes.status,
+      statusText: documentRes.statusText,
+      ok: documentRes.ok
     });
 
-    const sopData = await sopRes.json();
-    console.log('Test 3: SOP query data:', {
-      responseStatus: sopData.responseStatus,
-      hasData: !!sopData.data,
-      dataLength: sopData.data?.length || 0,
-      responseDetails: sopData.responseDetails,
-      errors: sopData.errors
+    const documentData = await documentRes.json();
+    console.log('Test 3: Document query data:', {
+      responseStatus: documentData.responseStatus,
+      hasData: !!documentData.data,
+      dataLength: documentData.data?.length || 0,
+      responseDetails: documentData.responseDetails,
+      errors: documentData.errors
     });
 
     return {
