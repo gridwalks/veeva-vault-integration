@@ -291,7 +291,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       const allDocumentIds = [
         ...selectedDocuments.map(doc => doc.veeva_document_id),
         ...attachedDocuments.map(doc => doc.id),
-        ...newBlobUploads.filter(upload => upload.indexed && upload.documentId).map(upload => upload.documentId)
+        ...newBlobUploads.filter(upload => upload.indexed && upload.documentId).map(upload => `uploaded_${upload.documentId}`)
       ];
 
       const blobAttachmentMap = new Map();

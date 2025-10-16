@@ -126,8 +126,8 @@ export const handler = async (event) => {
     if (documentIds && Array.isArray(documentIds)) {
       documentIds.forEach(id => {
         if (typeof id === 'string' && id.startsWith('uploaded_')) {
-          // Extract the numeric ID after 'uploaded_' prefix
-          uploadedDocumentIds.push(parseInt(id.substring(9), 10));
+          // Extract the UUID after 'uploaded_' prefix
+          uploadedDocumentIds.push(id.substring(9));
         } else {
           veevaDocumentIds.push(id);
         }

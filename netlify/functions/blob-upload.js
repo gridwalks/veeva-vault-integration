@@ -120,14 +120,6 @@ async function processAndIndexDocument(fileBuffer, fileName, blobKey, userId = n
       INSERT INTO qms_chat_documents 
       (id, document_name, document_type, version, document_number, user_id, created_at, updated_at, source)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      ON CONFLICT (id) DO UPDATE SET
-        document_name = $2,
-        document_type = $3,
-        version = $4,
-        document_number = $5,
-        user_id = $6,
-        updated_at = $7,
-        source = $9
     `, [
       documentId,
       fileName,
@@ -170,8 +162,6 @@ async function processAndIndexDocument(fileBuffer, fileName, blobKey, userId = n
             INSERT INTO qms_chat_document_chunks 
             (document_id, veeva_document_id, chunk_index, chunk_text, embedding, token_count, user_id)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (document_id, chunk_index) 
-            DO UPDATE SET chunk_text = $4, embedding = $5, token_count = $6, user_id = $7, created_at = CURRENT_TIMESTAMP
           `, [
             documentId,
             null, // No Veeva document ID for uploaded files
