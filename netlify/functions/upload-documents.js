@@ -184,6 +184,28 @@ async function generateSummary(text, fileName) {
     
     console.log(`Generating summary for ${fileName}: ${text.length} chars -> ${truncatedText.length} chars`);
     
+    console.log(`Attempting Groq API call with model: openai/gpt-oss-20b`);
+    console.log(`Text length being sent: ${truncatedText.length} characters`);
+    
+    // First, let's test if the model is available with a simple call
+    try {
+      const testResponse = await groq.chat.completions.create({
+        model: "openai/gpt-oss-20b",
+        messages: [
+          {
+            role: "user",
+            content: "Hello"
+          }
+        ],
+        max_tokens: 10,
+        temperature: 0.1
+      });
+      console.log(`Model test successful: ${testResponse.choices[0]?.message?.content}`);
+    } catch (testError) {
+      console.error('Model test failed:', testError.message);
+      throw testError;
+    }
+    
     const response = await groq.chat.completions.create({
       model: "openai/gpt-oss-20b",
       messages: [
@@ -199,18 +221,28 @@ async function generateSummary(text, fileName) {
       max_tokens: 200,
       temperature: 0.1
     });
+    
+    console.log(`Groq API call successful for ${fileName}`);
 
     return response.choices[0].message.content.trim();
   } catch (error) {
     console.error('Error generating summary:', {
       fileName,
       textLength: text.length,
-      truncatedLength: Math.min(3000, text.length),
+      truncatedLength: Math.min(1000, text.length),
       errorMessage: error.message,
       errorStatus: error.status,
       errorCode: error.code,
-      errorType: error.type
+      errorType: error.type,
+      fullError: error,
+      model: "openai/gpt-oss-20b"
     });
+    
+    // Check if this is a model-related error
+    if (error.message && error.message.includes('8192')) {
+      console.error('CRITICAL: 8192 token limit error detected! This suggests the model is not working as expected.');
+    }
+    
     // If summary generation fails, return a basic summary instead of failing the entire upload
     return `Document: ${fileName} (${text.length} characters) - Summary generation failed: ${error.message}`;
   }
