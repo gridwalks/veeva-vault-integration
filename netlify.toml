@@ -4,8 +4,14 @@
 
 [functions]
   node_bundler = "esbuild"
+  external_node_modules = ["@netlify/blobs"]
+  node_version = "18"
 
 [[redirects]]
   from = "/api/*"
   to   = "/.netlify/functions/:splat"
   status = 200
+
+[[scheduled]]
+  path = "/.netlify/functions/cleanup-blobs"
+  schedule = "0 2 * * *"

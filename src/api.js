@@ -180,10 +180,15 @@ export async function getUploadedDocuments({ limit = 50, offset = 0, search = ''
   }
 }
 
-export async function chatWithDocuments({ message, documentIds = [], conversationHistory = [], userId }) {
+export async function chatWithDocuments({ message, documentIds = [], conversationHistory = [], userId, attachments = [] }) {
   const startTime = Date.now();
-  console.log('Sending chat message...', { message: message.substring(0, 100) + '...', documentIds, userId });
-  
+  console.log('Sending chat message...', {
+    message: message.substring(0, 100) + '...',
+    documentIds,
+    userId,
+    attachmentCount: attachments.length
+  });
+
   try {
     const res = await fetch('/api/chat-with-documents', {
       method: 'POST',
@@ -194,7 +199,8 @@ export async function chatWithDocuments({ message, documentIds = [], conversatio
         message,
         documentIds,
         conversationHistory,
-        userId
+        userId,
+        attachments
       })
     });
     

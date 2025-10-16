@@ -31,6 +31,8 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [attachedDocuments, setAttachedDocuments] = useState([]);
   const [isProcessingAttachments, setIsProcessingAttachments] = useState(false);
+  const [uploadedBlobs, setUploadedBlobs] = useState([]);
+  const [purgeUploadsOnClear, setPurgeUploadsOnClear] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [userId, setUserId] = useState(null);
@@ -39,6 +41,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
   const chatPromptBoxRef = useRef(null);
+  const uploadedBlobKeysRef = useRef([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -55,78 +58,120 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    uploadedBlobKeysRef.current = uploadedBlobs.map(blob => blob.key);
+  }, [uploadedBlobs]);
+
+  const uploadFileToBlob = async (file) => {
+    const response = await fetch('/.netlify/functions/blob-upload?includeUrl=true', {
+      method: 'POST',
+      headers: {
+        'Content-Type': file.type || 'application/octet-stream',
+        'x-file-name': encodeURIComponent(file.name),
+        'x-file-size': file.size.toString()
+      },
+      body: file
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    if (!result?.key) {
+      throw new Error('Upload response missing blob key');
+    }
+
+    return {
+      key: result.key,
+      url: result.url || null,
+      createdAt: result.createdAt,
+      name: file.name,
+      size: file.size,
+      type: file.type
+    };
+  };
+
   const handleFileUpload = async (files) => {
     if (!files || files.length === 0) return [];
 
     setIsUploading(true);
     setUploadProgress({ fileName: files[0].name, progress: 0 });
 
+    const uploaded = [];
+
     try {
-      const formData = new FormData();
-      files.forEach((file, index) => {
-        formData.append(`file_${index}`, file);
-      });
-      formData.append('fileCount', files.length.toString());
-      formData.append('uploadType', 'chat_upload');
-      formData.append('userId', userId);
-
-      const response = await fetch('/api/upload-documents', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      
-      console.log('Upload API response:', {
-        success: result.success,
-        resultsCount: result.results?.length || 0,
-        results: result.results?.map((r, index) => ({
-          fileIndex: index,
-          fileName: files[index]?.name || 'Unknown',
-          success: r.success,
-          documentId: r.documentId,
-          error: r.error,
-          fileSize: files[index]?.size || 0
-        })) || []
-      });
-      
-      // Log individual file results for debugging
-      if (result.results && result.results.length > 0) {
-        result.results.forEach((r, index) => {
-          console.log(`File ${index + 1} (${files[index]?.name}):`, {
-            success: r.success,
-            documentId: r.documentId,
-            error: r.error,
-            fileSize: files[index]?.size
-          });
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index];
+        setUploadProgress({ fileName: file.name, progress: Math.round((index / files.length) * 100) });
+        const upload = await uploadFileToBlob(file);
+        uploaded.push(upload);
+        setUploadProgress({ fileName: file.name, progress: Math.round(((index + 1) / files.length) * 100), success: true });
+        console.log('Blob upload completed:', {
+          fileName: file.name,
+          key: upload.key,
+          size: file.size,
+          urlReturned: Boolean(upload.url)
         });
       }
-      
-      if (result.success) {
-        setUploadProgress({ fileName: files[0].name, progress: 100, success: true });
-        
-        // Return uploaded document IDs for immediate use
-        const newDocumentIds = result.results
-          .filter(r => r.success)
-          .map(r => r.documentId);
-        
-        console.log('Successfully uploaded document IDs:', newDocumentIds);
-        return newDocumentIds;
-      } else {
-        console.error('Upload failed:', result.error);
-        throw new Error(result.error || 'Upload failed');
+
+      if (uploaded.length > 0) {
+        setUploadedBlobs(prev => {
+          const existingKeys = new Set(prev.map(item => item.key));
+          const merged = [...prev];
+          uploaded.forEach(item => {
+            if (!existingKeys.has(item.key)) {
+              merged.push(item);
+            }
+          });
+          return merged;
+        });
       }
+
+      return uploaded;
     } catch (error) {
       console.error('Upload error:', error);
       setUploadProgress({ fileName: files[0].name, progress: 0, error: error.message });
-      return [];
+      return uploaded;
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const purgeUploadedBlobs = async (keys = []) => {
+    if (!keys || keys.length === 0) {
+      return;
+    }
+
+    const uniqueKeys = Array.from(new Set(keys.filter(Boolean)));
+    if (uniqueKeys.length === 0) {
+      return;
+    }
+
+    console.log('Purging uploaded blobs:', uniqueKeys);
+
+    await Promise.allSettled(
+      uniqueKeys.map(async (key) => {
+        try {
+          const response = await fetch('/.netlify/functions/blob-delete', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ key })
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to delete blob ${key}: ${response.status} ${response.statusText} - ${errorText}`);
+          }
+
+          console.log('Blob deleted successfully:', key);
+        } catch (error) {
+          console.error('Error deleting blob:', key, error);
+        }
+      })
+    );
   };
 
   const triggerFileUpload = () => {
@@ -139,6 +184,14 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     // Scroll to bottom when new messages are added
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversationHistory, isLoading]);
+
+  useEffect(() => {
+    return () => {
+      if (purgeUploadsOnClear && uploadedBlobKeysRef.current.length > 0) {
+        purgeUploadedBlobs(uploadedBlobKeysRef.current);
+      }
+    };
+  }, [purgeUploadsOnClear]);
 
   const sendMessage = async (message, files = []) => {
     if (!message.trim() || isLoading) return;
@@ -153,7 +206,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     setConversationHistory(newHistory);
 
     // Handle file upload if files are provided - WAIT for completion
-    let newUploadedDocumentIds = [];
+    let newBlobUploads = [];
     if (files && files.length > 0) {
       setIsProcessingAttachments(true);
       
@@ -165,36 +218,25 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       setConversationHistory(prev => [...prev, processingMessage]);
       
       // Wait for files to be fully processed
-      newUploadedDocumentIds = await handleFileUpload(files);
-      
-      console.log('File upload results:', {
+      newBlobUploads = await handleFileUpload(files);
+
+      console.log('Blob upload results:', {
         filesUploaded: files.length,
-        successfulUploads: newUploadedDocumentIds.length,
-        uploadedIds: newUploadedDocumentIds,
+        successfulUploads: newBlobUploads.length,
+        uploadedKeys: newBlobUploads.map(upload => upload.key),
         fileSizes: files.map(f => ({
           name: f.name,
           sizeBytes: f.size,
-          estimatedTokens: estimateTokens(f.name) // File name tokens
+          estimatedTokens: estimateTokens(f.name)
         }))
       });
-      
-      // Add uploaded documents to attached documents for session persistence
-      if (newUploadedDocumentIds.length > 0) {
-        const newAttachedDocs = newUploadedDocumentIds.map((id, index) => ({
-          id: `uploaded_${id}`,
-          name: files[index]?.name || 'Uploaded Document',
-          type: 'uploaded_document',
-          source: 'upload'
-        }));
-        setAttachedDocuments(prev => [...prev, ...newAttachedDocs]);
-      }
-      
+
       // If not all files uploaded successfully, show detailed error
-      if (newUploadedDocumentIds.length !== files.length) {
-        const failedCount = files.length - newUploadedDocumentIds.length;
+      if (newBlobUploads.length !== files.length) {
+        const failedCount = files.length - newBlobUploads.length;
         const errorMessage = {
           role: 'assistant',
-          content: `⚠️ Warning: Only ${newUploadedDocumentIds.length} of ${files.length} files uploaded successfully. ${failedCount} file${failedCount !== 1 ? 's' : ''} failed to process. This is usually due to file size limits (files over 5MB may not process correctly) or content complexity. Please try with smaller files.`
+          content: `⚠️ Warning: Only ${newBlobUploads.length} of ${files.length} files uploaded successfully. ${failedCount} file${failedCount !== 1 ? 's' : ''} failed to process. This is usually due to file size limits (files over 5MB may not process correctly) or content complexity. Please try with smaller files.`
         };
         setConversationHistory(prev => [...prev, errorMessage]);
       }
@@ -206,7 +248,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
           ...withoutProcessing,
           {
             role: 'assistant',
-            content: `✅ Files processed successfully! Now I can answer your question about the ${newUploadedDocumentIds.length} document${newUploadedDocumentIds.length !== 1 ? 's' : ''} you attached.`
+            content: `✅ Files processed successfully! Now I can answer your question about the ${newBlobUploads.length} upload${newBlobUploads.length !== 1 ? 's' : ''} you attached.`
           }
         ];
       });
@@ -215,9 +257,29 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     try {
       const allDocumentIds = [
         ...selectedDocuments.map(doc => doc.veeva_document_id),
-        ...attachedDocuments.map(doc => doc.id),
-        ...newUploadedDocumentIds.map(id => `uploaded_${id}`)
+        ...attachedDocuments.map(doc => doc.id)
       ];
+
+      const blobAttachmentMap = new Map();
+      uploadedBlobs.forEach(item => {
+        if (item?.key) {
+          blobAttachmentMap.set(item.key, item);
+        }
+      });
+      newBlobUploads.forEach(item => {
+        if (item?.key) {
+          blobAttachmentMap.set(item.key, item);
+        }
+      });
+
+      const blobAttachmentsForRequest = Array.from(blobAttachmentMap.values()).map(item => ({
+        key: item.key,
+        url: item.url,
+        createdAt: item.createdAt,
+        name: item.name,
+        size: item.size,
+        type: item.type
+      }));
       
       // Log token count information for debugging
       const messageTokens = estimateTokens(userMessage);
@@ -251,11 +313,12 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       console.log('Sending chat request with document IDs:', {
         selectedDocuments: selectedDocuments.map(doc => doc.veeva_document_id),
         attachedDocuments: attachedDocuments.map(doc => doc.id),
-        newUploadedDocumentIds: newUploadedDocumentIds.map(id => `uploaded_${id}`),
+        blobAttachments: blobAttachmentsForRequest.map(item => item.key),
         allDocumentIds,
         message: userMessage.substring(0, 100) + '...',
         attachedDocumentsLength: attachedDocuments.length,
-        newUploadedLength: newUploadedDocumentIds.length,
+        newUploadCount: newBlobUploads.length,
+        totalBlobAttachments: blobAttachmentsForRequest.length,
         selectedDocumentsLength: selectedDocuments.length
       });
       
@@ -266,7 +329,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
                                userMessage.toLowerCase().includes('errors based on');
       
       // Check if user has documents (either attached or in current message)
-      const hasDocuments = allDocumentIds.length > 0 || (files && files.length > 0);
+      const hasDocuments = allDocumentIds.length > 0 || (files && files.length > 0) || uploadedBlobs.length > 0 || newBlobUploads.length > 0;
       
       if (isComparisonQuery && !hasDocuments) {
         // Add a helpful message about uploading documents
@@ -293,7 +356,8 @@ The files will upload automatically and I'll be able to perform a detailed compa
         message: userMessage,
         documentIds: allDocumentIds,
         conversationHistory: newHistory,
-        userId: userId
+        userId: userId,
+        attachments: blobAttachmentsForRequest
       });
 
       // Update conversation with AI response
@@ -344,6 +408,10 @@ The files will upload automatically and I'll be able to perform a detailed compa
     setUsedDocuments([]);
     setError(null);
     setAttachedDocuments([]);
+    if (purgeUploadsOnClear && uploadedBlobKeysRef.current.length > 0) {
+      purgeUploadedBlobs(uploadedBlobKeysRef.current);
+    }
+    setUploadedBlobs([]);
     // Clear files from ChatPromptBox
     if (chatPromptBoxRef.current) {
       chatPromptBoxRef.current();
@@ -882,21 +950,23 @@ The files will upload automatically and I'll be able to perform a detailed compa
               }}>
                 Chat with Documents
               </h3>
-              {selectedDocuments.length > 0 || attachedDocuments.length > 0 ? (
-                <p style={{ 
-                  margin: '4px 0 0 0', 
-                  fontSize: '13px', 
-                  color: '#666' 
+              {selectedDocuments.length > 0 || attachedDocuments.length > 0 || uploadedBlobs.length > 0 ? (
+                <p style={{
+                  margin: '4px 0 0 0',
+                  fontSize: '13px',
+                  color: '#666'
                 }}>
                   {selectedDocuments.length > 0 && `${selectedDocuments.length} Veeva document${selectedDocuments.length !== 1 ? 's' : ''}`}
-                  {selectedDocuments.length > 0 && attachedDocuments.length > 0 && ', '}
-                  {attachedDocuments.length > 0 && `${attachedDocuments.length} attached file${attachedDocuments.length !== 1 ? 's' : ''}`}
-                  {(selectedDocuments.length + attachedDocuments.length) >= 2 && (
-                    <span style={{ 
-                      marginLeft: '8px', 
-                      padding: '2px 6px', 
-                      backgroundColor: '#e3f2fd', 
-                      color: '#1976d2', 
+                  {selectedDocuments.length > 0 && (attachedDocuments.length > 0 || uploadedBlobs.length > 0) && ', '}
+                  {attachedDocuments.length > 0 && `${attachedDocuments.length} indexed upload${attachedDocuments.length !== 1 ? 's' : ''}`}
+                  {attachedDocuments.length > 0 && uploadedBlobs.length > 0 && ', '}
+                  {uploadedBlobs.length > 0 && `${uploadedBlobs.length} chat upload${uploadedBlobs.length !== 1 ? 's' : ''}`}
+                  {(selectedDocuments.length + attachedDocuments.length + uploadedBlobs.length) >= 2 && (
+                    <span style={{
+                      marginLeft: '8px',
+                      padding: '2px 6px',
+                      backgroundColor: '#e3f2fd',
+                      color: '#1976d2',
                       borderRadius: '12px', 
                       fontSize: '11px',
                       fontWeight: '500'
@@ -904,22 +974,22 @@ The files will upload automatically and I'll be able to perform a detailed compa
                       🔍 Comparison Ready
                     </span>
                   )}
-                  {attachedDocuments.length > 0 && (
-                    <span style={{ 
-                      marginLeft: '8px', 
-                      padding: '2px 6px', 
-                      backgroundColor: '#e8f5e8', 
-                      color: '#2e7d32', 
-                      borderRadius: '12px', 
+                  {(attachedDocuments.length > 0 || uploadedBlobs.length > 0) && (
+                    <span style={{
+                      marginLeft: '8px',
+                      padding: '2px 6px',
+                      backgroundColor: '#e8f5e8',
+                      color: '#2e7d32',
+                      borderRadius: '12px',
                       fontSize: '11px',
                       fontWeight: '500'
                     }}>
-                      📎 Attached
+                      📎 Attachments ready
                     </span>
                   )}
                 </p>
               ) : (
-                <p style={{ 
+                <p style={{
                   margin: '4px 0 0 0', 
                   fontSize: '13px', 
                   color: '#999' 
@@ -928,7 +998,16 @@ The files will upload automatically and I'll be able to perform a detailed compa
                 </p>
               )}
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#495057' }}>
+                <input
+                  type="checkbox"
+                  checked={purgeUploadsOnClear}
+                  onChange={(event) => setPurgeUploadsOnClear(event.target.checked)}
+                  style={{ cursor: 'pointer' }}
+                />
+                Delete uploads on clear
+              </label>
               {conversationHistory.length > 0 && (
                 <button
                   onClick={clearConversation}
