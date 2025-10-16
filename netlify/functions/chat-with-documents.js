@@ -379,26 +379,56 @@ export const handler = async (event) => {
     // Always run keyword search for document numbers, even if semantic search worked
     // This ensures we catch exact document number matches that semantic search might miss
     console.log('Running keyword search for document numbers...');
-    const searchTerms = message.toLowerCase().split(' ').filter(term => {
+    const searchTerms = message.toLowerCase().split(/\s+/).filter(term => {
+      // Remove punctuation from the end of terms but keep internal punctuation
+      const cleanTerm = term.replace(/[.,!?;:]$/, '');
+      
       // Keep terms longer than 3 characters
-      if (term.length > 3) return true;
+      if (cleanTerm.length > 3) return true;
       
       // Keep terms that look like document numbers (contain numbers, hyphens, or are alphanumeric)
-      if (/^[a-z0-9\-_]+$/i.test(term)) return true;
+      if (/^[a-z0-9\-_]+$/i.test(cleanTerm)) return true;
       
       // Keep single letters that might be important (like "A", "B", "C" in document codes)
-      if (term.length === 1 && /^[a-z]$/i.test(term)) return true;
+      if (cleanTerm.length === 1 && /^[a-z]$/i.test(cleanTerm)) return true;
       
       return false;
     });
     
     console.log('Search terms after filtering:', {
       originalMessage: message,
-      allTerms: message.toLowerCase().split(' '),
-      filteredTerms: searchTerms
+      allTerms: message.toLowerCase().split(/\s+/),
+      filteredTerms: searchTerms,
+      searchTermDetails: searchTerms.map(term => ({
+        term,
+        length: term.length,
+        isDocumentNumber: /^[a-z0-9\-_]+$/i.test(term),
+        isLongEnough: term.length > 3
+      }))
     });
     
     if (searchTerms.length > 0 && veevaDocumentIds.length === 0 && uploadedDocumentIds.length === 0) {
+        // First, try exact document number matches (case-insensitive)
+        const exactMatches = [];
+        for (const term of searchTerms) {
+          if (/^[a-z0-9\-_]+$/i.test(term)) {
+            console.log(`Checking for exact document number match: ${term}`);
+            const exactQuery = `
+              SELECT veeva_document_id, document_number, document_name, 
+                     major_version, minor_version, document_type, status, summary, manual_summary,
+                     'veeva' as source_type
+              FROM Veeva_Doc_Chat_document_index 
+              WHERE document_number ILIKE $1
+              LIMIT 5
+            `;
+            const exactResult = await pool.query(exactQuery, [term]);
+            if (exactResult.rows.length > 0) {
+              console.log(`Found exact match for ${term}:`, exactResult.rows.map(doc => doc.document_number));
+              exactMatches.push(...exactResult.rows);
+            }
+          }
+        }
+        
         // Create a search query that looks for terms in document names, summaries, manual summaries, types, and document numbers
         const searchConditions = searchTerms.map((term, index) => 
           `(document_name ILIKE $${index + 1} OR summary ILIKE $${index + 1} OR manual_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1} OR document_number ILIKE $${index + 1})`
@@ -429,16 +459,24 @@ export const handler = async (event) => {
         const result = await pool.query(query, [...searchParams, searchParams, searchParams, searchParams]);
         const keywordSearchDocuments = result.rows;
         
-        console.log(`Found ${keywordSearchDocuments.length} relevant documents based on keyword search`);
-        console.log('Keyword search documents:', keywordSearchDocuments.map(doc => ({
+        // Combine exact matches with general search results, prioritizing exact matches
+        const allKeywordDocuments = [...exactMatches, ...keywordSearchDocuments];
+        // Remove duplicates based on veeva_document_id
+        const uniqueKeywordDocuments = allKeywordDocuments.filter((doc, index, self) => 
+          index === self.findIndex(d => d.veeva_document_id === doc.veeva_document_id)
+        );
+        
+        console.log(`Found ${uniqueKeywordDocuments.length} relevant documents based on keyword search (${exactMatches.length} exact matches, ${keywordSearchDocuments.length} general matches)`);
+        console.log('Keyword search documents:', uniqueKeywordDocuments.map(doc => ({
           id: doc.veeva_document_id,
           number: doc.document_number,
-          name: doc.document_name
+          name: doc.document_name,
+          isExactMatch: exactMatches.some(exact => exact.veeva_document_id === doc.veeva_document_id)
         })));
         
         // Merge with existing documents from semantic search, avoiding duplicates
         const existingDocIds = new Set(relevantDocuments.map(doc => doc.veeva_document_id || doc.document_id));
-        const newDocuments = keywordSearchDocuments.filter(doc => !existingDocIds.has(doc.veeva_document_id));
+        const newDocuments = uniqueKeywordDocuments.filter(doc => !existingDocIds.has(doc.veeva_document_id));
         relevantDocuments.push(...newDocuments);
         
         console.log(`Added ${newDocuments.length} new documents from keyword search (${relevantDocuments.length} total)`);
