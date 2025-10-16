@@ -1,9 +1,9 @@
-import { downloadUrl, updateManualSummary, downloadUploadedDocumentUrl } from "../api";
+import { downloadUrl, updateManualSummary, downloadUploadedDocumentUrl, deleteDocument } from "../api";
 import { useState } from "react";
 import DocumentViewer from "./DocumentViewer.jsx";
 import ReactMarkdown from "react-markdown";
 
-export default function IndexedDocumentList({ items = [], onDocumentsSelected }) {
+export default function IndexedDocumentList({ items = [], onDocumentsSelected, onDocumentDeleted }) {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [selectedDocs, setSelectedDocs] = useState(new Set());
@@ -11,6 +11,9 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
   const [summaryText, setSummaryText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [deletingDoc, setDeletingDoc] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteError, setDeleteError] = useState(null);
 
   const handleViewDocument = (doc) => {
     let url;
@@ -107,6 +110,48 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
     setEditingSummary(null);
     setSummaryText('');
     setSaveError(null);
+  };
+
+  const handleDeleteDocument = (doc) => {
+    setDeleteConfirm({
+      id: doc.id,
+      name: doc.document_name,
+      sourceType: doc.source_type
+    });
+    setDeleteError(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm) return;
+    
+    setDeletingDoc(deleteConfirm.id);
+    setDeleteError(null);
+    
+    try {
+      await deleteDocument({
+        documentId: deleteConfirm.id,
+        sourceType: deleteConfirm.sourceType
+      });
+      
+      console.log('Document deleted successfully:', deleteConfirm.name);
+      
+      // Notify parent component to refresh the list
+      if (onDocumentDeleted) {
+        onDocumentDeleted(deleteConfirm.id);
+      }
+      
+      setDeleteConfirm(null);
+    } catch (error) {
+      console.error('Failed to delete document:', error);
+      setDeleteError(error.message);
+    } finally {
+      setDeletingDoc(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteConfirm(null);
+    setDeleteError(null);
   };
 
   if (!items?.length) {
@@ -246,6 +291,21 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
                     Download
                   </a>
                 )}
+                <button
+                  onClick={() => handleDeleteDocument(doc)}
+                  disabled={deletingDoc === doc.id}
+                  style={{
+                    padding: '6px 10px',
+                    backgroundColor: deletingDoc === doc.id ? '#ccc' : '#dc3545',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: deletingDoc === doc.id ? 'not-allowed' : 'pointer',
+                    fontSize: '11px'
+                  }}
+                >
+                  {deletingDoc === doc.id ? 'Deleting...' : 'Delete'}
+                </button>
               </div>
             </div>
           
@@ -421,6 +481,86 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected })
         documentUrl={selectedDocument?.url}
         documentName={selectedDocument?.name}
       />
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirm && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '24px',
+            borderRadius: '8px',
+            maxWidth: '400px',
+            width: '90%',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', color: '#dc3545', fontSize: '18px' }}>
+              Confirm Delete
+            </h3>
+            <p style={{ margin: '0 0 16px 0', color: '#333', lineHeight: '1.5' }}>
+              Are you sure you want to delete <strong>"{deleteConfirm.name}"</strong> from the index?
+              <br />
+              <span style={{ fontSize: '14px', color: '#666' }}>
+                This will also delete all associated chunks and embeddings. This action cannot be undone.
+              </span>
+            </p>
+            {deleteError && (
+              <div style={{
+                backgroundColor: '#f8d7da',
+                color: '#721c24',
+                padding: '8px 12px',
+                borderRadius: '4px',
+                marginBottom: '16px',
+                fontSize: '14px'
+              }}>
+                Error: {deleteError}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={handleCancelDelete}
+                disabled={deletingDoc === deleteConfirm.id}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: deletingDoc === deleteConfirm.id ? 'not-allowed' : 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={deletingDoc === deleteConfirm.id}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: deletingDoc === deleteConfirm.id ? '#ccc' : '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: deletingDoc === deleteConfirm.id ? 'not-allowed' : 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                {deletingDoc === deleteConfirm.id ? 'Deleting...' : 'Delete Document'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

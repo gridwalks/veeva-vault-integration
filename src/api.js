@@ -137,6 +137,49 @@ export function downloadUploadedDocumentUrl({ documentId }) {
   return `/api/download-uploaded-document?${p}`;
 }
 
+export async function deleteDocument({ documentId, sourceType }) {
+  const startTime = Date.now();
+  console.log('Deleting document...', { documentId, sourceType });
+  
+  try {
+    const p = new URLSearchParams({ id: documentId, source_type: sourceType });
+    const res = await fetch(`/api/delete-document?${p}`, {
+      method: 'DELETE'
+    });
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to delete document:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText,
+        url: res.url,
+        params: { documentId, sourceType }
+      });
+      throw new Error(`Failed to delete document: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Document deleted in ${duration}ms:`, {
+      documentId,
+      sourceType,
+      deletedChunks: data.deletedChunks,
+      duration: data.duration
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error deleting document after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack,
+      params: { documentId, sourceType }
+    });
+    throw error;
+  }
+}
+
 export async function getUploadedDocuments({ limit = 50, offset = 0, search = '', userId } = {}) {
   const startTime = Date.now();
   console.log('Fetching uploaded documents...', { limit, offset, search, userId });

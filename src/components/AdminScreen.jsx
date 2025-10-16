@@ -384,6 +384,10 @@ export default function AdminScreen() {
           
           <IndexedDocumentList 
             items={indexedData.items}
+            onDocumentDeleted={(deletedId) => {
+              console.log('Document deleted, refreshing list...', deletedId);
+              loadIndexed(indexedData.pageOffset);
+            }}
           />
           <div className="pager" style={{display:'flex', gap:8, alignItems:'center', marginTop:10}}>
             <button 
