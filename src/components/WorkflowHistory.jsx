@@ -401,7 +401,9 @@ export default function WorkflowHistory() {
           color: '#6b7280',
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
         }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+          <div style={{ marginBottom: '16px' }}>
+            <img src="/loading-icon.png" alt="Loading" style={{ width: '48px', height: '48px' }} />
+          </div>
           <div style={{ fontSize: '14px' }}>Loading workflow history...</div>
         </div>
       ) : filteredInstances.length === 0 ? (
@@ -487,7 +489,8 @@ export default function WorkflowHistory() {
                         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                       }}>
                         {instance.status === 'completed' ? '✅ Completed' : 
-                         instance.status === 'in_progress' ? '⏳ In Progress' : '❌ Abandoned'}
+                         instance.status === 'in_progress' ? 
+                         <><img src="/loading-icon.png" alt="In Progress" style={{ width: '12px', height: '12px', marginRight: '4px', verticalAlign: 'middle' }} />In Progress</> : '❌ Abandoned'}
                       </span>
                     </div>
                     <div style={{
@@ -1087,7 +1090,8 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                   }}
                 >
-                  {isSubmitting ? '⏳ Processing...' : '🤖 Submit to AI'}
+                  {isSubmitting ? 
+                    <><img src="/loading-icon.png" alt="Processing" style={{ width: '16px', height: '16px', marginRight: '4px', verticalAlign: 'middle' }} />Processing...</> : '🤖 Submit to AI'}
                 </button>
               </div>
             </div>

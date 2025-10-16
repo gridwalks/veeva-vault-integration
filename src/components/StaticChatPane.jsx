@@ -856,7 +856,7 @@ The documents will be automatically included in the comparison analysis.
       ...prev,
       { 
         role: 'assistant', 
-        content: `Processing your workflow completion...\n\n⏳ **Generating document from your responses**\n✨ **Enhancing with AI for grammar and clarity**\n\nThis may take a few moments...` 
+        content: `Processing your workflow completion...\n\n🔄 **Generating document from your responses**\n✨ **Enhancing with AI for grammar and clarity**\n\nThis may take a few moments...` 
       }
     ]);
     

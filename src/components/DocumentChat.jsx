@@ -1270,7 +1270,8 @@ The files will upload automatically and I'll be able to perform a detailed compa
                            <span className="w-4">
                              {file.status === 'success' ? '✓' : 
                               file.status === 'error' ? '✗' : 
-                              file.status === 'uploading' ? '⟳' : '⏳'}
+                              file.status === 'uploading' ? '⟳' : 
+                              <img src="/loading-icon.png" alt="Loading" style={{ width: '16px', height: '16px' }} />}
                            </span>
                            <span className={`flex-1 truncate ${
                              file.status === 'success' ? 'text-green-600' :
