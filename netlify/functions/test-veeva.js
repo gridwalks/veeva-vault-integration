@@ -61,10 +61,12 @@ export const handler = async (event) => {
     // Test 3: Document query (same as indexing)
     console.log('Test 3: Testing document query...');
     const documentVql = `
-      SELECT id, document_number__v, name__v, status__v, major_version_number__v, minor_version_number__v, type__v
+      SELECT id, document_number__v, name__v, status__v, major_version_number__v, minor_version_number__v, subtype__v, type__v
       FROM documents
         WHERE status__v = STEADYSTATE() AND
-        subtype__v IN ('Standard Operating Procedure', 'Policy', 'Work Instruction')
+        (subtype__v = 'Standard Operating Procedure' OR 
+         subtype__v = 'Work Instruction' OR 
+         subtype__v = 'Policy')
       LIMIT 5
     `;
     
