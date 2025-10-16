@@ -12,6 +12,7 @@
   to   = "/.netlify/functions/:splat"
   status = 200
 
+# Scheduled cleanup: daily at 02:00 UTC
 [[scheduled]]
+  cron = "0 2 * * *"
   path = "/.netlify/functions/cleanup-blobs"
-  schedule = "0 2 * * *"
