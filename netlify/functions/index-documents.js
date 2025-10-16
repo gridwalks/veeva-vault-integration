@@ -735,6 +735,7 @@ export const handler = async (event) => {
       const doc = documentsToProcess[i];
       const globalIndex = startIndex + i;
       const docStartTime = Date.now();
+      const docDuration = Date.now() - docStartTime; // Initialize here for use in logging
       
       // Progress tracking
       const progressPercent = Math.round(((globalIndex + 1) / documents.length) * 100);
@@ -1497,12 +1498,10 @@ ${fallbackText.substring(0, 4000)}`
           });
         }
 
-        const docDuration = Date.now() - docStartTime;
         console.log(`=== DOCUMENT ${globalIndex + 1} COMPLETED ===`);
         console.log(`Document processed in ${docDuration}ms: ${doc.name__v}`);
         
       } catch (error) {
-        const docDuration = Date.now() - docStartTime;
         console.error(`=== DOCUMENT ${globalIndex + 1} ERROR ===`);
         console.error(`Error processing document ${doc.id} after ${docDuration}ms:`, {
           message: error.message,
