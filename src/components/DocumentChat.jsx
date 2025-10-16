@@ -1267,7 +1267,7 @@ The files will upload automatically and I'll be able to perform a detailed compa
                      <div className="space-y-1 max-h-20 overflow-y-auto">
                        {uploadProgress.files.map((file, index) => (
                          <div key={index} className="flex items-center gap-2 text-xs">
-                           <span className="w-4">
+                           <span className="w-4 flex items-center justify-center">
                              {file.status === 'success' ? '✓' : 
                               file.status === 'error' ? '✗' : 
                               file.status === 'uploading' ? '⟳' : 
