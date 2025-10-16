@@ -92,7 +92,13 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       createdAt: result.createdAt,
       name: file.name,
       size: file.size,
-      type: file.type
+      type: file.type,
+      indexed: result.processingResult?.indexed || false,
+      documentId: result.processingResult?.documentId,
+      chunksCreated: result.processingResult?.chunksCreated,
+      textLength: result.processingResult?.textLength,
+      extractionMethod: result.processingResult?.extractionMethod,
+      processingError: result.processingResult?.error
     };
   };
 
@@ -115,7 +121,13 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
           fileName: file.name,
           key: upload.key,
           size: file.size,
-          urlReturned: Boolean(upload.url)
+          urlReturned: Boolean(upload.url),
+          indexed: upload.indexed,
+          documentId: upload.documentId,
+          chunksCreated: upload.chunksCreated,
+          textLength: upload.textLength,
+          extractionMethod: upload.extractionMethod,
+          processingError: upload.processingError
         });
       }
 
@@ -235,6 +247,10 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
         }))
       });
 
+      // Check indexing status
+      const indexedFiles = newBlobUploads.filter(upload => upload.indexed);
+      const failedIndexing = newBlobUploads.filter(upload => !upload.indexed && upload.processingError);
+      
       // If not all files uploaded successfully, show detailed error
       if (newBlobUploads.length !== files.length) {
         const failedCount = files.length - newBlobUploads.length;
@@ -245,14 +261,27 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
         setConversationHistory(prev => [...prev, errorMessage]);
       }
       
+      // Show indexing status
+      if (failedIndexing.length > 0) {
+        const indexingErrorMessage = {
+          role: 'assistant',
+          content: `⚠️ Warning: ${failedIndexing.length} file${failedIndexing.length !== 1 ? 's' : ''} uploaded but failed to index for AI analysis: ${failedIndexing.map(f => f.name).join(', ')}. The files are stored but I won't be able to analyze their content.`
+        };
+        setConversationHistory(prev => [...prev, indexingErrorMessage]);
+      }
+      
       // Remove the processing message and add confirmation
       setConversationHistory(prev => {
         const withoutProcessing = prev.filter(msg => !msg.content.includes('Processing'));
+        const statusMessage = indexedFiles.length === newBlobUploads.length 
+          ? `✅ Files processed and indexed successfully! Now I can answer your question about the ${newBlobUploads.length} upload${newBlobUploads.length !== 1 ? 's' : ''} you attached.`
+          : `✅ Files uploaded successfully! ${indexedFiles.length} of ${newBlobUploads.length} files are ready for AI analysis.`;
+        
         return [
           ...withoutProcessing,
           {
             role: 'assistant',
-            content: `✅ Files processed successfully! Now I can answer your question about the ${newBlobUploads.length} upload${newBlobUploads.length !== 1 ? 's' : ''} you attached.`
+            content: statusMessage
           }
         ];
       });
@@ -261,7 +290,8 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
     try {
       const allDocumentIds = [
         ...selectedDocuments.map(doc => doc.veeva_document_id),
-        ...attachedDocuments.map(doc => doc.id)
+        ...attachedDocuments.map(doc => doc.id),
+        ...newBlobUploads.filter(upload => upload.indexed && upload.documentId).map(upload => upload.documentId)
       ];
 
       const blobAttachmentMap = new Map();
