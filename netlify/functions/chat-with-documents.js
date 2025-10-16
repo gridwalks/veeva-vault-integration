@@ -775,26 +775,29 @@ ${externalResourcesContext}`;
     const groqStartTime = Date.now();
     let completion;
     let response;
+    let groqDuration = 0;
+    let groqModelUsed = "openai/gpt-oss-20b";
     
     try {
       completion = await groq.chat.completions.create({
-        model: "openai/gpt-oss-20b",
+        model: groqModelUsed,
         messages: messages,
         max_tokens: 2000,
         temperature: 0.3,
       });
 
-      const groqDuration = Date.now() - groqStartTime;
+      groqDuration = Date.now() - groqStartTime;
       response = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
       
       console.log('Groq response received:', {
         responseTime: `${groqDuration}ms`,
         responseLength: response.length,
         responsePreview: response.substring(0, 200) + (response.length > 200 ? '...' : ''),
-        tokensUsed: completion.usage?.total_tokens || 0,
-        promptTokens: completion.usage?.prompt_tokens || 0,
-        completionTokens: completion.usage?.completion_tokens || 0,
-        finishReason: completion.choices[0]?.finish_reason
+        tokensUsed: completion?.usage?.total_tokens || 0,
+        promptTokens: completion?.usage?.prompt_tokens || 0,
+        completionTokens: completion?.usage?.completion_tokens || 0,
+        finishReason: completion.choices[0]?.finish_reason,
+        model: groqModelUsed
       });
     } catch (groqError) {
       console.error('Groq API error:', {
@@ -810,16 +813,26 @@ ${externalResourcesContext}`;
       
       // Try fallback to a different model
       try {
-        console.log('Attempting fallback to mixtral-8x7b-32768...');
+        const fallbackModel = "mixtral-8x7b-32768";
+        console.log(`Attempting fallback to ${fallbackModel}...`);
+        const fallbackStartTime = Date.now();
         const fallbackCompletion = await groq.chat.completions.create({
-          model: "mixtral-8x7b-32768",
+          model: fallbackModel,
           messages: messages,
           max_tokens: 2000,
           temperature: 0.3,
         });
-        
+
+        completion = fallbackCompletion;
         response = fallbackCompletion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
-        console.log('Fallback model succeeded');
+        groqDuration = Date.now() - fallbackStartTime;
+        groqModelUsed = fallbackModel;
+
+        console.log('Fallback model succeeded', {
+          responseTime: `${groqDuration}ms`,
+          responseLength: response.length,
+          model: groqModelUsed
+        });
         
       } catch (fallbackError) {
         console.error('Fallback model also failed:', {
@@ -912,8 +925,9 @@ ${externalResourcesContext}`;
           externalResourcesUsed: relevantExternalResources.length,
           usingRAG: relevantChunks.length > 0,
           responseTime: groqDuration,
-          tokensUsed: completion.usage?.total_tokens || 0,
-          isComparisonQuery: isComparisonQuery
+          tokensUsed: completion?.usage?.total_tokens || 0,
+          isComparisonQuery: isComparisonQuery,
+          modelUsed: groqModelUsed
         }
       })
     };
