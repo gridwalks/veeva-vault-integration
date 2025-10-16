@@ -382,6 +382,51 @@ async function extractTextFromBuffer(fileBuffer, fileName = '', contentType = ''
   };
 }
 
+// Function to log indexing activities
+async function logIndexingActivity(pool, logData) {
+  try {
+    const {
+      operationType,
+      sourceType,
+      documentId,
+      veevaDocumentId,
+      documentName,
+      documentNumber,
+      documentType,
+      version,
+      status,
+      processingDurationMs,
+      chunksCreated = 0,
+      summaryGenerated = false,
+      errorMessage = null,
+      batchId,
+      batchOffset,
+      userId = null,
+      sessionId = null,
+      forceRegenerate = false
+    } = logData;
+
+    await pool.query(`
+      INSERT INTO qms_chat_indexing_logs (
+        operation_type, source_type, document_id, veeva_document_id, 
+        document_name, document_number, document_type, version, status,
+        processing_duration_ms, chunks_created, summary_generated, error_message,
+        batch_id, batch_offset, user_id, session_id, force_regenerate
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+    `, [
+      operationType, sourceType, documentId, veevaDocumentId,
+      documentName, documentNumber, documentType, version, status,
+      processingDurationMs, chunksCreated, summaryGenerated, errorMessage,
+      batchId, batchOffset, userId, sessionId, forceRegenerate
+    ]);
+
+    console.log(`📝 Logged indexing activity: ${operationType} - ${documentName} - ${status}`);
+  } catch (error) {
+    console.error('Failed to log indexing activity:', error);
+    // Don't throw error to avoid breaking the main process
+  }
+}
+
 // Function to generate embeddings and store chunks
 async function chunkAndEmbedDocument(documentText, documentId, veevaDocumentId, pool, startTime = Date.now()) {
   const MAX_CHUNK_PROCESSING_TIME = 20000; // 20 seconds for chunk processing
@@ -640,6 +685,9 @@ export const handler = async (event) => {
     });
     
     const results = [];
+    
+    // Generate batch ID for this indexing session
+    const batchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Apply batch processing to avoid timeout - use smaller batches for better timeout handling
     const startIndex = batchOffset;
@@ -1012,6 +1060,25 @@ ${documentText.substring(0, 4000)}`
             chunkingAttempted: true
           });
           console.log(`Document updated: ${doc.name__v} at ${updateTimestamp}`);
+
+          // Log the indexing activity
+          await logIndexingActivity(pool, {
+            operationType: forceRegenerate ? 'force_regenerate' : 'regenerate',
+            sourceType: 'veeva',
+            documentId: existing.id,
+            veevaDocumentId: doc.id,
+            documentName: doc.name__v,
+            documentNumber: doc.document_number__v,
+            documentType: doc.type__v,
+            version: `${doc.major_version_number__v}.${doc.minor_version_number__v}`,
+            status: 'success',
+            processingDurationMs: docDuration,
+            chunksCreated: chunkResult?.chunksCreated || 0,
+            summaryGenerated: !!updatedSummary,
+            batchId: batchId,
+            batchOffset: globalIndex,
+            forceRegenerate: forceRegenerate
+          });
           } else {
             console.log(`Document unchanged: ${doc.name__v}`);
             console.log(`Checking chunk status for unchanged document ${doc.id} (db id: ${existing.id})...`);
@@ -1117,6 +1184,25 @@ ${documentText.substring(0, 4000)}`
               document: documentData,
               summary: existing.summary,
               chunkingDebug: chunkingInfo
+            });
+
+            // Log the indexing activity
+            await logIndexingActivity(pool, {
+              operationType: 'index',
+              sourceType: 'veeva',
+              documentId: existing.id,
+              veevaDocumentId: doc.id,
+              documentName: doc.name__v,
+              documentNumber: doc.document_number__v,
+              documentType: doc.type__v,
+              version: `${doc.major_version_number__v}.${doc.minor_version_number__v}`,
+              status: 'skipped',
+              processingDurationMs: docDuration,
+              chunksCreated: 0,
+              summaryGenerated: false,
+              batchId: batchId,
+              batchOffset: globalIndex,
+              forceRegenerate: forceRegenerate
             });
           }
         } else {
@@ -1390,6 +1476,25 @@ ${fallbackText.substring(0, 4000)}`
             timestamp: insertTimestamp
           });
           console.log(`Document inserted: ${doc.name__v} at ${insertTimestamp}`);
+
+          // Log the indexing activity
+          await logIndexingActivity(pool, {
+            operationType: 'index',
+            sourceType: 'veeva',
+            documentId: newDocumentId,
+            veevaDocumentId: doc.id,
+            documentName: doc.name__v,
+            documentNumber: doc.document_number__v,
+            documentType: doc.type__v,
+            version: `${doc.major_version_number__v}.${doc.minor_version_number__v}`,
+            status: 'success',
+            processingDurationMs: docDuration,
+            chunksCreated: chunkResult?.chunksCreated || 0,
+            summaryGenerated: !!summary,
+            batchId: batchId,
+            batchOffset: globalIndex,
+            forceRegenerate: forceRegenerate
+          });
         }
 
         const docDuration = Date.now() - docStartTime;
@@ -1416,6 +1521,26 @@ ${fallbackText.substring(0, 4000)}`
             document_name: doc.name__v,
           },
           error: error.message
+        });
+
+        // Log the indexing activity
+        await logIndexingActivity(pool, {
+          operationType: 'index',
+          sourceType: 'veeva',
+          documentId: null,
+          veevaDocumentId: doc.id,
+          documentName: doc.name__v,
+          documentNumber: doc.document_number__v,
+          documentType: doc.type__v,
+          version: `${doc.major_version_number__v}.${doc.minor_version_number__v}`,
+          status: 'error',
+          processingDurationMs: docDuration,
+          chunksCreated: 0,
+          summaryGenerated: false,
+          errorMessage: error.message,
+          batchId: batchId,
+          batchOffset: globalIndex,
+          forceRegenerate: forceRegenerate
         });
       }
     }

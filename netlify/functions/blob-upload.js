@@ -8,6 +8,51 @@ import { parseDocument } from 'docx-parser';
 import { chunkText } from './chunking-utils.js';
 
 const STORE_NAME = 'chat-uploads';
+
+// Function to log indexing activities
+async function logIndexingActivity(pool, logData) {
+  try {
+    const {
+      operationType,
+      sourceType,
+      documentId,
+      veevaDocumentId,
+      documentName,
+      documentNumber,
+      documentType,
+      version,
+      status,
+      processingDurationMs,
+      chunksCreated = 0,
+      summaryGenerated = false,
+      errorMessage = null,
+      batchId,
+      batchOffset,
+      userId = null,
+      sessionId = null,
+      forceRegenerate = false
+    } = logData;
+
+    await pool.query(`
+      INSERT INTO qms_chat_indexing_logs (
+        operation_type, source_type, document_id, veeva_document_id, 
+        document_name, document_number, document_type, version, status,
+        processing_duration_ms, chunks_created, summary_generated, error_message,
+        batch_id, batch_offset, user_id, session_id, force_regenerate
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+    `, [
+      operationType, sourceType, documentId, veevaDocumentId,
+      documentName, documentNumber, documentType, version, status,
+      processingDurationMs, chunksCreated, summaryGenerated, errorMessage,
+      batchId, batchOffset, userId, sessionId, forceRegenerate
+    ]);
+
+    console.log(`📝 Logged indexing activity: ${operationType} - ${documentName} - ${status}`);
+  } catch (error) {
+    console.error('Failed to log indexing activity:', error);
+    // Don't throw error to avoid breaking the main process
+  }
+}
 const SIGNED_URL_TTL_MS = 60 * 60 * 1000; // 1 hour default lifetime
 
 // Initialize OpenAI for embeddings
@@ -93,6 +138,9 @@ async function extractTextFromFile(fileBuffer, fileName) {
 
 // Helper function to process and index the uploaded document
 async function processAndIndexDocument(fileBuffer, fileName, blobKey, userId = null) {
+  const startTime = Date.now();
+  const batchId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
   try {
     console.log(`Processing uploaded document: ${fileName}`);
     
@@ -101,6 +149,31 @@ async function processAndIndexDocument(fileBuffer, fileName, blobKey, userId = n
     
     if (!extractedText || extractedText.trim().length === 0) {
       console.warn(`No text extracted from ${fileName}`);
+      
+      // Log the failed processing
+      const pool = getPool();
+      if (pool) {
+        await logIndexingActivity(pool, {
+          operationType: 'upload',
+          sourceType: 'upload',
+          documentId: null,
+          veevaDocumentId: null,
+          documentName: fileName,
+          documentNumber: null,
+          documentType: 'uploaded',
+          version: '1.0',
+          status: 'error',
+          processingDurationMs: Date.now() - startTime,
+          chunksCreated: 0,
+          summaryGenerated: false,
+          errorMessage: 'No text content found in document',
+          batchId: batchId,
+          batchOffset: 0,
+          userId: userId,
+          forceRegenerate: false
+        });
+      }
+      
       return { success: false, error: 'No text content found in document' };
     }
     
@@ -182,6 +255,26 @@ async function processAndIndexDocument(fileBuffer, fileName, blobKey, userId = n
     
     console.log(`Successfully indexed ${fileName}: ${chunksCreated} chunks created`);
     
+    // Log the successful processing
+    await logIndexingActivity(pool, {
+      operationType: 'upload',
+      sourceType: 'upload',
+      documentId: documentId,
+      veevaDocumentId: null,
+      documentName: fileName,
+      documentNumber: `UPLOAD-${Date.now()}`,
+      documentType: 'uploaded',
+      version: '1.0',
+      status: 'success',
+      processingDurationMs: Date.now() - startTime,
+      chunksCreated: chunksCreated,
+      summaryGenerated: false,
+      batchId: batchId,
+      batchOffset: 0,
+      userId: userId,
+      forceRegenerate: false
+    });
+    
     return { 
       success: true, 
       documentId, 
@@ -192,6 +285,31 @@ async function processAndIndexDocument(fileBuffer, fileName, blobKey, userId = n
     
   } catch (error) {
     console.error(`Error processing document ${fileName}:`, error);
+    
+    // Log the error
+    const pool = getPool();
+    if (pool) {
+      await logIndexingActivity(pool, {
+        operationType: 'upload',
+        sourceType: 'upload',
+        documentId: null,
+        veevaDocumentId: null,
+        documentName: fileName,
+        documentNumber: null,
+        documentType: 'uploaded',
+        version: '1.0',
+        status: 'error',
+        processingDurationMs: Date.now() - startTime,
+        chunksCreated: 0,
+        summaryGenerated: false,
+        errorMessage: error.message,
+        batchId: batchId,
+        batchOffset: 0,
+        userId: userId,
+        forceRegenerate: false
+      });
+    }
+    
     return { success: false, error: error.message };
   }
 }

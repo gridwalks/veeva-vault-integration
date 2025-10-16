@@ -126,6 +126,107 @@ export async function getIndexedDocuments({ name = "", limit = 50, offset = 0 } 
   }
 }
 
+export async function getIndexingLogs({ 
+  limit = 50, 
+  offset = 0, 
+  operationType = null, 
+  sourceType = null, 
+  status = null, 
+  batchId = null, 
+  startDate = null, 
+  endDate = null 
+} = {}) {
+  const startTime = Date.now();
+  console.log('Fetching indexing logs...', { 
+    limit, offset, operationType, sourceType, status, batchId, startDate, endDate 
+  });
+  
+  try {
+    const params = new URLSearchParams({ limit, offset });
+    if (operationType) params.set('operationType', operationType);
+    if (sourceType) params.set('sourceType', sourceType);
+    if (status) params.set('status', status);
+    if (batchId) params.set('batchId', batchId);
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    
+    const res = await fetch(`/api/get-indexing-logs?${params}`);
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to fetch indexing logs:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText,
+        url: res.url,
+        params: { limit, offset, operationType, sourceType, status, batchId, startDate, endDate }
+      });
+      throw new Error(`Failed to fetch indexing logs: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Indexing logs fetched in ${duration}ms:`, {
+      logCount: data.logs?.length || 0,
+      total: data.pagination?.total || 0,
+      hasMore: data.pagination?.hasMore || false
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error fetching indexing logs after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack,
+      params: { limit, offset, operationType, sourceType, status, batchId, startDate, endDate }
+    });
+    throw error;
+  }
+}
+
+export async function cleanupIndexingLogs({ retentionDays = 30, dryRun = false } = {}) {
+  const startTime = Date.now();
+  console.log('Cleaning up indexing logs...', { retentionDays, dryRun });
+  
+  try {
+    const params = new URLSearchParams({ retentionDays, dryRun });
+    
+    const res = await fetch(`/api/cleanup-indexing-logs?${params}`, {
+      method: 'POST'
+    });
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to cleanup indexing logs:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText,
+        url: res.url,
+        params: { retentionDays, dryRun }
+      });
+      throw new Error(`Failed to cleanup indexing logs: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Indexing logs cleanup completed in ${duration}ms:`, {
+      success: data.success,
+      logsDeleted: data.logsDeleted,
+      dryRun: data.dryRun
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error cleaning up indexing logs after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack,
+      params: { retentionDays, dryRun }
+    });
+    throw error;
+  }
+}
+
 export function downloadUrl({ id, major, minor }) {
   const p = new URLSearchParams({ docId: id });
   if (major && minor) { p.set("major", major); p.set("minor", minor); }
