@@ -75,6 +75,18 @@ export const handler = async (event) => {
       };
     }
 
+    if (!process.env.GROQ_API_KEY) {
+      console.error('GROQ_API_KEY environment variable is not set');
+      return {
+        statusCode: 500,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          error: "AI service is not configured. Please contact your administrator.",
+          details: "GROQ_API_KEY environment variable is missing"
+        })
+      };
+    }
+
     // Parse request body
     const body = JSON.parse(event.body || '{}');
     const { message, documentIds, conversationHistory = [], userId } = body;
@@ -766,7 +778,7 @@ ${externalResourcesContext}`;
     
     try {
       completion = await groq.chat.completions.create({
-        model: "llama-3.1-70b-versatile",
+        model: "llama-3.1-70b-instruct",
         messages: messages,
         max_tokens: 2000,
         temperature: 0.3,
@@ -789,18 +801,43 @@ ${externalResourcesContext}`;
         message: groqError.message,
         status: groqError.status,
         code: groqError.code,
-        type: groqError.type
+        type: groqError.type,
+        stack: groqError.stack,
+        model: "llama-3.1-70b-versatile",
+        messageCount: messages.length,
+        totalTokens: messages.reduce((sum, msg) => sum + (msg.content?.length || 0), 0)
       });
       
-      return {
-        statusCode: 500,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          error: "AI service temporarily unavailable",
-          details: groqError.message,
-          response: "I'm sorry, I encountered an error while processing your request. Please try again in a moment."
-        })
-      };
+      // Try fallback to a different model
+      try {
+        console.log('Attempting fallback to mixtral-8x7b-32768...');
+        const fallbackCompletion = await groq.chat.completions.create({
+          model: "mixtral-8x7b-32768",
+          messages: messages,
+          max_tokens: 2000,
+          temperature: 0.3,
+        });
+        
+        response = fallbackCompletion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
+        console.log('Fallback model succeeded');
+        
+      } catch (fallbackError) {
+        console.error('Fallback model also failed:', {
+          message: fallbackError.message,
+          status: fallbackError.status,
+          code: fallbackError.code
+        });
+        
+        return {
+          statusCode: 500,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            error: "AI service temporarily unavailable",
+            details: `Primary model failed: ${groqError.message}. Fallback model failed: ${fallbackError.message}`,
+            response: "I'm sorry, I encountered an error while processing your request. Please try again in a moment."
+          })
+        };
+      }
     }
 
     // Store comparison history if this was a comparison query
