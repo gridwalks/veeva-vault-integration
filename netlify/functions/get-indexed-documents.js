@@ -186,6 +186,10 @@ export const handler = async (event) => {
           manual_summary: row.manual_summary,
           indexed_at: row.indexed_at,
           updated_at: row.updated_at,
+          source_type: row.source_type,
+          blob_url: row.blob_url,
+          original_filename: row.original_filename,
+          mime_type: row.mime_type
         }))
       }),
     };
