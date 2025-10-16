@@ -57,7 +57,26 @@ export const handler = async (event) => {
     };
   }
 
-  const store = getStore(STORE_NAME);
+  let store;
+  try {
+    store = await getStore(STORE_NAME);
+  } catch (error) {
+    console.error('Failed to access blob store:', error);
+    return {
+      statusCode: 502,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Blob storage is currently unavailable' })
+    };
+  }
+
+  if (!store || typeof store.set !== 'function') {
+    console.error('Blob store is unavailable or missing required methods.');
+    return {
+      statusCode: 502,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Blob storage is currently unavailable' })
+    };
+  }
   const includeUrl = (event.queryStringParameters?.includeUrl || '').toLowerCase() === 'true';
   const headers = event.headers || {};
   const rawFileName = normalizeHeader(headers, 'x-file-name') || normalizeHeader(headers, 'x-filename');
