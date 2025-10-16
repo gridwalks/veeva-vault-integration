@@ -744,7 +744,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                     color: '#6b7280'
                   }}>
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ marginBottom: '8px' }}>
+                      <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                         <img src="/loading-icon.png" alt="Loading" style={{ width: '24px', height: '24px' }} />
                       </div>
                       <p style={{ margin: 0, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>

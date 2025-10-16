@@ -401,7 +401,7 @@ export default function WorkflowHistory() {
           color: '#6b7280',
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
         }}>
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <img src="/loading-icon.png" alt="Loading" style={{ width: '48px', height: '48px' }} />
           </div>
           <div style={{ fontSize: '14px' }}>Loading workflow history...</div>
@@ -490,7 +490,10 @@ export default function WorkflowHistory() {
                       }}>
                         {instance.status === 'completed' ? '✅ Completed' : 
                          instance.status === 'in_progress' ? 
-                         <><img src="/loading-icon.png" alt="In Progress" style={{ width: '12px', height: '12px', marginRight: '4px', verticalAlign: 'middle' }} />In Progress</> : '❌ Abandoned'}
+                         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                           <img src="/loading-icon.png" alt="In Progress" style={{ width: '12px', height: '12px', marginRight: '4px' }} />
+                           In Progress
+                         </span> : '❌ Abandoned'}
                       </span>
                     </div>
                     <div style={{
@@ -1091,7 +1094,10 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                   }}
                 >
                   {isSubmitting ? 
-                    <><img src="/loading-icon.png" alt="Processing" style={{ width: '16px', height: '16px', marginRight: '4px', verticalAlign: 'middle' }} />Processing...</> : '🤖 Submit to AI'}
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <img src="/loading-icon.png" alt="Processing" style={{ width: '16px', height: '16px', marginRight: '4px' }} />
+                      Processing...
+                    </span> : '🤖 Submit to AI'}
                 </button>
               </div>
             </div>
