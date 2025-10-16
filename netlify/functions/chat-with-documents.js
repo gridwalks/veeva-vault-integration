@@ -89,7 +89,7 @@ export const handler = async (event) => {
 
     // Parse request body
     const body = JSON.parse(event.body || '{}');
-    const { message, documentIds, conversationHistory = [], userId } = body;
+    const { message, documentIds, conversationHistory = [], userId, attachments = [] } = body;
     
     // Detect comparison intent
     const isComparisonQuery = detectComparisonIntent(message);
@@ -141,7 +141,8 @@ export const handler = async (event) => {
       uploadedDocumentIds: uploadedDocumentIds.length > 0 ? uploadedDocumentIds : 'none',
       veevaCount: veevaDocumentIds.length,
       uploadedCount: uploadedDocumentIds.length,
-      historyLength: conversationHistory.length
+      historyLength: conversationHistory.length,
+      attachmentCount: Array.isArray(attachments) ? attachments.length : 0
     });
 
     // Generate embedding for the query
@@ -753,10 +754,26 @@ I don't have access to any specific documents or external resources for this que
 ${externalResourcesContext}`;
 
     // Prepare conversation messages
+    const attachmentDetails = Array.isArray(attachments) && attachments.length > 0
+      ? attachments
+          .map((attachment, index) => {
+            const name = attachment?.name || attachment?.fileName || attachment?.originalName || attachment?.key;
+            const url = attachment?.url || attachment?.signedUrl;
+            const size = attachment?.size || attachment?.bytes;
+            const sizeLabel = size ? ` (${Math.round(size / 1024)} KB)` : '';
+            return `${index + 1}. ${name || 'attachment'}${sizeLabel}${url ? ` - ${url}` : ''}`;
+          })
+          .join('\n')
+      : '';
+
+    const userMessageWithAttachments = attachmentDetails
+      ? `${message}\n\nAttachments provided for analysis:\n${attachmentDetails}`
+      : message;
+
     const messages = [
       { role: 'system', content: systemPrompt },
       ...conversationHistory.slice(-10), // Keep last 10 messages for context
-      { role: 'user', content: message }
+      { role: 'user', content: userMessageWithAttachments }
     ];
 
     console.log('Sending request to OpenAI:', {

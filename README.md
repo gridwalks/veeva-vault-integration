@@ -87,6 +87,13 @@ Netlify CLI will read `.env` for local dev. In production, set these in **Netlif
 - **Smart Document Discovery**: Automatically finds relevant documents based on your questions.
 - **Hybrid Summaries**: Combines AI-generated and user-added manual summaries for comprehensive document understanding.
 
+## Chat File Uploads & Retention
+
+- **Netlify Blobs Storage**: Chat attachments up to ~2 MB are stored privately in the `chat-uploads` Netlify Blob store via `POST /.netlify/functions/blob-upload`. The function returns a blob key and a short-lived signed URL for Groq ingestion.
+- **Secure Deletion**: Use `POST /.netlify/functions/blob-delete` with `{ key }` to remove uploads when a chat is cleared. Users can toggle automatic purge behaviour in the UI.
+- **Automated Cleanup**: The scheduled function `/.netlify/functions/cleanup-blobs` runs daily at 02:00 UTC (configured in `netlify.toml`) and removes uploads older than 48 hours.
+- **Audit Logging**: Upload, delete, and cleanup actions write rows to the `blob_audit_log` table in Neon for traceability.
+
 ## Manual Summary Features
 
 - **User-Added Context**: Add your own notes and summaries to complement AI-generated summaries.
