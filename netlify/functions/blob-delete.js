@@ -40,7 +40,15 @@ export const handler = async (event) => {
     };
   }
 
-  const store = getStore(STORE_NAME);
+  const STORE_INIT_TIMEOUT = 5000; // 5 seconds
+  const store = await Promise.race([
+    getStore({
+      name: STORE_NAME,
+      siteID: process.env.NETLIFY_BLOBS_SITE_ID,
+      token: process.env.NETLIFY_BLOBS_TOKEN
+    }),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Store initialization timeout')), STORE_INIT_TIMEOUT))
+  ]);
 
   try {
     if (typeof store.delete === 'function') {

@@ -90,7 +90,15 @@ function parseMultipartFormData(body, contentType) {
 async function saveFileToBlob(fileBuffer, fileName, mimeType) {
   try {
     // Get the blob store for uploaded documents
-    const store = getStore('uploaded-documents');
+    const STORE_INIT_TIMEOUT = 5000; // 5 seconds
+    const store = await Promise.race([
+      getStore({
+        name: 'uploaded-documents',
+        siteID: process.env.NETLIFY_BLOBS_SITE_ID,
+        token: process.env.NETLIFY_BLOBS_TOKEN
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Store initialization timeout')), STORE_INIT_TIMEOUT))
+    ]);
     
     // Generate a unique filename to avoid conflicts
     const timestamp = Date.now();

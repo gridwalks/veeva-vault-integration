@@ -63,6 +63,10 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
   }, [uploadedBlobs]);
 
   const uploadFileToBlob = async (file) => {
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error(`File "${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Maximum size is 5MB.`);
+    }
     const response = await fetch('/.netlify/functions/blob-upload?includeUrl=true', {
       method: 'POST',
       headers: {

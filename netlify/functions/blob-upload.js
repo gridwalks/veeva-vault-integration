@@ -59,9 +59,24 @@ export const handler = async (event) => {
 
   let store;
   try {
-    store = await getStore(STORE_NAME);
+    const STORE_INIT_TIMEOUT = 5000; // 5 seconds
+    const storePromise = getStore({
+      name: STORE_NAME,
+      siteID: process.env.NETLIFY_BLOBS_SITE_ID,
+      token: process.env.NETLIFY_BLOBS_TOKEN
+    });
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Store initialization timeout')), STORE_INIT_TIMEOUT)
+    );
+    store = await Promise.race([storePromise, timeoutPromise]);
   } catch (error) {
-    console.error('Failed to access blob store:', error);
+    console.error('Failed to access blob store:', {
+      message: error?.message,
+      stack: error?.stack,
+      storeName: STORE_NAME,
+      hasToken: !!process.env.NETLIFY_BLOBS_TOKEN,
+      hasSiteId: !!process.env.NETLIFY_BLOBS_SITE_ID
+    });
     return {
       statusCode: 502,
       headers: { 'Content-Type': 'application/json' },
@@ -84,6 +99,17 @@ export const handler = async (event) => {
   const contentType = normalizeHeader(headers, 'content-type') || 'application/octet-stream';
   const fileSizeHeader = normalizeHeader(headers, 'content-length') || normalizeHeader(headers, 'x-file-size');
 
+  // Enforce upload size limits to avoid function/body limits
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB safe under Netlify limits
+  const declaredSize = fileSizeHeader ? parseInt(fileSizeHeader, 10) : null;
+  if (declaredSize && declaredSize > MAX_FILE_SIZE) {
+    return {
+      statusCode: 413,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'File too large', maxSize: MAX_FILE_SIZE, receivedSize: declaredSize })
+    };
+  }
+
   if (!event.body) {
     return {
       statusCode: 400,
@@ -102,6 +128,16 @@ export const handler = async (event) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ error: 'No file content received' })
     };
+  }
+
+  // Warn if buffer size does not match declared size (if provided)
+  if (declaredSize && Math.abs(buffer.length - declaredSize) > 1024) {
+    console.warn('Buffer size mismatch detected during blob upload', {
+      fileName,
+      declaredSize,
+      bufferLength: buffer.length,
+      difference: buffer.length - declaredSize
+    });
   }
 
   const createdAt = new Date().toISOString();
@@ -151,7 +187,13 @@ export const handler = async (event) => {
       })
     };
   } catch (error) {
-    console.error('Blob upload failed:', error);
+    console.error('Blob upload failed:', {
+      message: error?.message,
+      stack: error?.stack,
+      fileName,
+      contentType,
+      size: buffer.length
+    });
     await writeBlobAudit({
       action: 'upload',
       blobKey,

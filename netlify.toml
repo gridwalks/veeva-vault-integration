@@ -6,6 +6,15 @@
   node_bundler = "esbuild"
   external_node_modules = ["@netlify/blobs"]
 
+[functions."blob-upload"]
+  timeout = 26
+
+[functions."blob-delete"]
+  timeout = 10
+
+[functions."cleanup-blobs"]
+  timeout = 300
+
 [build.environment]
   NODE_VERSION = "18"
 
