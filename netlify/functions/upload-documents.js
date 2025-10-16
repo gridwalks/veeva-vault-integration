@@ -187,25 +187,6 @@ async function generateSummary(text, fileName) {
     console.log(`Attempting Groq API call with model: openai/gpt-oss-20b`);
     console.log(`Text length being sent: ${truncatedText.length} characters`);
     
-    // First, let's test if the model is available with a simple call
-    try {
-      const testResponse = await groq.chat.completions.create({
-        model: "openai/gpt-oss-20b",
-        messages: [
-          {
-            role: "user",
-            content: "Hello"
-          }
-        ],
-        max_tokens: 10,
-        temperature: 0.1
-      });
-      console.log(`Model test successful: ${testResponse.choices[0]?.message?.content}`);
-    } catch (testError) {
-      console.error('Model test failed:', testError.message);
-      throw testError;
-    }
-    
     const response = await groq.chat.completions.create({
       model: "openai/gpt-oss-20b",
       messages: [
