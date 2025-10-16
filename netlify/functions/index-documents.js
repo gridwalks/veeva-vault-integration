@@ -1035,10 +1035,13 @@ ${documentText.substring(0, 4000)}`
               }
             }
             
+            // Declare chunkResult outside the conditional for logging
+            let chunkResult = null;
+            
             // Chunk and embed if we have document text
             if (documentTextForChunking) {
               console.log(`Chunking and embedding document for RAG: ${doc.id}`);
-              const chunkResult = await chunkAndEmbedDocument(
+              chunkResult = await chunkAndEmbedDocument(
                 documentTextForChunking,
                 existing.id,
                 doc.id,
@@ -1451,10 +1454,13 @@ ${fallbackText.substring(0, 4000)}`
             documentName: doc.name__v
           });
 
+          // Declare chunkResult outside the conditional for logging
+          let chunkResult = null;
+
           // Chunk and embed the new document for RAG (if we have document text)
           if (documentText && documentText.trim().length > 0) {
             console.log(`Chunking and embedding new document for RAG: ${doc.id}`);
-            const chunkResult = await chunkAndEmbedDocument(
+            chunkResult = await chunkAndEmbedDocument(
               documentText,
               newDocumentId, // Use the newly created document_index id
               doc.id,
