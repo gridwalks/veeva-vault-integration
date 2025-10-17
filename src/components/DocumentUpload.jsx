@@ -1,7 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
-import { getUploadedDocuments, downloadUploadedDocumentUrl } from '../api';
+import {
+  getUploadedDocuments,
+  downloadUploadedDocumentUrl,
+  updateUploadedDocumentMetadata,
+  deleteDocument
+} from '../api';
 
-export default function DocumentUpload({ onUploadComplete }) {
+const initialMetadataForm = {
+  documentName: '',
+  documentType: 'uploaded_document',
+  version: '',
+  aiSummary: ''
+};
+
+export default function DocumentUpload({ onUploadComplete, userId }) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -9,6 +21,12 @@ export default function DocumentUpload({ onUploadComplete }) {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [editingDocumentId, setEditingDocumentId] = useState(null);
+  const [metadataForm, setMetadataForm] = useState(initialMetadataForm);
+  const [metadataSaving, setMetadataSaving] = useState(false);
+  const [metadataMessage, setMetadataMessage] = useState(null);
+  const [metadataError, setMetadataError] = useState(null);
+  const [deletingDocumentId, setDeletingDocumentId] = useState(null);
   const fileInputRef = useRef(null);
 
   const acceptedFileTypes = {
@@ -58,20 +76,35 @@ export default function DocumentUpload({ onUploadComplete }) {
   };
 
   const loadUploadedDocuments = async () => {
+    if (!userId) {
+      setUploadedDocuments([]);
+      return;
+    }
+
     setLoadingDocuments(true);
+    setMetadataError(null);
     try {
-      const result = await getUploadedDocuments({ limit: 100, offset: 0, search: '' });
+      const result = await getUploadedDocuments({ limit: 100, offset: 0, search: '', userId });
       setUploadedDocuments(result.items || []);
     } catch (error) {
       console.error('Error loading uploaded documents:', error);
+      setMetadataError('Failed to load uploaded documents. Please try again.');
     } finally {
       setLoadingDocuments(false);
     }
   };
 
   useEffect(() => {
-    loadUploadedDocuments();
-  }, []);
+    setEditingDocumentId(null);
+    setMetadataForm(initialMetadataForm);
+    setMetadataMessage(null);
+
+    if (userId) {
+      loadUploadedDocuments();
+    } else {
+      setUploadedDocuments([]);
+    }
+  }, [userId]);
 
   const removeFile = (index) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
@@ -83,13 +116,20 @@ export default function DocumentUpload({ onUploadComplete }) {
       return;
     }
 
+    if (!userId) {
+      alert('Unable to upload files: missing user information.');
+      return;
+    }
+
     setUploading(true);
     setUploadProgress(0);
     setUploadResult(null);
+    setMetadataMessage(null);
+    setMetadataError(null);
 
     try {
       const formData = new FormData();
-      
+
       // Add files to FormData
       selectedFiles.forEach((file, index) => {
         formData.append(`file_${index}`, file);
@@ -98,6 +138,7 @@ export default function DocumentUpload({ onUploadComplete }) {
       // Add metadata
       formData.append('fileCount', selectedFiles.length.toString());
       formData.append('uploadType', 'bulk_import');
+      formData.append('userId', userId);
 
       const response = await fetch('/api/upload-documents', {
         method: 'POST',
@@ -123,16 +164,122 @@ export default function DocumentUpload({ onUploadComplete }) {
 
       // Refresh uploaded documents list
       loadUploadedDocuments();
+      setMetadataMessage('Documents uploaded successfully and added to the knowledge base.');
 
     } catch (error) {
       console.error('Upload error:', error);
-      setUploadResult({ 
-        success: false, 
+      setUploadResult({
+        success: false,
         error: error.message 
       });
     } finally {
       setUploading(false);
       setUploadProgress(0);
+    }
+  };
+
+  const startEditingDocument = (doc) => {
+    const fallbackName = doc.document_name || doc.original_filename || 'Untitled Document';
+    setEditingDocumentId(doc.id);
+    setMetadataForm({
+      documentName: fallbackName,
+      documentType: doc.document_type || 'uploaded_document',
+      version: doc.version || '',
+      aiSummary: doc.ai_summary || ''
+    });
+    setMetadataError(null);
+    setMetadataMessage(null);
+  };
+
+  const cancelEditingDocument = () => {
+    setEditingDocumentId(null);
+    setMetadataForm(initialMetadataForm);
+    setMetadataError(null);
+  };
+
+  const handleMetadataFieldChange = (field, value) => {
+    setMetadataForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const saveMetadataChanges = async () => {
+    if (!editingDocumentId) return;
+
+    const trimmedName = metadataForm.documentName.trim();
+    if (!trimmedName) {
+      setMetadataError('Document name is required.');
+      return;
+    }
+
+    if (!userId) {
+      setMetadataError('Unable to save changes: missing user information.');
+      return;
+    }
+
+    setMetadataSaving(true);
+    setMetadataError(null);
+
+    try {
+      const response = await updateUploadedDocumentMetadata({
+        documentId: editingDocumentId,
+        userId,
+        documentName: trimmedName,
+        documentType: metadataForm.documentType,
+        version: metadataForm.version,
+        aiSummary: metadataForm.aiSummary
+      });
+
+      if (!response?.success) {
+        throw new Error(response?.error || 'Failed to update document metadata.');
+      }
+
+      setMetadataMessage('Document metadata updated successfully.');
+      setEditingDocumentId(null);
+      setMetadataForm(initialMetadataForm);
+      await loadUploadedDocuments();
+    } catch (error) {
+      console.error('Error updating uploaded document metadata:', error);
+      setMetadataError(error.message || 'Failed to update document metadata.');
+    } finally {
+      setMetadataSaving(false);
+    }
+  };
+
+  const handleDeleteUploadedDocument = async (doc) => {
+    const docName = doc.document_name || doc.original_filename || 'this document';
+    const confirmDelete = window.confirm(`Are you sure you want to delete "${docName}"? This action cannot be undone.`);
+    if (!confirmDelete) {
+      return;
+    }
+
+    setMetadataError(null);
+    setMetadataMessage(null);
+    setDeletingDocumentId(doc.id);
+
+    try {
+      const response = await deleteDocument({
+        documentId: doc.id,
+        sourceType: 'upload'
+      });
+
+      if (!response?.success) {
+        throw new Error(response?.error || 'Failed to delete document.');
+      }
+
+      if (editingDocumentId === doc.id) {
+        setEditingDocumentId(null);
+        setMetadataForm(initialMetadataForm);
+      }
+
+      setMetadataMessage('Document deleted successfully.');
+      await loadUploadedDocuments();
+    } catch (error) {
+      console.error('Error deleting uploaded document:', error);
+      setMetadataError(error.message || 'Failed to delete document.');
+    } finally {
+      setDeletingDocumentId(null);
     }
   };
 
@@ -376,6 +523,34 @@ export default function DocumentUpload({ onUploadComplete }) {
         </div>
       )}
 
+      {metadataMessage && (
+        <div style={{
+          marginTop: '20px',
+          padding: '14px 16px',
+          backgroundColor: '#d4edda',
+          color: '#155724',
+          borderRadius: '6px',
+          border: '1px solid #c3e6cb',
+          fontSize: '14px'
+        }}>
+          {metadataMessage}
+        </div>
+      )}
+
+      {metadataError && (
+        <div style={{
+          marginTop: '20px',
+          padding: '14px 16px',
+          backgroundColor: '#f8d7da',
+          color: '#721c24',
+          borderRadius: '6px',
+          border: '1px solid #f5c6cb',
+          fontSize: '14px'
+        }}>
+          {metadataError}
+        </div>
+      )}
+
       {/* Uploaded Documents List */}
       <div style={{ marginTop: '32px' }}>
         <div style={{
@@ -458,7 +633,7 @@ export default function DocumentUpload({ onUploadComplete }) {
           }}>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 150px 150px 120px',
+              gridTemplateColumns: '1.6fr 1fr 1fr 1fr 220px',
               gap: '16px',
               padding: '12px 16px',
               backgroundColor: '#f8fafc',
@@ -469,67 +644,256 @@ export default function DocumentUpload({ onUploadComplete }) {
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}>
               <div>Document Name</div>
+              <div>Version</div>
               <div>Type</div>
               <div>Uploaded</div>
               <div>Actions</div>
             </div>
-            {uploadedDocuments.map((doc, index) => (
-              <div
-                key={doc.id || index}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 150px 150px 120px',
-                  gap: '16px',
-                  padding: '12px 16px',
-                  borderBottom: index < uploadedDocuments.length - 1 ? '1px solid #e5e7eb' : 'none',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  transition: 'background-color 0.2s ease'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <div style={{
-                  fontSize: '14px',
-                  color: '#374151',
-                  fontWeight: '500',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}>
-                  {doc.original_filename || doc.filename || 'Untitled'}
-                </div>
-                <div style={{
-                  fontSize: '13px',
-                  color: '#6b7280'
-                }}>
-                  {doc.mime_type || doc.document_type || 'Unknown'}
-                </div>
-                <div style={{
-                  fontSize: '13px',
-                  color: '#6b7280'
-                }}>
-                  {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'N/A'}
-                </div>
-                <div>
-                  <a
-                    href={downloadUploadedDocumentUrl({ documentId: doc.id })}
-                    download
+            {uploadedDocuments.map((doc, index) => {
+              const isEditing = editingDocumentId === doc.id;
+              const uploadedDate = doc.created_at ? new Date(doc.created_at).toLocaleString() : 'N/A';
+              const updatedDate = doc.updated_at ? new Date(doc.updated_at).toLocaleString() : uploadedDate;
+              const summaryText = doc.ai_summary || 'No summary available.';
+
+              return (
+                <div
+                  key={doc.id || index}
+                  style={{
+                    borderBottom: index < uploadedDocuments.length - 1 ? '1px solid #e5e7eb' : 'none',
+                    backgroundColor: isEditing ? '#eef2ff' : 'transparent',
+                    transition: 'background-color 0.2s ease'
+                  }}
+                >
+                  <div
                     style={{
-                      padding: '6px 12px',
-                      backgroundColor: '#4338ca',
-                      color: '#ffffff',
-                      textDecoration: 'none',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      fontWeight: '500',
-                      display: 'inline-block'
+                      display: 'grid',
+                      gridTemplateColumns: '1.6fr 1fr 1fr 1fr 220px',
+                      gap: '16px',
+                      padding: '12px 16px',
+                      alignItems: 'center',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                     }}
                   >
-                    Download
-                  </a>
+                    <div style={{
+                      fontSize: '14px',
+                      color: '#374151',
+                      fontWeight: '500',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px'
+                    }}>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={metadataForm.documentName}
+                          onChange={(e) => handleMetadataFieldChange('documentName', e.target.value)}
+                          placeholder="Document name"
+                          style={{
+                            padding: '8px',
+                            border: '1px solid #cbd5f5',
+                            borderRadius: '4px',
+                            fontSize: '13px'
+                          }}
+                        />
+                      ) : (
+                        <span title={doc.document_name || doc.original_filename || 'Untitled Document'}>
+                          {doc.document_name || doc.original_filename || 'Untitled Document'}
+                        </span>
+                      )}
+                      <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                        {doc.original_filename || '—'}
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: '13px', color: '#374151' }}>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={metadataForm.version}
+                          onChange={(e) => handleMetadataFieldChange('version', e.target.value)}
+                          placeholder="e.g. 1.0"
+                          style={{
+                            padding: '8px',
+                            border: '1px solid #cbd5f5',
+                            borderRadius: '4px',
+                            fontSize: '13px'
+                          }}
+                        />
+                      ) : (
+                        doc.version || '—'
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: '13px', color: '#374151' }}>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={metadataForm.documentType}
+                          onChange={(e) => handleMetadataFieldChange('documentType', e.target.value)}
+                          placeholder="Document type"
+                          style={{
+                            padding: '8px',
+                            border: '1px solid #cbd5f5',
+                            borderRadius: '4px',
+                            fontSize: '13px'
+                          }}
+                        />
+                      ) : (
+                        doc.document_type || 'uploaded_document'
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: '13px', color: '#374151' }}>
+                      <div>{uploadedDate}</div>
+                      <div style={{ fontSize: '12px', color: '#6b7280' }}>Updated {updatedDate}</div>
+                    </div>
+
+                    <div style={{
+                      display: 'flex',
+                      gap: '8px',
+                      flexWrap: 'wrap',
+                      justifyContent: 'flex-end'
+                    }}>
+                      {isEditing ? (
+                        <>
+                          <button
+                            onClick={saveMetadataChanges}
+                            disabled={metadataSaving}
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: metadataSaving ? '#9ca3af' : '#16a34a',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: '500',
+                              cursor: metadataSaving ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            {metadataSaving ? 'Saving...' : 'Save Changes'}
+                          </button>
+                          <button
+                            onClick={cancelEditingDocument}
+                            disabled={metadataSaving}
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: '#e5e7eb',
+                              color: '#374151',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: '500',
+                              cursor: metadataSaving ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <a
+                            href={downloadUploadedDocumentUrl({ documentId: doc.id })}
+                            download
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: '#4338ca',
+                              color: '#ffffff',
+                              textDecoration: 'none',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: '500'
+                            }}
+                          >
+                            Download
+                          </a>
+                          <button
+                            onClick={() => startEditingDocument(doc)}
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: '#2563eb',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: '500',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUploadedDocument(doc)}
+                            disabled={deletingDocumentId === doc.id}
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: '#dc2626',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: '500',
+                              cursor: deletingDocumentId === doc.id ? 'not-allowed' : 'pointer',
+                              opacity: deletingDocumentId === doc.id ? 0.7 : 1
+                            }}
+                          >
+                            {deletingDocumentId === doc.id ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{
+                    padding: '0 16px 16px 16px',
+                    backgroundColor: isEditing ? '#eef2ff' : '#f9fafb',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    borderTop: '1px solid #e5e7eb'
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      color: '#6b7280',
+                      marginBottom: '6px',
+                      fontWeight: '500'
+                    }}>
+                      AI Summary
+                    </div>
+                    {isEditing ? (
+                      <textarea
+                        value={metadataForm.aiSummary}
+                        onChange={(e) => handleMetadataFieldChange('aiSummary', e.target.value)}
+                        placeholder="Short description to help teammates find this document"
+                        rows={4}
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          border: '1px solid #cbd5f5',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          resize: 'vertical'
+                        }}
+                      />
+                    ) : (
+                      <p style={{
+                        margin: 0,
+                        fontSize: '13px',
+                        color: '#374151',
+                        lineHeight: 1.5
+                      }}>
+                        {summaryText}
+                      </p>
+                    )}
+
+                    <div style={{
+                      marginTop: '10px',
+                      fontSize: '12px',
+                      color: '#6b7280'
+                    }}>
+                      {formatFileSize(Number(doc.file_size) || 0)} • {doc.mime_type || 'Unknown MIME type'}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
