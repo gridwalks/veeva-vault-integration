@@ -478,23 +478,50 @@ async function chunkAndEmbedDocument(documentText, documentId, fileName, userId)
       for (let j = 0; j < batchChunks.length; j++) {
         const chunk = batchChunks[j];
         const embedding = embeddings ? embeddings[j] : null;
-        const embeddingStr = embedding ? '[' + embedding.join(',') + ']' : null;
+        const embeddingLiteral = Array.isArray(embedding) ? `[${embedding.join(',')}]` : null;
 
-        await pool.query(`
-          INSERT INTO qms_chat_document_chunks
-          (document_id, veeva_document_id, chunk_index, chunk_text, embedding, token_count, user_id)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-          ON CONFLICT (document_id, chunk_index)
-          DO UPDATE SET chunk_text = $4, embedding = $5, token_count = $6, user_id = $7, created_at = CURRENT_TIMESTAMP
-        `, [
-          documentId,
-          null, // No Veeva document ID for uploaded files
-          chunk.index,
-          chunk.text,
-          embeddingStr,
-          chunk.tokenCount,
-          userId
-        ]);
+        try {
+          await pool.query(`
+            INSERT INTO qms_chat_document_chunks
+            (document_id, veeva_document_id, chunk_index, chunk_text, embedding, token_count, user_id)
+            VALUES ($1, $2, $3, $4, $5::vector, $6, $7)
+            ON CONFLICT (document_id, chunk_index)
+            DO UPDATE SET chunk_text = $4, embedding = $5::vector, token_count = $6, user_id = $7, created_at = CURRENT_TIMESTAMP
+          `, [
+            documentId,
+            null, // No Veeva document ID for uploaded files
+            chunk.index,
+            chunk.text,
+            embeddingLiteral,
+            chunk.tokenCount,
+            userId
+          ]);
+        } catch (dbError) {
+          if (embeddingLiteral) {
+            console.warn('Falling back to storing chunk without embeddings due to database error', {
+              documentId,
+              chunkIndex: chunk.index,
+              error: dbError.message
+            });
+
+            await pool.query(`
+              INSERT INTO qms_chat_document_chunks
+              (document_id, veeva_document_id, chunk_index, chunk_text, embedding, token_count, user_id)
+              VALUES ($1, $2, $3, $4, NULL, $5, $6)
+              ON CONFLICT (document_id, chunk_index)
+              DO UPDATE SET chunk_text = $4, embedding = NULL, token_count = $5, user_id = $6, created_at = CURRENT_TIMESTAMP
+            `, [
+              documentId,
+              null,
+              chunk.index,
+              chunk.text,
+              chunk.tokenCount,
+              userId
+            ]);
+          } else {
+            throw dbError;
+          }
+        }
 
         chunksCreated++;
       }
