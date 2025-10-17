@@ -20,13 +20,15 @@ const groq = new Groq({
 });
 
 // Helper function to parse multipart form data
-function parseMultipartFormData(body, contentType) {
+function parseMultipartFormData(body, contentType, isBase64Encoded = true) {
   const boundary = contentType.split('boundary=')[1];
   if (!boundary) {
     throw new Error('No boundary found in content-type header');
   }
 
-  const bodyBuffer = Buffer.from(body, 'base64');
+  const bodyBuffer = isBase64Encoded
+    ? Buffer.from(body, 'base64')
+    : Buffer.from(body, 'utf-8');
   const boundaryMarker = `--${boundary}`;
   const bodyString = bodyBuffer.toString('latin1');
   const rawParts = bodyString.split(boundaryMarker);
@@ -256,16 +258,18 @@ async function createDocumentsTable() {
         blob_url TEXT,
         original_filename TEXT,
         mime_type VARCHAR(255),
+        user_id VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    
+
     // Add missing columns if they don't exist (for existing tables)
     const columnsToAdd = [
       { name: 'blob_url', type: 'TEXT' },
       { name: 'original_filename', type: 'TEXT' },
-      { name: 'mime_type', type: 'VARCHAR(255)' }
+      { name: 'mime_type', type: 'VARCHAR(255)' },
+      { name: 'user_id', type: 'VARCHAR(255)' }
     ];
 
     for (const column of columnsToAdd) {
@@ -297,18 +301,8 @@ async function createDocumentsTable() {
 // Helper function to store document in database
 async function storeDocument(fileName, extractedText, summary, fileSize, extractionMethod, blobUrl, originalFileName, mimeType, userId) {
   try {
-    // Ensure table exists
-    const tableCheck = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'qms_chat_documents'
-      );
-    `);
-    
-    if (!tableCheck.rows[0].exists) {
-      await createDocumentsTable();
-    }
+    // Ensure table structure is up to date
+    await createDocumentsTable();
 
     // Try to insert with all columns first, fall back to basic columns if new ones don't exist
     let result;
@@ -377,17 +371,24 @@ async function createChunksTable() {
         chunk_text TEXT NOT NULL,
         embedding vector(1536),
         token_count INTEGER,
+        user_id VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(document_id, chunk_index)
       );
     `);
-    
+
     // Create indexes
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_qms_chat_chunks_document_id ON qms_chat_document_chunks(document_id);
       CREATE INDEX IF NOT EXISTS idx_qms_chat_chunks_veeva_document_id ON qms_chat_document_chunks(veeva_document_id);
     `);
     
+    // Add user_id column for existing deployments
+    await pool.query(`
+      ALTER TABLE qms_chat_document_chunks
+      ADD COLUMN IF NOT EXISTS user_id VARCHAR(255)
+    `);
+
     console.log('Veeva_Doc_Chat_document_chunks table created successfully');
   } catch (error) {
     console.error('Error creating Veeva_Doc_Chat_document_chunks table:', error);
@@ -401,17 +402,7 @@ async function chunkAndEmbedDocument(documentText, documentId, fileName, userId)
     console.log(`Chunking and embedding document ${fileName}...`);
     
     // Ensure chunks table exists
-    const tableCheck = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'qms_chat_document_chunks'
-      );
-    `);
-    
-    if (!tableCheck.rows[0].exists) {
-      await createChunksTable();
-    }
+    await createChunksTable();
     
         // Chunk the text
         console.log(`=== CHUNKING DEBUG ===`);
@@ -535,8 +526,9 @@ export const handler = async (event) => {
     const parseStartTime = Date.now();
     
     const { files, fileCount, uploadType, userId } = parseMultipartFormData(
-      event.body, 
-      event.headers['content-type']
+      event.body,
+      event.headers['content-type'],
+      event.isBase64Encoded !== false
     );
 
     const parseDuration = Date.now() - parseStartTime;
