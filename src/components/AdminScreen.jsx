@@ -7,7 +7,7 @@ import QAManagement from "./QAManagement.jsx";
 import WorkflowManagement from "./WorkflowManagement.jsx";
 import IndexingLogs from "./IndexingLogs.jsx";
 
-export default function AdminScreen() {
+export default function AdminScreen({ userId }) {
   const [q, setQ] = useState("");
   const [indexedData, setIndexedData] = useState({ items: [], total: 0, pageOffset: 0, pageSize: 50 });
   const [activeTab, setActiveTab] = useState("indexed");
@@ -438,7 +438,8 @@ export default function AdminScreen() {
           </div>
         </>
       ) : activeTab === "upload" ? (
-        <DocumentUpload 
+        <DocumentUpload
+          userId={userId}
           onUploadComplete={(result) => {
             console.log('Upload completed:', result);
             // Refresh indexed documents after upload
