@@ -444,7 +444,7 @@ async function chunkAndEmbedDocument(documentText, documentId, fileName, userId)
     console.log(`Deleted existing chunks for document ${documentId}`);
 
     // Generate embeddings for each chunk in batches
-    const batchSize = 10;
+    const batchSize = 5; // Reduced batch size for faster processing
     let chunksCreated = 0;
 
     const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-ada-002';
@@ -628,7 +628,7 @@ export const handler = async (event) => {
     let totalChunksCreated = 0;
     let totalErrors = 0;
     const processingStartTime = Date.now();
-    const MAX_PROCESSING_TIME = 8000; // 8 seconds to leave buffer for response
+    const MAX_PROCESSING_TIME = 20000; // 20 seconds to leave buffer for response
 
     // Process each file
     for (const file of files) {
@@ -683,13 +683,13 @@ export const handler = async (event) => {
           file.fileName
         );
 
-        // Generate AI summary (skip for large files to avoid token limits)
+        // Generate AI summary (skip for large files to avoid token limits and timeouts)
         console.log(`=== FILE PROCESSING DEBUG ===`);
         console.log(`File: ${file.fileName}, Text length: ${extractedText.length} chars`);
-        console.log(`Summary generation: ${extractedText.length > 10000 ? 'SKIPPED' : 'PROCEEDING'}`);
+        console.log(`Summary generation: ${extractedText.length > 5000 ? 'SKIPPED' : 'PROCEEDING'}`);
         
         let summary = '';
-        if (extractedText.length > 10000) {
+        if (extractedText.length > 5000) {
           console.log(`Skipping AI summary generation for large file: ${file.fileName} (${extractedText.length} chars)`);
           // Create a basic text-based summary instead
           summary = `Document: ${file.fileName} (${extractedText.length} characters)`;
