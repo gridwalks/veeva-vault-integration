@@ -455,6 +455,13 @@ async function chunkAndEmbedDocument(documentText, documentId, fileName, userId)
     }
 
     for (let i = 0; i < chunks.length; i += batchSize) {
+      // Check if we're approaching timeout during chunking
+      const chunkElapsedTime = Date.now() - processingStartTime;
+      if (chunkElapsedTime > MAX_PROCESSING_TIME) {
+        console.warn(`Chunking timeout warning: ${chunkElapsedTime}ms elapsed, stopping chunk processing`);
+        break;
+      }
+
       const batchChunks = chunks.slice(i, Math.min(i + batchSize, chunks.length));
 
       console.log(`Processing embedding batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(chunks.length / batchSize)} (${batchChunks.length} chunks)`);
@@ -536,12 +543,14 @@ async function chunkAndEmbedDocument(documentText, documentId, fileName, userId)
 }
 
 export const handler = async (event) => {
+  const functionStartTime = Date.now();
   console.log('=== DOCUMENT UPLOAD STARTED ===');
   console.log('Processing file upload...', {
     timestamp: new Date().toISOString(),
     contentType: event.headers['content-type'],
     method: event.httpMethod,
-    bodyLength: event.body?.length || 0
+    bodyLength: event.body?.length || 0,
+    functionTimeout: '26 seconds (configured)'
   });
 
   // Handle OPTIONS request for CORS
@@ -639,7 +648,7 @@ export const handler = async (event) => {
         results.push({
           fileName: file.fileName,
           success: false,
-          error: 'Processing timeout - function approaching time limit'
+          error: 'Processing timeout - file too large or complex for current timeout settings'
         });
         totalErrors++;
         continue;
@@ -779,8 +788,10 @@ export const handler = async (event) => {
 
     const successCount = results.filter(r => r.success).length;
     const failureCount = results.filter(r => !r.success).length;
+    const totalFunctionTime = Date.now() - functionStartTime;
 
     console.log(`Upload processing completed: ${successCount} successful, ${failureCount} failed`);
+    console.log(`Total function execution time: ${totalFunctionTime}ms`);
 
     return {
       statusCode: 200,
@@ -806,11 +817,13 @@ export const handler = async (event) => {
     };
 
   } catch (error) {
+    const totalFunctionTime = Date.now() - functionStartTime;
     console.error('Upload processing error:', {
       message: error.message,
       stack: error.stack,
       name: error.name,
-      cause: error.cause
+      cause: error.cause,
+      totalFunctionTime: `${totalFunctionTime}ms`
     });
     
     return {
