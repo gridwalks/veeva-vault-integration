@@ -3,6 +3,7 @@ import { OpenAI } from 'openai';
 import Groq from 'groq-sdk';
 import mammoth from 'mammoth';
 import { parseDocument } from 'docx-parser';
+import pdfParse from 'pdf-parse';
 import { chunkText, validateChunks } from './chunking-utils.js';
 import { getStore } from '@netlify/blobs';
 
@@ -142,10 +143,22 @@ async function extractTextFromFile(fileBuffer, fileName) {
       extractedText = fileBuffer.toString('utf-8');
       extractionMethod = 'utf8';
     } else if (fileExtension === 'pdf') {
-      // For PDF files, we'll need to implement PDF text extraction
-      // For now, we'll return a placeholder
-      extractedText = `[PDF Content: ${fileName}] - PDF text extraction not yet implemented`;
-      extractionMethod = 'pdf_placeholder';
+      try {
+        const pdfResult = await pdfParse(fileBuffer);
+        extractedText = (pdfResult.text || '').replace(/\u0000/g, '').trim();
+
+        if (!extractedText) {
+          console.warn(`PDF text extraction returned empty text for ${fileName}`);
+          extractedText = `[PDF Content: ${fileName}] - No extractable text found`;
+          extractionMethod = 'pdf_empty_fallback';
+        } else {
+          extractionMethod = 'pdf_parse';
+        }
+      } catch (pdfError) {
+        console.error(`PDF extraction failed for ${fileName}:`, pdfError);
+        extractedText = `[PDF Content: ${fileName}] - PDF text extraction failed`;
+        extractionMethod = 'pdf_error_fallback';
+      }
     } else if (fileExtension === 'docx') {
       try {
         const result = await mammoth.extractRawText({ buffer: fileBuffer });
