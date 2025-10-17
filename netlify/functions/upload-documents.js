@@ -3,7 +3,7 @@ import { OpenAI } from 'openai';
 import Groq from 'groq-sdk';
 import mammoth from 'mammoth';
 import { parseDocument } from 'docx-parser';
-import { chunkText } from './chunking-utils.js';
+import { chunkText, validateChunks } from './chunking-utils.js';
 import { getStore } from '@netlify/blobs';
 
 const pool = new Pool({
@@ -409,15 +409,18 @@ async function chunkAndEmbedDocument(documentText, documentId, fileName, userId)
         console.log(`Document text length: ${documentText.length} chars`);
         console.log(`Starting chunking with 8192 tokens per chunk...`);
         
-        const chunks = chunkText(documentText, 8192, 400);
-        console.log(`Created ${chunks.length} chunks for ${fileName}`);
+    const rawChunks = chunkText(documentText, 8192, 400);
+    console.log(`Created ${rawChunks.length} raw chunks for ${fileName}`);
 
-        if (chunks.length === 0) {
-          console.log(`No valid chunks created for ${fileName}`);
-          return { chunksCreated: 0, error: 'No valid chunks created' };
-        }
-        
-        console.log(`Chunk details:`, chunks.map((chunk, index) => ({
+    const chunks = validateChunks(rawChunks);
+    console.log(`Validated chunk count for ${fileName}: ${chunks.length}`);
+
+    if (chunks.length === 0) {
+      console.log(`No valid chunks created for ${fileName}`);
+      return { chunksCreated: 0, error: 'No valid chunks created' };
+    }
+
+    console.log(`Chunk details:`, chunks.map((chunk, index) => ({
           index,
           textLength: chunk.text.length,
           tokenCount: chunk.tokenCount
@@ -431,51 +434,60 @@ async function chunkAndEmbedDocument(documentText, documentId, fileName, userId)
     const batchSize = 10;
     let chunksCreated = 0;
 
+    const embeddingModel = process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-ada-002';
+    const embeddingsConfigured = Boolean(process.env.OPENAI_API_KEY);
+
+    if (!embeddingsConfigured) {
+      console.warn('OPENAI_API_KEY not configured. Chunks will be stored without embeddings.');
+    }
+
     for (let i = 0; i < chunks.length; i += batchSize) {
       const batchChunks = chunks.slice(i, Math.min(i + batchSize, chunks.length));
-      
+
       console.log(`Processing embedding batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(chunks.length / batchSize)} (${batchChunks.length} chunks)`);
 
-      try {
-        // Generate embeddings for the batch
-        const embeddingResponse = await openai.embeddings.create({
-          model: "text-embedding-ada-002",
-          input: batchChunks.map(chunk => chunk.text),
-        });
+      let embeddings = null;
 
-        // Store chunks with embeddings in database
-        for (let j = 0; j < batchChunks.length; j++) {
-          const chunk = batchChunks[j];
-          const embedding = embeddingResponse.data[j].embedding;
+      if (embeddingsConfigured) {
+        try {
+          const embeddingResponse = await openai.embeddings.create({
+            model: embeddingModel,
+            input: batchChunks.map(chunk => chunk.text),
+          });
 
-          // Convert embedding array to PostgreSQL vector format
-          const embeddingStr = '[' + embedding.join(',') + ']';
-
-          await pool.query(`
-            INSERT INTO qms_chat_document_chunks 
-            (document_id, veeva_document_id, chunk_index, chunk_text, embedding, token_count, user_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (document_id, chunk_index) 
-            DO UPDATE SET chunk_text = $4, embedding = $5, token_count = $6, user_id = $7, created_at = CURRENT_TIMESTAMP
-          `, [
-            documentId,
-            null, // No Veeva document ID for uploaded files
-            chunk.index,
-            chunk.text,
-            embeddingStr,
-            chunk.tokenCount,
-            userId
-          ]);
-
-          chunksCreated++;
+          embeddings = embeddingResponse.data.map(item => item.embedding);
+        } catch (batchError) {
+          console.error(`Error generating embeddings (storing chunks without embeddings):`, batchError);
         }
-      } catch (batchError) {
-        console.error(`Error processing embedding batch:`, batchError);
-        throw batchError;
+      }
+
+      // Store chunks with embeddings (if available) in database
+      for (let j = 0; j < batchChunks.length; j++) {
+        const chunk = batchChunks[j];
+        const embedding = embeddings ? embeddings[j] : null;
+        const embeddingStr = embedding ? '[' + embedding.join(',') + ']' : null;
+
+        await pool.query(`
+          INSERT INTO qms_chat_document_chunks
+          (document_id, veeva_document_id, chunk_index, chunk_text, embedding, token_count, user_id)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          ON CONFLICT (document_id, chunk_index)
+          DO UPDATE SET chunk_text = $4, embedding = $5, token_count = $6, user_id = $7, created_at = CURRENT_TIMESTAMP
+        `, [
+          documentId,
+          null, // No Veeva document ID for uploaded files
+          chunk.index,
+          chunk.text,
+          embeddingStr,
+          chunk.tokenCount,
+          userId
+        ]);
+
+        chunksCreated++;
       }
     }
 
-    console.log(`Successfully created ${chunksCreated} chunks with embeddings for ${fileName}`);
+    console.log(`Successfully created ${chunksCreated} chunks for ${fileName}${embeddingsConfigured ? '' : ' (without embeddings)'}`);
     return { chunksCreated, error: null };
   } catch (error) {
     console.error(`Error chunking and embedding document ${fileName}:`, error);
