@@ -284,11 +284,11 @@ export async function deleteDocument({ documentId, sourceType }) {
 export async function getUploadedDocuments({ limit = 50, offset = 0, search = '', userId } = {}) {
   const startTime = Date.now();
   console.log('Fetching uploaded documents...', { limit, offset, search, userId });
-  
+
   try {
     const params = new URLSearchParams({ limit, offset, userId });
     if (search) params.set('search', search);
-    
+
     const res = await fetch(`/api/list-uploaded-documents?${params}`);
     
     if (!res.ok) {
@@ -319,6 +319,72 @@ export async function getUploadedDocuments({ limit = 50, offset = 0, search = ''
       message: error.message,
       stack: error.stack,
       params: { limit, offset, search }
+    });
+    throw error;
+  }
+}
+
+export async function updateUploadedDocumentMetadata({
+  documentId,
+  userId,
+  documentName,
+  documentType,
+  version,
+  aiSummary
+}) {
+  const startTime = Date.now();
+  console.log('Updating uploaded document metadata...', {
+    documentId,
+    userId,
+    hasName: typeof documentName !== 'undefined',
+    hasType: typeof documentType !== 'undefined',
+    hasVersion: typeof version !== 'undefined',
+    hasSummary: typeof aiSummary !== 'undefined'
+  });
+
+  try {
+    const res = await fetch('/api/update-uploaded-document', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        documentId,
+        userId,
+        documentName,
+        documentType,
+        version,
+        aiSummary
+      })
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to update uploaded document metadata:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText,
+        documentId,
+        userId
+      });
+      throw new Error(`Failed to update metadata: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Uploaded document metadata updated in ${duration}ms`, {
+      documentId,
+      userId
+    });
+
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error updating uploaded document metadata after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack,
+      documentId,
+      userId
     });
     throw error;
   }
