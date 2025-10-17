@@ -170,7 +170,7 @@ export default function App() {
       ) : (
         /* Admin Screen */
         <div style={{ margin: '0 16px' }}>
-          <AdminScreen />
+          <AdminScreen userId={user?.sub} />
         </div>
       )}
     </div>
