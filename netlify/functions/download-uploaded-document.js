@@ -67,27 +67,43 @@ export const handler = async (event) => {
       };
     }
 
+    // Check if blob storage is configured before attempting to use it
+    if (!process.env.NETLIFY_BLOBS_SITE_ID || !process.env.NETLIFY_BLOBS_TOKEN) {
+      console.warn('Blob storage not configured - returning document metadata instead of file content');
+      return {
+        statusCode: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({
+          message: 'Blob storage not configured',
+          document: {
+            id: document.id,
+            name: document.document_name,
+            original_filename: document.original_filename,
+            mime_type: document.mime_type,
+            file_size: document.file_size,
+            created_at: document.created_at,
+            blob_url: document.blob_url
+          },
+          note: 'File download not available - blob storage not configured'
+        })
+      };
+    }
+
     // Get the blob store and retrieve the file using the blob key
     let store;
     try {
-      // Check if blob storage is properly configured
-      if (!process.env.NETLIFY_BLOBS_SITE_ID || !process.env.NETLIFY_BLOBS_TOKEN) {
-        console.warn('Blob storage not configured - missing NETLIFY_BLOBS_SITE_ID or NETLIFY_BLOBS_TOKEN');
-        return {
-          statusCode: 500,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          },
-          body: JSON.stringify({
-            error: 'Blob storage not configured',
-            details: 'Missing required properties when creating a store: siteID, token'
-          })
-        };
-      }
-
       const siteID = process.env.NETLIFY_BLOBS_SITE_ID;
       const token = process.env.NETLIFY_BLOBS_TOKEN;
+
+      console.log('Environment variables check:', {
+        siteID: siteID ? 'present' : 'missing',
+        token: token ? 'present' : 'missing',
+        siteIDLength: siteID ? siteID.length : 0,
+        tokenLength: token ? token.length : 0
+      });
 
       store = await getStore({
         name: 'uploaded-documents',
