@@ -81,23 +81,23 @@ export const handler = async (event) => {
       
       if (columnCheck.rows.length > 0) {
         // Column exists - include both user-specific and legacy documents
-        baseWhereClause = "WHERE source_type = 'upload' AND (user_id = $1 OR user_id IS NULL)";
+        baseWhereClause = "WHERE d.source_type = 'upload' AND (d.user_id = $1 OR d.user_id IS NULL)";
       } else {
         // Column doesn't exist - show all uploaded documents
-        baseWhereClause = "WHERE source_type = 'upload'";
+        baseWhereClause = "WHERE d.source_type = 'upload'";
         queryParams.length = 0; // Remove userId from params
         paramIndex = 1;
       }
     } catch (error) {
       console.log('Column check failed, using fallback query:', error.message);
       // Fallback to showing all uploaded documents
-      baseWhereClause = "WHERE source_type = 'upload'";
+      baseWhereClause = "WHERE d.source_type = 'upload'";
       queryParams.length = 0; // Remove userId from params
       paramIndex = 1;
     }
 
     if (search) {
-      baseWhereClause += ` AND (document_name ILIKE $${paramIndex} OR ai_summary ILIKE $${paramIndex})`;
+      baseWhereClause += ` AND (d.document_name ILIKE $${paramIndex} OR d.ai_summary ILIKE $${paramIndex})`;
       queryParams.push(`%${search}%`);
       paramIndex++;
     }
@@ -105,7 +105,7 @@ export const handler = async (event) => {
     // Get total count
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM qms_chat_documents
+      FROM qms_chat_documents d
       ${baseWhereClause}
     `;
     
@@ -119,7 +119,7 @@ export const handler = async (event) => {
     
     // Build WHERE clause for documents query with table aliases
     // Use the same logic as the count query
-    let documentsWhereClause = baseWhereClause.replace('source_type', 'd.source_type');
+    let documentsWhereClause = baseWhereClause;
     if (search) {
       const searchParamIndex = queryParams.length;
       documentsWhereClause += ` AND (d.document_name ILIKE $${searchParamIndex} OR d.ai_summary ILIKE $${searchParamIndex})`;
