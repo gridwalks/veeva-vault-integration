@@ -243,6 +243,29 @@ export const handler = async (event) => {
           const veevaResult = await pool.query(veevaQuery, [embeddingStr]);
           veevaChunks = veevaResult.rows;
           console.log(`Found ${veevaChunks.length} Veeva chunks from all documents`);
+          
+          // Also search all uploaded documents when no specific docs are selected
+          const uploadedQuery = `
+            SELECT 
+              c.chunk_text,
+              c.document_id as upload_document_id,
+              c.chunk_index,
+              d.document_name,
+              d.document_type,
+              d.ai_summary,
+              d.file_size,
+              d.original_filename,
+              1 - (c.embedding <=> $1::vector) as similarity,
+              'upload' as source_type
+            FROM qms_chat_document_chunks c
+            JOIN qms_chat_documents d ON c.document_id = d.id
+            WHERE c.user_id = $2
+            ORDER BY c.embedding <=> $1::vector
+            LIMIT 5
+          `;
+          const uploadedResult = await pool.query(uploadedQuery, [embeddingStr, userId]);
+          uploadedChunks = uploadedResult.rows;
+          console.log(`Found ${uploadedChunks.length} uploaded chunks from all documents for user ${userId}`);
         }
         
         // Query uploaded document chunks if we have uploaded document IDs
@@ -459,24 +482,51 @@ export const handler = async (event) => {
         const result = await pool.query(query, [...searchParams, searchParams, searchParams, searchParams]);
         const keywordSearchDocuments = result.rows;
         
+        // Also search uploaded documents
+        const uploadedSearchConditions = searchTerms.map((term, index) => 
+          `(document_name ILIKE $${index + 1} OR ai_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1} OR original_filename ILIKE $${index + 1})`
+        ).join(' OR ');
+        
+        const uploadedQuery = `
+          SELECT id as document_id, document_name, 
+                 document_type, ai_summary, file_size, original_filename,
+                 'upload' as source_type
+          FROM qms_chat_documents 
+          WHERE (${uploadedSearchConditions}) AND user_id = $${searchParams.length + 1}
+          ORDER BY 
+            CASE 
+              WHEN document_name ILIKE ANY($${searchParams.length + 2}) THEN 1
+              WHEN ai_summary ILIKE ANY($${searchParams.length + 3}) THEN 2
+              WHEN original_filename ILIKE ANY($${searchParams.length + 4}) THEN 3
+              ELSE 4
+            END,
+            document_name
+          LIMIT 10
+        `;
+        
+        console.log('Uploaded documents keyword search query:', uploadedQuery);
+        const uploadedResult = await pool.query(uploadedQuery, [...searchParams, userId, searchParams, searchParams, searchParams]);
+        const uploadedKeywordDocuments = uploadedResult.rows;
+        
         // Combine exact matches with general search results, prioritizing exact matches
-        const allKeywordDocuments = [...exactMatches, ...keywordSearchDocuments];
-        // Remove duplicates based on veeva_document_id
+        const allKeywordDocuments = [...exactMatches, ...keywordSearchDocuments, ...uploadedKeywordDocuments];
+        // Remove duplicates based on veeva_document_id or document_id
         const uniqueKeywordDocuments = allKeywordDocuments.filter((doc, index, self) => 
-          index === self.findIndex(d => d.veeva_document_id === doc.veeva_document_id)
+          index === self.findIndex(d => (d.veeva_document_id || d.document_id) === (doc.veeva_document_id || doc.document_id))
         );
         
-        console.log(`Found ${uniqueKeywordDocuments.length} relevant documents based on keyword search (${exactMatches.length} exact matches, ${keywordSearchDocuments.length} general matches)`);
+        console.log(`Found ${uniqueKeywordDocuments.length} relevant documents based on keyword search (${exactMatches.length} exact matches, ${keywordSearchDocuments.length} Veeva matches, ${uploadedKeywordDocuments.length} uploaded matches)`);
         console.log('Keyword search documents:', uniqueKeywordDocuments.map(doc => ({
-          id: doc.veeva_document_id,
-          number: doc.document_number,
+          id: doc.veeva_document_id || doc.document_id,
+          number: doc.document_number || 'N/A',
           name: doc.document_name,
-          isExactMatch: exactMatches.some(exact => exact.veeva_document_id === doc.veeva_document_id)
+          source: doc.source_type,
+          isExactMatch: exactMatches.some(exact => (exact.veeva_document_id || exact.document_id) === (doc.veeva_document_id || doc.document_id))
         })));
         
         // Merge with existing documents from semantic search, avoiding duplicates
         const existingDocIds = new Set(relevantDocuments.map(doc => doc.veeva_document_id || doc.document_id));
-        const newDocuments = uniqueKeywordDocuments.filter(doc => !existingDocIds.has(doc.veeva_document_id));
+        const newDocuments = uniqueKeywordDocuments.filter(doc => !existingDocIds.has(doc.veeva_document_id || doc.document_id));
         relevantDocuments.push(...newDocuments);
         
         console.log(`Added ${newDocuments.length} new documents from keyword search (${relevantDocuments.length} total)`);
