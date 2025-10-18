@@ -65,9 +65,36 @@ export const handler = async (event) => {
     }
 
     // Build the WHERE clause for search
-    let baseWhereClause = "WHERE source_type = 'upload' AND user_id = $1";
+    // First check if user_id column exists, then build appropriate query
+    let baseWhereClause;
     const queryParams = [userId];
     let paramIndex = 2;
+
+    try {
+      // Check if user_id column exists
+      const columnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'qms_chat_documents' 
+        AND column_name = 'user_id'
+      `);
+      
+      if (columnCheck.rows.length > 0) {
+        // Column exists - include both user-specific and legacy documents
+        baseWhereClause = "WHERE source_type = 'upload' AND (user_id = $1 OR user_id IS NULL)";
+      } else {
+        // Column doesn't exist - show all uploaded documents
+        baseWhereClause = "WHERE source_type = 'upload'";
+        queryParams.length = 0; // Remove userId from params
+        paramIndex = 1;
+      }
+    } catch (error) {
+      console.log('Column check failed, using fallback query:', error.message);
+      // Fallback to showing all uploaded documents
+      baseWhereClause = "WHERE source_type = 'upload'";
+      queryParams.length = 0; // Remove userId from params
+      paramIndex = 1;
+    }
 
     if (search) {
       baseWhereClause += ` AND (document_name ILIKE $${paramIndex} OR ai_summary ILIKE $${paramIndex})`;
@@ -91,9 +118,11 @@ export const handler = async (event) => {
     queryParams.push(limit, offset);
     
     // Build WHERE clause for documents query with table aliases
-    let documentsWhereClause = "WHERE d.source_type = 'upload' AND d.user_id = $1";
+    // Use the same logic as the count query
+    let documentsWhereClause = baseWhereClause.replace('source_type', 'd.source_type');
     if (search) {
-      documentsWhereClause += ` AND (d.document_name ILIKE $2 OR d.ai_summary ILIKE $2)`;
+      const searchParamIndex = queryParams.length;
+      documentsWhereClause += ` AND (d.document_name ILIKE $${searchParamIndex} OR d.ai_summary ILIKE $${searchParamIndex})`;
     }
     
     const documentsQuery = `
