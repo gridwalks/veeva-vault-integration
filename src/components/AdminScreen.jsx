@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { indexDocuments, getIndexedDocuments } from "../api";
 import IndexedDocumentList from "./IndexedDocumentList.jsx";
+import BlobDocumentList from "./BlobDocumentList.jsx";
 import DocumentUpload from "./DocumentUpload.jsx";
 import ExternalResources from "./ExternalResources.jsx";
 import QAManagement from "./QAManagement.jsx";
@@ -212,6 +213,26 @@ export default function AdminScreen({ userId }) {
           }}
         >
           Upload Documents
+        </button>
+        <button
+          onClick={() => {
+            console.log('Switching to blob documents tab');
+            setActiveTab("blob");
+          }}
+          style={{
+            padding: '6px 12px',
+            backgroundColor: activeTab === "blob" ? '#4338ca' : '#f3f4f6',
+            color: activeTab === "blob" ? 'white' : '#374151',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: '500',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          Blob Documents
         </button>
         <button
           onClick={() => {
@@ -446,6 +467,14 @@ export default function AdminScreen({ userId }) {
             if (result.success) {
               loadIndexed(0);
             }
+          }}
+        />
+      ) : activeTab === "blob" ? (
+        <BlobDocumentList
+          userId={userId}
+          onDocumentDeleted={(deletedId) => {
+            console.log('Blob document deleted, refreshing list...', deletedId);
+            // The BlobDocumentList component handles its own refresh
           }}
         />
       ) : activeTab === "external" ? (
