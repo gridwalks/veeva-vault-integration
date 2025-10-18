@@ -91,17 +91,52 @@ export const handler = async (event) => {
 
     const document = documentResult.rows[0];
     
+    console.log('Document found in database:', {
+      id: document.id,
+      document_name: document.document_name,
+      original_filename: document.original_filename,
+      blob_url: document.blob_url,
+      file_size: document.file_size,
+      mime_type: document.mime_type
+    });
+    
     if (!document.blob_url) {
-      return {
-        statusCode: 404,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({
-          error: 'File not available in blob storage'
-        })
-      };
+      console.log('Document has no blob_url, checking if content is available in database');
+      
+      // If no blob_url, try to return the content from the database
+      if (document.content) {
+        console.log('Returning content from database');
+        const mimeType = document.mime_type || 'text/plain';
+        const downloadFilename = document.original_filename || document.document_name;
+        
+        return {
+          statusCode: 200,
+          headers: {
+            'Content-Type': mimeType,
+            'Content-Disposition': `attachment; filename="${downloadFilename}"`,
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'public, max-age=3600'
+          },
+          body: document.content
+        };
+      } else {
+        console.log('Document has no blob_url and no content, returning 404');
+        return {
+          statusCode: 404,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          },
+          body: JSON.stringify({
+            error: 'File not available in blob storage and no content in database',
+            document: {
+              id: document.id,
+              document_name: document.document_name,
+              original_filename: document.original_filename
+            }
+          })
+        };
+      }
     }
 
     // Check if blob storage is configured before attempting to use it
@@ -165,11 +200,22 @@ export const handler = async (event) => {
     
     const blobKey = document.blob_url;
     
+    console.log('Attempting to retrieve file from blob storage:', {
+      blobKey: blobKey,
+      blobKeyLength: blobKey ? blobKey.length : 0
+    });
+    
     try {
       // Get file from Netlify Blob storage
       const fileBuffer = await store.get(blobKey, { type: 'arrayBuffer' });
       
+      console.log('Blob retrieval result:', {
+        hasFileBuffer: !!fileBuffer,
+        fileBufferSize: fileBuffer ? fileBuffer.byteLength : 0
+      });
+      
       if (!fileBuffer) {
+        console.log('File not found in blob storage, returning 404');
         return {
           statusCode: 404,
           headers: {
@@ -177,7 +223,8 @@ export const handler = async (event) => {
             'Access-Control-Allow-Origin': '*'
           },
           body: JSON.stringify({
-            error: 'File not found in blob storage'
+            error: 'File not found in blob storage',
+            blobKey: blobKey
           })
         };
       }
