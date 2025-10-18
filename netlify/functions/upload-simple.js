@@ -102,8 +102,8 @@ export const handler = async (event) => {
       };
     }
 
-    // Handle non-POST requests
-    if (event.httpMethod !== 'POST') {
+    // Handle non-POST requests (allow GET for testing)
+    if (event.httpMethod !== 'POST' && event.httpMethod !== 'GET') {
       return {
         statusCode: 405,
         headers: {
@@ -112,15 +112,34 @@ export const handler = async (event) => {
         },
         body: JSON.stringify({
           error: 'Method not allowed',
-          allowedMethods: ['POST', 'OPTIONS']
+          allowedMethods: ['GET', 'POST', 'OPTIONS']
         })
       };
     }
 
     console.log('Processing simple upload...', {
+      method: event.httpMethod,
       contentType: event.headers['content-type'],
       bodyLength: event.body?.length || 0
     });
+
+    // For GET requests, return test data without processing
+    if (event.httpMethod === 'GET') {
+      return {
+        statusCode: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({
+          success: true,
+          message: 'Simple upload test - GET request received',
+          timestamp: new Date().toISOString(),
+          method: 'GET',
+          note: 'Use POST to test actual upload processing with mock data'
+        })
+      };
+    }
 
     // Parse multipart data
     const { files, fileCount, uploadType, userId } = parseMultipartSimple(
