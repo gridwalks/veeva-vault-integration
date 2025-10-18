@@ -155,26 +155,54 @@ export const handler = async (event) => {
     let vectorSearchTest = null;
     try {
       if (chunkCount > 0) {
-        // Get a sample embedding for testing
-        const sampleChunk = await pool.query(`
-          SELECT embedding FROM Veeva_Doc_Chat_document_chunks 
-          WHERE embedding IS NOT NULL AND array_length(embedding, 1) = 1536
-          LIMIT 1
-        `);
+        // Try to get a sample embedding from either table
+        let sampleChunk = null;
+        try {
+          sampleChunk = await pool.query(`
+            SELECT embedding FROM Veeva_Doc_Chat_document_chunks 
+            WHERE embedding IS NOT NULL AND array_length(embedding, 1) = 1536
+            LIMIT 1
+          `);
+        } catch (e) {
+          // If Veeva table doesn't exist, try uploaded chunks table
+          sampleChunk = await pool.query(`
+            SELECT embedding FROM qms_chat_document_chunks 
+            WHERE embedding IS NOT NULL AND array_length(embedding, 1) = 1536
+            LIMIT 1
+          `);
+        }
         
         if (sampleChunk.rows.length > 0) {
           const testEmbedding = sampleChunk.rows[0].embedding;
-          const vectorTest = await pool.query(`
-            SELECT 
-              dc.chunk_text,
-              di.document_name,
-              1 - (dc.embedding <=> $1::vector) as similarity
-            FROM Veeva_Doc_Chat_document_chunks dc
-            JOIN Veeva_Doc_Chat_document_index di ON dc.document_id = di.id
-            WHERE dc.embedding IS NOT NULL
-            ORDER BY dc.embedding <=> $1::vector
-            LIMIT 3
-          `, [testEmbedding]);
+          
+          // Test both tables for vector search
+          let vectorTest = null;
+          try {
+            vectorTest = await pool.query(`
+              SELECT 
+                dc.chunk_text,
+                di.document_name,
+                1 - (dc.embedding <=> $1::vector) as similarity
+              FROM Veeva_Doc_Chat_document_chunks dc
+              JOIN Veeva_Doc_Chat_document_index di ON dc.document_id = di.id
+              WHERE dc.embedding IS NOT NULL
+              ORDER BY dc.embedding <=> $1::vector
+              LIMIT 3
+            `, [testEmbedding]);
+          } catch (e) {
+            // If Veeva table doesn't exist, try uploaded chunks
+            vectorTest = await pool.query(`
+              SELECT 
+                c.chunk_text,
+                d.document_name,
+                1 - (c.embedding <=> $1::vector) as similarity
+              FROM qms_chat_document_chunks c
+              JOIN qms_chat_documents d ON c.document_id = d.id
+              WHERE c.embedding IS NOT NULL
+              ORDER BY c.embedding <=> $1::vector
+              LIMIT 3
+            `, [testEmbedding]);
+          }
           
           vectorSearchTest = {
             success: true,
@@ -222,8 +250,8 @@ export const handler = async (event) => {
         vectorSearchTest,
         recommendations: generateRecommendations({
           docsWithoutChunks,
-          chunksWithoutEmbeddings: parseInt(invalidStats.chunks_without_embeddings),
-          chunksWithInvalidEmbeddings: parseInt(invalidStats.chunks_with_invalid_embeddings),
+          chunksWithoutEmbeddings: invalidStats.chunks_without_embeddings,
+          chunksWithInvalidEmbeddings: invalidStats.chunks_with_invalid_embeddings,
           vectorSearchTest
         }),
         timestamp: new Date().toISOString()

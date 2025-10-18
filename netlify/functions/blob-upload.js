@@ -213,7 +213,7 @@ async function processAndIndexDocument(fileBuffer, fileName, blobKey, userId = n
     const documentId = documentResult.rows[0].id;
     
     // Chunk the text
-    const chunks = chunkText(extractedText, 1000, 200); // 1000 chars, 200 overlap
+    const chunks = chunkText(extractedText, 512, 50); // 512 tokens, 50 overlap
     console.log(`Created ${chunks.length} chunks for ${fileName}`);
     
     // Generate embeddings and store chunks
@@ -241,7 +241,7 @@ async function processAndIndexDocument(fileBuffer, fileName, blobKey, userId = n
           await pool.query(`
             INSERT INTO qms_chat_document_chunks 
             (document_id, veeva_document_id, chunk_index, chunk_text, embedding, token_count, user_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            VALUES ($1, $2, $3, $4, $5::vector, $6, $7)
           `, [
             documentId,
             null, // No Veeva document ID for uploaded files

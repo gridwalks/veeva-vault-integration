@@ -461,10 +461,10 @@ async function chunkAndEmbedDocument(
         // Chunk the text
         console.log(`=== CHUNKING DEBUG ===`);
         console.log(`Document text length: ${documentText.length} chars`);
-        console.log(`Starting chunking with 8192 tokens per chunk...`);
+        console.log(`Starting chunking with 512 tokens per chunk...`);
         
         const { chunkText, validateChunks } = await import('./chunking-utils.js');
-        const rawChunks = chunkText(documentText, 8192, 400);
+        const rawChunks = chunkText(documentText, 512, 50);
         console.log(`Created ${rawChunks.length} raw chunks for ${fileName}`);
 
         const chunks = validateChunks(rawChunks);
