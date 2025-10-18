@@ -119,6 +119,18 @@ export const handler = async (event) => {
     await initDatabase();
     const pool = getPool();
 
+    // Detect if user is asking specifically about uploaded documents
+    const isUploadedDocQuery = message.toLowerCase().includes('uploaded') || 
+                              message.toLowerCase().includes('my documents') ||
+                              message.toLowerCase().includes('my files') ||
+                              message.toLowerCase().includes('what documents do i have');
+    
+    console.log('Query analysis:', {
+      message: message.substring(0, 100),
+      isUploadedDocQuery,
+      isComparisonQuery
+    });
+
     // Separate Veeva document IDs from uploaded document IDs
     let veevaDocumentIds = [];
     let uploadedDocumentIds = [];
@@ -221,51 +233,77 @@ export const handler = async (event) => {
           veevaChunks = veevaResult.rows;
           console.log(`Found ${veevaChunks.length} Veeva chunks (comparison mode: ${isComparisonQuery})`);
         } else if (veevaDocumentIds.length === 0 && uploadedDocumentIds.length === 0) {
-          // If no specific docs selected at all, search all Veeva docs
-          const veevaQuery = `
-            SELECT 
-              dc.chunk_text,
-              dc.veeva_document_id,
-              dc.chunk_index,
-              di.document_name,
-              di.document_number,
-              di.major_version,
-              di.minor_version,
-              di.document_type,
-              di.status,
-              1 - (dc.embedding <=> $1::vector) as similarity,
-              'veeva' as source_type
-            FROM Veeva_Doc_Chat_document_chunks dc
-            JOIN Veeva_Doc_Chat_document_index di ON dc.document_id = di.id
-            ORDER BY dc.embedding <=> $1::vector
-            LIMIT 5
-          `;
-          const veevaResult = await pool.query(veevaQuery, [embeddingStr]);
-          veevaChunks = veevaResult.rows;
-          console.log(`Found ${veevaChunks.length} Veeva chunks from all documents`);
-          
-          // Also search all uploaded documents when no specific docs are selected
-          const uploadedQuery = `
-            SELECT 
-              c.chunk_text,
-              c.document_id as upload_document_id,
-              c.chunk_index,
-              d.document_name,
-              d.document_type,
-              d.ai_summary,
-              d.file_size,
-              d.original_filename,
-              1 - (c.embedding <=> $1::vector) as similarity,
-              'upload' as source_type
-            FROM qms_chat_document_chunks c
-            JOIN qms_chat_documents d ON c.document_id = d.id
-            WHERE c.user_id = $2
-            ORDER BY c.embedding <=> $1::vector
-            LIMIT 5
-          `;
-          const uploadedResult = await pool.query(uploadedQuery, [embeddingStr, userId]);
-          uploadedChunks = uploadedResult.rows;
-          console.log(`Found ${uploadedChunks.length} uploaded chunks from all documents for user ${userId}`);
+          if (isUploadedDocQuery) {
+            // If asking about uploaded documents, only search uploaded docs
+            console.log('Searching only uploaded documents for uploaded doc query');
+            const uploadedQuery = `
+              SELECT 
+                c.chunk_text,
+                c.document_id as upload_document_id,
+                c.chunk_index,
+                d.document_name,
+                d.document_type,
+                d.ai_summary,
+                d.file_size,
+                d.original_filename,
+                1 - (c.embedding <=> $1::vector) as similarity,
+                'upload' as source_type
+              FROM qms_chat_document_chunks c
+              JOIN qms_chat_documents d ON c.document_id = d.id
+              WHERE c.user_id = $2
+              ORDER BY c.embedding <=> $1::vector
+              LIMIT 10
+            `;
+            const uploadedResult = await pool.query(uploadedQuery, [embeddingStr, userId]);
+            uploadedChunks = uploadedResult.rows;
+            console.log(`Found ${uploadedChunks.length} uploaded chunks for uploaded doc query`);
+          } else {
+            // If no specific docs selected and not asking about uploaded docs, search all Veeva docs
+            const veevaQuery = `
+              SELECT 
+                dc.chunk_text,
+                dc.veeva_document_id,
+                dc.chunk_index,
+                di.document_name,
+                di.document_number,
+                di.major_version,
+                di.minor_version,
+                di.document_type,
+                di.status,
+                1 - (dc.embedding <=> $1::vector) as similarity,
+                'veeva' as source_type
+              FROM Veeva_Doc_Chat_document_chunks dc
+              JOIN Veeva_Doc_Chat_document_index di ON dc.document_id = di.id
+              ORDER BY dc.embedding <=> $1::vector
+              LIMIT 5
+            `;
+            const veevaResult = await pool.query(veevaQuery, [embeddingStr]);
+            veevaChunks = veevaResult.rows;
+            console.log(`Found ${veevaChunks.length} Veeva chunks from all documents`);
+            
+            // Also search all uploaded documents when no specific docs are selected
+            const uploadedQuery = `
+              SELECT 
+                c.chunk_text,
+                c.document_id as upload_document_id,
+                c.chunk_index,
+                d.document_name,
+                d.document_type,
+                d.ai_summary,
+                d.file_size,
+                d.original_filename,
+                1 - (c.embedding <=> $1::vector) as similarity,
+                'upload' as source_type
+              FROM qms_chat_document_chunks c
+              JOIN qms_chat_documents d ON c.document_id = d.id
+              WHERE c.user_id = $2
+              ORDER BY c.embedding <=> $1::vector
+              LIMIT 5
+            `;
+            const uploadedResult = await pool.query(uploadedQuery, [embeddingStr, userId]);
+            uploadedChunks = uploadedResult.rows;
+            console.log(`Found ${uploadedChunks.length} uploaded chunks from all documents for user ${userId}`);
+          }
         }
         
         // Query uploaded document chunks if we have uploaded document IDs
@@ -431,8 +469,47 @@ export const handler = async (event) => {
     });
     
     if (searchTerms.length > 0 && veevaDocumentIds.length === 0 && uploadedDocumentIds.length === 0) {
-        // First, try exact document number matches (case-insensitive)
-        const exactMatches = [];
+        if (isUploadedDocQuery) {
+          // If asking about uploaded documents, only search uploaded docs
+          console.log('Keyword search: searching only uploaded documents for uploaded doc query');
+          const uploadedSearchConditions = searchTerms.map((term, index) => 
+            `(document_name ILIKE $${index + 1} OR ai_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1} OR original_filename ILIKE $${index + 1})`
+          ).join(' OR ');
+          
+          const uploadedQuery = `
+            SELECT id as document_id, document_name, 
+                   document_type, ai_summary, file_size, original_filename,
+                   'upload' as source_type
+            FROM qms_chat_documents 
+            WHERE (${uploadedSearchConditions}) AND user_id = $${searchParams.length + 1}
+            ORDER BY 
+              CASE 
+                WHEN document_name ILIKE ANY($${searchParams.length + 2}) THEN 1
+                WHEN ai_summary ILIKE ANY($${searchParams.length + 3}) THEN 2
+                WHEN original_filename ILIKE ANY($${searchParams.length + 4}) THEN 3
+                ELSE 4
+              END,
+              document_name
+            LIMIT 10
+          `;
+          
+          console.log('Uploaded documents keyword search query:', uploadedQuery);
+          const uploadedResult = await pool.query(uploadedQuery, [...searchParams, userId, searchParams, searchParams, searchParams]);
+          const uploadedKeywordDocuments = uploadedResult.rows;
+          
+          console.log(`Found ${uploadedKeywordDocuments.length} uploaded documents based on keyword search`);
+          console.log('Uploaded keyword search documents:', uploadedKeywordDocuments.map(doc => ({
+            id: doc.document_id,
+            name: doc.document_name,
+            source: doc.source_type
+          })));
+          
+          // Add uploaded documents to relevant documents
+          relevantDocuments.push(...uploadedKeywordDocuments);
+        } else {
+          // Regular search for both Veeva and uploaded documents
+          // First, try exact document number matches (case-insensitive)
+          const exactMatches = [];
         for (const term of searchTerms) {
           if (/^[a-z0-9\-_]+$/i.test(term)) {
             console.log(`Checking for exact document number match: ${term}`);
@@ -544,6 +621,7 @@ export const handler = async (event) => {
           // These documents will be included in the documentContext via the relevantDocuments array
           // The AI will use their summaries and metadata to respond
         }
+        } // End of else block for regular search
     } else if (documentIds && documentIds.length > 0) {
       // Get specific documents by IDs
       const placeholders = documentIds.map((_, index) => `$${index + 1}`).join(',');
