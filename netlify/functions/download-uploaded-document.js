@@ -25,19 +25,56 @@ export const handler = async (event) => {
       };
     }
 
-    // Get document information from database
-    const documentResult = await pool.query(`
-      SELECT 
-        id,
-        document_name,
-        original_filename,
-        mime_type,
-        file_size,
-        blob_url,
-        created_at
-      FROM qms_chat_documents 
-      WHERE id = $1 AND source_type = 'upload'
-    `, [documentId]);
+    // Try to find document by ID (both as integer and as string)
+    let documentResult;
+    
+    // First try as integer
+    if (/^\d+$/.test(documentId)) {
+      documentResult = await pool.query(`
+        SELECT 
+          id,
+          document_name,
+          original_filename,
+          mime_type,
+          file_size,
+          blob_url,
+          created_at
+        FROM qms_chat_documents 
+        WHERE id = $1 AND source_type = 'upload'
+      `, [parseInt(documentId)]);
+    } else {
+      // Try as string (UUID or other format)
+      documentResult = await pool.query(`
+        SELECT 
+          id,
+          document_name,
+          original_filename,
+          mime_type,
+          file_size,
+          blob_url,
+          created_at
+        FROM qms_chat_documents 
+        WHERE id::text = $1 AND source_type = 'upload'
+      `, [documentId]);
+    }
+    
+    // If not found, try searching by document_name or original_filename
+    if (documentResult.rows.length === 0) {
+      documentResult = await pool.query(`
+        SELECT 
+          id,
+          document_name,
+          original_filename,
+          mime_type,
+          file_size,
+          blob_url,
+          created_at
+        FROM qms_chat_documents 
+        WHERE (document_name ILIKE $1 OR original_filename ILIKE $1) AND source_type = 'upload'
+        ORDER BY created_at DESC
+        LIMIT 5
+      `, [`%${documentId}%`]);
+    }
 
     if (documentResult.rows.length === 0) {
       return {
