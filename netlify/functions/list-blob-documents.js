@@ -1,6 +1,9 @@
-import { getStore } from '@netlify/blobs';
+import { Pool } from 'pg';
 
-const STORE_NAME = 'uploaded-documents';
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
 
 export const handler = async (event) => {
   console.log('=== LIST BLOB DOCUMENTS ===');
@@ -46,107 +49,78 @@ export const handler = async (event) => {
 
     console.log('Query parameters:', { limit, offset, search, userId });
 
-    // Get the blob store with proper configuration
-    let store;
-    try {
-      // Check if blob storage is properly configured
-      if (!process.env.NETLIFY_BLOBS_SITE_ID || !process.env.NETLIFY_BLOBS_TOKEN) {
-        console.warn('Blob storage not configured - missing NETLIFY_BLOBS_SITE_ID or NETLIFY_BLOBS_TOKEN');
-        return {
-          statusCode: 500,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'Content-Type',
-            'Access-Control-Allow-Methods': 'GET, OPTIONS'
-          },
-          body: JSON.stringify({
-            success: false,
-            error: 'Blob storage not configured',
-            details: 'Missing required properties when creating a store: siteID, token'
-          })
-        };
-      }
-
-      console.log('Blob storage configuration found, initializing store...');
-      const siteID = process.env.NETLIFY_BLOBS_SITE_ID;
-      const token = process.env.NETLIFY_BLOBS_TOKEN;
-
-      store = await getStore({
-        name: STORE_NAME,
-        siteID,
-        token
-      });
-      console.log('Blob store retrieved successfully');
-    } catch (storeError) {
-      console.error('Error initializing blob store:', storeError);
-      return {
-        statusCode: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type',
-          'Access-Control-Allow-Methods': 'GET, OPTIONS'
-        },
-        body: JSON.stringify({
-          success: false,
-          error: 'Failed to initialize blob store',
-          details: storeError.message
-        })
-      };
+    // Query uploaded documents from database
+    console.log('Querying uploaded documents from database...');
+    
+    let query = `
+      SELECT 
+        id,
+        document_name,
+        document_type,
+        version,
+        ai_summary,
+        file_size,
+        extraction_method,
+        blob_url,
+        original_filename,
+        mime_type,
+        created_at,
+        updated_at,
+        source_type,
+        user_id
+      FROM qms_chat_documents 
+      WHERE source_type = 'upload'
+    `;
+    
+    const queryParams = [];
+    
+    // Add user filter if userId is provided
+    if (userId) {
+      query += ` AND user_id = $1`;
+      queryParams.push(userId);
     }
     
-    // List all blobs from the store
-    console.log('Listing blobs from store:', STORE_NAME);
-    const blobList = await store.list();
-    console.log(`Found ${blobList.length} blobs in storage`);
-
-    // Convert blobs to document format and apply search filter
-    let documents = blobList.map((blob, index) => ({
-      id: blob.key, // Use blob key as ID
-      document_id: blob.key,
-      document_name: blob.key, // Use blob key as name
-      document_type: 'uploaded_document',
-      version: '1.0',
-      ai_summary: null, // Not available from blob metadata
-      file_size: blob.size,
-      extraction_method: 'blob_storage',
-      blob_url: blob.key, // The blob key is the URL
-      original_filename: blob.key,
-      mime_type: blob.contentType || 'application/octet-stream',
-      chunk_count: 0, // Not available from blob metadata
-      created_at: blob.lastModified ? new Date(blob.lastModified).toISOString() : new Date().toISOString(),
-      updated_at: blob.lastModified ? new Date(blob.lastModified).toISOString() : new Date().toISOString(),
-      source_type: 'upload',
-      isUploaded: true,
-      blob_metadata: {
-        key: blob.key,
-        size: blob.size,
-        contentType: blob.contentType,
-        lastModified: blob.lastModified,
-        etag: blob.etag
-      }
-    }));
-
-    // Apply search filter if provided
+    // Add search filter if search is provided
     if (search) {
-      const searchLower = search.toLowerCase();
-      documents = documents.filter(doc => 
-        doc.document_name.toLowerCase().includes(searchLower) ||
-        doc.original_filename.toLowerCase().includes(searchLower)
-      );
-      console.log(`Filtered to ${documents.length} documents matching search: "${search}"`);
+      const searchParam = queryParams.length + 1;
+      query += ` AND (document_name ILIKE $${searchParam} OR original_filename ILIKE $${searchParam})`;
+      queryParams.push(`%${search}%`);
     }
-
-    // Sort by creation date (newest first)
-    documents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
+    query += ` ORDER BY created_at DESC`;
+    
+    console.log('Executing query:', query);
+    console.log('Query parameters:', queryParams);
+    
+    const result = await pool.query(query, queryParams);
+    const documents = result.rows.map(doc => ({
+      id: doc.id,
+      document_id: doc.id,
+      document_name: doc.document_name,
+      document_type: doc.document_type || 'uploaded_document',
+      version: doc.version || '1.0',
+      ai_summary: doc.ai_summary,
+      file_size: doc.file_size,
+      extraction_method: doc.extraction_method,
+      blob_url: doc.blob_url,
+      original_filename: doc.original_filename,
+      mime_type: doc.mime_type || 'application/octet-stream',
+      chunk_count: 0, // Will be calculated separately if needed
+      created_at: doc.created_at,
+      updated_at: doc.updated_at,
+      source_type: doc.source_type,
+      user_id: doc.user_id,
+      isUploaded: true
+    }));
+    
+    console.log(`Found ${documents.length} uploaded documents in database`);
 
     // Apply pagination
     const total = documents.length;
     const paginatedDocuments = documents.slice(offset, offset + limit);
 
     const duration = Date.now() - startTime;
-    console.log(`Blob query completed in ${duration}ms, returning ${paginatedDocuments.length} documents`);
+    console.log(`Database query completed in ${duration}ms, returning ${paginatedDocuments.length} documents`);
 
     return {
       statusCode: 200,
@@ -163,7 +137,7 @@ export const handler = async (event) => {
         pageSize: limit,
         pageOffset: offset,
         duration: `${duration}ms`,
-        source: 'blob_storage'
+        source: 'database'
       })
     };
 
