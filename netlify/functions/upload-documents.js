@@ -595,7 +595,14 @@ export const handler = async (event) => {
     contentType: event.headers['content-type'],
     method: event.httpMethod,
     bodyLength: event.body?.length || 0,
-    functionTimeout: '26 seconds (configured)'
+    functionTimeout: '26 seconds (configured)',
+    environment: {
+      hasDatabaseUrl: !!process.env.DATABASE_URL,
+      hasOpenaiKey: !!process.env.OPENAI_API_KEY,
+      hasGroqKey: !!process.env.GROQ_API_KEY,
+      hasBlobSiteId: !!process.env.NETLIFY_BLOBS_SITE_ID,
+      hasBlobToken: !!process.env.NETLIFY_BLOBS_TOKEN
+    }
   });
 
   // Handle OPTIONS request for CORS
@@ -631,11 +638,34 @@ export const handler = async (event) => {
     console.log('Parsing multipart form data...');
     const parseStartTime = Date.now();
     
-    const { files, fileCount, uploadType, userId } = parseMultipartFormData(
-      event.body,
-      event.headers['content-type'],
-      event.isBase64Encoded !== false
-    );
+    let files, fileCount, uploadType, userId;
+    try {
+      const parsed = parseMultipartFormData(
+        event.body,
+        event.headers['content-type'],
+        event.isBase64Encoded !== false
+      );
+      files = parsed.files;
+      fileCount = parsed.fileCount;
+      uploadType = parsed.uploadType;
+      userId = parsed.userId;
+    } catch (parseError) {
+      console.error('Error parsing multipart form data:', parseError);
+      return {
+        statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS'
+        },
+        body: JSON.stringify({
+          success: false,
+          error: 'Failed to parse form data',
+          details: parseError.message
+        })
+      };
+    }
 
     const parseDuration = Date.now() - parseStartTime;
     console.log(`Multipart parsing completed in ${parseDuration}ms`);
@@ -706,26 +736,35 @@ export const handler = async (event) => {
         let mimeType = 'application/octet-stream';
         
         try {
-          // Determine MIME type based on file extension
-          const fileExtension = file.fileName.split('.').pop()?.toLowerCase() || '';
-          const mimeTypeMap = {
-            'pdf': 'application/pdf',
-            'doc': 'application/msword',
-            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'txt': 'text/plain',
-            'csv': 'text/csv',
-            'rtf': 'application/rtf'
-          };
-          mimeType = mimeTypeMap[fileExtension] || 'application/octet-stream';
-          
-          console.log(`Attempting to save file to blob storage: ${file.fileName} (${mimeType})`);
-          blobKey = await saveFileToBlob(file.buffer, file.fileName, mimeType);
-          console.log(`✅ File saved to blob storage with key: ${blobKey}`);
+          // Check if blob storage is configured
+          if (!process.env.NETLIFY_BLOBS_SITE_ID || !process.env.NETLIFY_BLOBS_TOKEN) {
+            console.warn('Netlify Blob storage not configured, skipping blob storage');
+            blobKey = null;
+          } else {
+            // Determine MIME type based on file extension
+            const fileExtension = file.fileName.split('.').pop()?.toLowerCase() || '';
+            const mimeTypeMap = {
+              'pdf': 'application/pdf',
+              'doc': 'application/msword',
+              'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+              'txt': 'text/plain',
+              'csv': 'text/csv',
+              'rtf': 'application/rtf'
+            };
+            mimeType = mimeTypeMap[fileExtension] || 'application/octet-stream';
+            
+            console.log(`Attempting to save file to blob storage: ${file.fileName} (${mimeType})`);
+            console.log(`Blob storage config: siteID=${!!process.env.NETLIFY_BLOBS_SITE_ID}, token=${!!process.env.NETLIFY_BLOBS_TOKEN}`);
+            blobKey = await saveFileToBlob(file.buffer, file.fileName, mimeType);
+            console.log(`✅ File saved to blob storage with key: ${blobKey}`);
+          }
         } catch (blobError) {
           console.error(`❌ Failed to save file to blob storage:`, {
             fileName: file.fileName,
             error: blobError.message,
-            stack: blobError.stack
+            stack: blobError.stack,
+            hasSiteId: !!process.env.NETLIFY_BLOBS_SITE_ID,
+            hasToken: !!process.env.NETLIFY_BLOBS_TOKEN
           });
           // Continue processing even if blob storage fails
           blobKey = null;
