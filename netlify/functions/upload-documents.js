@@ -420,7 +420,7 @@ async function chunkAndEmbedDocument(
 ) {
   try {
     console.log(`Chunking and embedding document ${fileName}...`);
-    
+
     // Ensure chunks table exists
     await createChunksTable();
     
@@ -461,11 +461,20 @@ async function chunkAndEmbedDocument(
       console.warn('OPENAI_API_KEY not configured. Chunks will be stored without embeddings.');
     }
 
+    let timedOut = false;
+    const MIN_TIME_FOR_EMBEDDINGS = 5000;
+    const EMBEDDING_TIMEOUT_BUFFER = 1000;
+
     for (let i = 0; i < chunks.length; i += batchSize) {
       // Check if we're approaching timeout during chunking
       const chunkElapsedTime = Date.now() - processingStartTime;
-      if (chunkElapsedTime > maxProcessingTime) {
-        console.warn(`Chunking timeout warning: ${chunkElapsedTime}ms elapsed, stopping chunk processing`);
+      const remainingTime = maxProcessingTime - chunkElapsedTime;
+
+      if (remainingTime <= 0) {
+        console.warn(
+          `Chunking timeout warning: ${chunkElapsedTime}ms elapsed, stopping chunk processing`
+        );
+        timedOut = true;
         break;
       }
 
@@ -476,15 +485,38 @@ async function chunkAndEmbedDocument(
       let embeddings = null;
 
       if (embeddingsConfigured) {
-        try {
-          const embeddingResponse = await openai.embeddings.create({
-            model: embeddingModel,
-            input: batchChunks.map(chunk => chunk.text),
-          });
+        const embeddingTimeBudget = Math.max(remainingTime - EMBEDDING_TIMEOUT_BUFFER, EMBEDDING_TIMEOUT_BUFFER);
 
-          embeddings = embeddingResponse.data.map(item => item.embedding);
-        } catch (batchError) {
-          console.error(`Error generating embeddings (storing chunks without embeddings):`, batchError);
+        if (remainingTime <= MIN_TIME_FOR_EMBEDDINGS) {
+          console.warn(
+            `Skipping embedding generation for batch due to limited remaining time (${remainingTime}ms left)`
+          );
+        } else {
+          let timeoutId;
+          try {
+            const timeoutPromise = new Promise((_, reject) => {
+              timeoutId = setTimeout(
+                () => reject(new Error('Embedding request timed out')),
+                embeddingTimeBudget
+              );
+            });
+
+            const embeddingResponse = await Promise.race([
+              openai.embeddings.create({
+                model: embeddingModel,
+                input: batchChunks.map(chunk => chunk.text),
+              }),
+              timeoutPromise
+            ]);
+
+            clearTimeout(timeoutId);
+            embeddings = embeddingResponse?.data?.map(item => item.embedding) || null;
+          } catch (batchError) {
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+            }
+            console.error(`Error generating embeddings (storing chunks without embeddings):`, batchError);
+          }
         }
       }
 
@@ -539,6 +571,12 @@ async function chunkAndEmbedDocument(
 
         chunksCreated++;
       }
+    }
+
+    if (timedOut) {
+      const timeoutMessage = 'Chunking stopped early due to processing time limit';
+      console.warn(timeoutMessage, { fileName, chunksCreated });
+      return { chunksCreated, error: timeoutMessage };
     }
 
     console.log(`Successfully created ${chunksCreated} chunks for ${fileName}${embeddingsConfigured ? '' : ' (without embeddings)'}`);
@@ -760,6 +798,8 @@ export const handler = async (event) => {
         const chunkDuration = Date.now() - chunkStartTime;
         console.log(`Chunking and embedding completed in ${chunkDuration}ms for: ${file.fileName}`);
 
+        totalChunksCreated += chunksCreated;
+
         if (chunkError) {
           totalErrors++;
           results.push({
@@ -767,10 +807,9 @@ export const handler = async (event) => {
             success: false,
             error: chunkError,
             documentId,
-            chunksCreated: 0
+            chunksCreated
           });
         } else {
-          totalChunksCreated += chunksCreated;
           results.push({
             fileName: file.fileName,
             success: true,
