@@ -6,7 +6,7 @@ import Groq from 'groq-sdk';
 // import { parseDocument } from 'docx-parser';
 // import pdfParse from 'pdf-parse';
 // import { chunkText, validateChunks } from './chunking-utils.js';
-import { getStore } from '@netlify/blobs';
+import { getStore, createStore } from '@netlify/blobs';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -777,7 +777,13 @@ export const handler = async (event) => {
             blobKey = null;
           } else {
             console.log('Blob storage configuration found, proceeding with upload...');
-            const store = getStore('documents', {
+            console.log('Environment variables:', {
+              siteID: process.env.NETLIFY_BLOBS_SITE_ID ? 'present' : 'missing',
+              token: process.env.NETLIFY_BLOBS_TOKEN ? 'present' : 'missing'
+            });
+            
+            const store = createStore({
+              name: 'documents',
               siteID: process.env.NETLIFY_BLOBS_SITE_ID,
               token: process.env.NETLIFY_BLOBS_TOKEN
             });
