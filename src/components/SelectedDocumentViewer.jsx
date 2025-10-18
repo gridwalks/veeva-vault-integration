@@ -34,7 +34,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
         // For uploaded documents, we need to download them using the download API
         const { downloadUploadedDocumentUrl } = await import('../api');
         const downloadUrl = downloadUploadedDocumentUrl({ 
-          documentId: document.id || document.document_id 
+          documentId: document.veeva_document_id || document.id || document.document_id 
         });
         
         try {
