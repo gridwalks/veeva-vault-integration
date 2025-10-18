@@ -786,15 +786,20 @@ export const handler = async (event) => {
               tokenValue: process.env.NETLIFY_BLOBS_TOKEN ? process.env.NETLIFY_BLOBS_TOKEN.substring(0, 10) + '...' : 'missing'
             });
             
-            // Try the original getStore approach without parameters
-            // Since environment variables are valid, this should work
-            console.log('Using getStore without parameters (original working approach)...');
+            const siteID = process.env.NETLIFY_BLOBS_SITE_ID;
+            const token = process.env.NETLIFY_BLOBS_TOKEN;
+
+            console.log('Initializing blob store with explicit credentials...');
             console.log('Environment variable values:', {
-              siteID: process.env.NETLIFY_BLOBS_SITE_ID,
-              token: process.env.NETLIFY_BLOBS_TOKEN ? process.env.NETLIFY_BLOBS_TOKEN.substring(0, 20) + '...' : 'missing'
+              siteID: siteID ? siteID.substring(0, 20) + '...' : 'missing',
+              token: token ? token.substring(0, 20) + '...' : 'missing'
             });
-            
-            const store = getStore('documents');
+
+            const store = await getStore({
+              name: 'documents',
+              siteID,
+              token
+            });
             console.log('Blob store retrieved successfully');
             const uniqueFileName = `${Date.now()}-${file.fileName}`;
             console.log(`Generated unique filename: ${uniqueFileName}`);
