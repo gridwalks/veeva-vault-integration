@@ -27,6 +27,88 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
     setActiveDocument(document);
     
     try {
+      // Check if this is an uploaded document
+      if (document.isUploaded || document.source_type === 'upload') {
+        console.log('Handling uploaded document:', document);
+        
+        // For uploaded documents, we need to download them using the download API
+        const { downloadUploadedDocumentUrl } = await import('../api');
+        const downloadUrl = downloadUploadedDocumentUrl({ 
+          documentId: document.id || document.document_id 
+        });
+        
+        try {
+          const response = await fetch(downloadUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to download uploaded document: ${response.status} ${response.statusText}`);
+          }
+          
+          const blob = await response.blob();
+          const fileType = response.headers.get('content-type') || 'application/octet-stream';
+          
+          console.log('Uploaded document downloaded:', {
+            size: blob.size,
+            type: fileType
+          });
+
+          // Determine the file name with proper extension
+          let fileName = document.name || document.document_name || 'document';
+          
+          // If the document name doesn't have an extension, try to infer it from content-type
+          if (!fileName.includes('.')) {
+            const extensionMap = {
+              'application/pdf': '.pdf',
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+              'application/msword': '.doc',
+              'text/plain': '.txt',
+              'application/rtf': '.rtf'
+            };
+            
+            const extension = extensionMap[fileType] || '';
+            fileName = fileName + extension;
+          }
+
+          console.log('Using filename for uploaded document:', fileName);
+
+          // Check if it's already a PDF
+          const isPdf = fileType.includes('pdf') || fileName.toLowerCase().endsWith('.pdf');
+          
+          if (isPdf) {
+            // For PDFs, create a blob URL and display directly
+            const url = URL.createObjectURL(blob);
+            setDocumentContent(url);
+            setIsLoading(false);
+            return;
+          } else {
+            // For other file types, convert to PDF first
+            console.log('Converting uploaded document to PDF...');
+            
+            const formData = new FormData();
+            formData.append('file', blob, fileName);
+            
+            const convertResponse = await fetch('/api/convert-to-pdf', {
+              method: 'POST',
+              body: formData
+            });
+            
+            if (!convertResponse.ok) {
+              throw new Error(`Failed to convert document: ${convertResponse.status} ${convertResponse.statusText}`);
+            }
+            
+            const convertedBlob = await convertResponse.blob();
+            const convertedUrl = URL.createObjectURL(convertedBlob);
+            setDocumentContent(convertedUrl);
+            setIsLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Error handling uploaded document:', error);
+          setDocumentContent(`Error loading uploaded document: ${error.message}`);
+          setIsLoading(false);
+          return;
+        }
+      }
+      
       // Check if this is a workflow-generated document with text content
       if (document.isWorkflowDocument && document.content) {
         console.log('Displaying workflow-generated document with text content');

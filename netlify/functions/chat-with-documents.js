@@ -1107,14 +1107,35 @@ ${externalResourcesContext}`;
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         response, // Keep for backward compatibility
-        documents: relevantDocuments.map(doc => ({
-          id: doc.veeva_document_id,
-          name: doc.document_name,
-          number: doc.document_number,
-          version: `${doc.major_version}.${doc.minor_version}`,
-          type: doc.document_type,
-          status: doc.status
-        })),
+        documents: relevantDocuments.map(doc => {
+          // Handle both Veeva and uploaded documents
+          const isVeevaDoc = doc.source_type === 'veeva';
+          const isUploadedDoc = doc.source_type === 'upload';
+          
+          if (isUploadedDoc) {
+            return {
+              id: doc.document_id || doc.id,
+              name: doc.document_name,
+              number: doc.original_filename || doc.document_name, // Use filename as number for uploaded docs
+              version: doc.version || '1.0',
+              type: doc.document_type || 'uploaded_document',
+              status: 'uploaded',
+              source_type: 'upload',
+              isUploaded: true
+            };
+          } else {
+            // Veeva document
+            return {
+              id: doc.veeva_document_id,
+              name: doc.document_name,
+              number: doc.document_number,
+              version: `${doc.major_version}.${doc.minor_version}`,
+              type: doc.document_type,
+              status: doc.status,
+              source_type: 'veeva'
+            };
+          }
+        }),
         externalResources: relevantExternalResources.map(resource => ({
           id: resource.id,
           title: resource.title,

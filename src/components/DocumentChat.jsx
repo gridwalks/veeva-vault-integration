@@ -466,15 +466,30 @@ The files will upload automatically and I'll be able to perform a detailed compa
         document_name: document.name,
         document_type: document.type,
         version: document.version,
-        document_number: document.number
+        document_number: document.number,
+        // Add uploaded document properties
+        isUploaded: document.isUploaded || document.source_type === 'upload',
+        source_type: document.source_type || 'veeva'
       };
       onOpenDocumentInPane(mappedDocument);
     } else {
       // Fallback to document viewer if no callback provided
-      setSelectedDocument({
-        url: `/api/download-file?docId=${document.id}&major=${document.version.split('.')[0]}&minor=${document.version.split('.')[1]}`,
-        name: document.name
-      });
+      if (document.isUploaded || document.source_type === 'upload') {
+        // For uploaded documents, use the download API
+        import('../api').then(({ downloadUploadedDocumentUrl }) => {
+          const url = downloadUploadedDocumentUrl({ documentId: document.id });
+          setSelectedDocument({
+            url: url,
+            name: document.name
+          });
+        });
+      } else {
+        // For Veeva documents, use the regular download API
+        setSelectedDocument({
+          url: `/api/download-file?docId=${document.id}&major=${document.version.split('.')[0]}&minor=${document.version.split('.')[1]}`,
+          name: document.name
+        });
+      }
       setViewerOpen(true);
     }
   };
