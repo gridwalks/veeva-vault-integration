@@ -5,7 +5,7 @@ import mammoth from 'mammoth';
 import { parseDocument } from 'docx-parser';
 import pdfParse from 'pdf-parse';
 import { chunkText, validateChunks } from './chunking-utils.js';
-import { getStore } from '@netlify/blobs';
+// import { getStore } from '@netlify/blobs'; // Disabled for now
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -89,46 +89,11 @@ function parseMultipartFormData(body, contentType, isBase64Encoded = true) {
   return { files, fileCount, uploadType, userId };
 }
 
-// Helper function to save file to Netlify Blob storage
-async function saveFileToBlob(fileBuffer, fileName, mimeType) {
-  try {
-    // Get the blob store for uploaded documents
-    const STORE_INIT_TIMEOUT = 5000; // 5 seconds
-    const store = await Promise.race([
-      getStore({
-        name: 'uploaded-documents',
-        siteID: process.env.NETLIFY_BLOBS_SITE_ID,
-        token: process.env.NETLIFY_BLOBS_TOKEN
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Store initialization timeout')), STORE_INIT_TIMEOUT))
-    ]);
-    
-    // Generate a unique filename to avoid conflicts
-    const timestamp = Date.now();
-    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const blobKey = `documents/${timestamp}_${sanitizedFileName}`;
-    
-    console.log(`Saving file to Netlify Blob: ${blobKey}`);
-    
-    // Save file to Netlify Blob with metadata
-    await store.set(blobKey, fileBuffer, {
-      metadata: {
-        originalName: fileName,
-        mimeType: mimeType,
-        uploadedAt: new Date().toISOString(),
-        size: fileBuffer.length.toString()
-      }
-    });
-    
-    // Return the blob key (we'll use this to retrieve the file)
-    console.log(`File saved to blob storage with key: ${blobKey}`);
-    
-    return blobKey;
-  } catch (error) {
-    console.error('Error saving file to blob storage:', error);
-    throw error;
-  }
-}
+// Helper function to save file to Netlify Blob storage - DISABLED
+// async function saveFileToBlob(fileBuffer, fileName, mimeType) {
+//   // Blob storage disabled for now
+//   return null;
+// }
 
 // Helper function to extract text from different file types
 async function extractTextFromFile(fileBuffer, fileName) {
@@ -600,8 +565,8 @@ export const handler = async (event) => {
       hasDatabaseUrl: !!process.env.DATABASE_URL,
       hasOpenaiKey: !!process.env.OPENAI_API_KEY,
       hasGroqKey: !!process.env.GROQ_API_KEY,
-      hasBlobSiteId: !!process.env.NETLIFY_BLOBS_SITE_ID,
-      hasBlobToken: !!process.env.NETLIFY_BLOBS_TOKEN
+      blobStorage: 'DISABLED',
+      focus: 'text_extraction_and_chunking'
     }
   });
 
@@ -735,40 +700,21 @@ export const handler = async (event) => {
         let blobKey = null;
         let mimeType = 'application/octet-stream';
         
-        try {
-          // Check if blob storage is configured
-          if (!process.env.NETLIFY_BLOBS_SITE_ID || !process.env.NETLIFY_BLOBS_TOKEN) {
-            console.warn('Netlify Blob storage not configured, skipping blob storage');
-            blobKey = null;
-          } else {
-            // Determine MIME type based on file extension
-            const fileExtension = file.fileName.split('.').pop()?.toLowerCase() || '';
-            const mimeTypeMap = {
-              'pdf': 'application/pdf',
-              'doc': 'application/msword',
-              'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-              'txt': 'text/plain',
-              'csv': 'text/csv',
-              'rtf': 'application/rtf'
-            };
-            mimeType = mimeTypeMap[fileExtension] || 'application/octet-stream';
-            
-            console.log(`Attempting to save file to blob storage: ${file.fileName} (${mimeType})`);
-            console.log(`Blob storage config: siteID=${!!process.env.NETLIFY_BLOBS_SITE_ID}, token=${!!process.env.NETLIFY_BLOBS_TOKEN}`);
-            blobKey = await saveFileToBlob(file.buffer, file.fileName, mimeType);
-            console.log(`✅ File saved to blob storage with key: ${blobKey}`);
-          }
-        } catch (blobError) {
-          console.error(`❌ Failed to save file to blob storage:`, {
-            fileName: file.fileName,
-            error: blobError.message,
-            stack: blobError.stack,
-            hasSiteId: !!process.env.NETLIFY_BLOBS_SITE_ID,
-            hasToken: !!process.env.NETLIFY_BLOBS_TOKEN
-          });
-          // Continue processing even if blob storage fails
-          blobKey = null;
-        }
+        // Skip blob storage for now - focus on core functionality
+        console.log(`Skipping blob storage for ${file.fileName} - focusing on text extraction and chunking`);
+        blobKey = null;
+        
+        // Still determine MIME type for database storage
+        const fileExtension = file.fileName.split('.').pop()?.toLowerCase() || '';
+        const mimeTypeMap = {
+          'pdf': 'application/pdf',
+          'doc': 'application/msword',
+          'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'txt': 'text/plain',
+          'csv': 'text/csv',
+          'rtf': 'application/rtf'
+        };
+        mimeType = mimeTypeMap[fileExtension] || 'application/octet-stream';
 
         // Extract text from file
         const { text: extractedText, method: extractionMethod } = await extractTextFromFile(
@@ -824,8 +770,11 @@ export const handler = async (event) => {
         console.log(`Document stored in database in ${storeDuration}ms with ID: ${documentId}`);
 
         // Chunk and embed document
-        console.log(`Chunking and embedding document: ${file.fileName}`);
+        console.log(`=== CHUNKING PROCESS ===`);
+        console.log(`Starting chunking for: ${file.fileName}`);
+        console.log(`Text length: ${extractedText.length} characters`);
         const chunkStartTime = Date.now();
+        
         const { chunksCreated, error: chunkError } = await chunkAndEmbedDocument(
           extractedText,
           documentId,
@@ -834,8 +783,10 @@ export const handler = async (event) => {
           processingStartTime,
           MAX_PROCESSING_TIME
         );
+        
         const chunkDuration = Date.now() - chunkStartTime;
         console.log(`Chunking and embedding completed in ${chunkDuration}ms for: ${file.fileName}`);
+        console.log(`Chunks created: ${chunksCreated}`);
 
         totalChunksCreated += chunksCreated;
 
