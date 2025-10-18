@@ -787,7 +787,11 @@ export const handler = async (event) => {
             });
             
             // Try the original getStore approach that was working before
-            const store = getStore('documents');
+            // But now we need to pass the environment variables explicitly
+            const store = getStore('documents', {
+              siteID: process.env.NETLIFY_BLOBS_SITE_ID,
+              token: process.env.NETLIFY_BLOBS_TOKEN
+            });
             const uniqueFileName = `${Date.now()}-${file.fileName}`;
             console.log(`Generated unique filename: ${uniqueFileName}`);
             
