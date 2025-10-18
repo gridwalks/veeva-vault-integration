@@ -25,56 +25,51 @@ export const handler = async (event) => {
       };
     }
 
-    // Try to find document by ID (both as integer and as string)
-    let documentResult;
-    
-    // First try as integer
-    if (/^\d+$/.test(documentId)) {
-      documentResult = await pool.query(`
-        SELECT 
+    const uploadSourceTypes = ['upload', 'uploaded_document', 'uploaded', 'blob_upload'];
+
+    // Helper to execute document lookup with a specific condition
+    const executeDocumentLookup = async (condition, params) => {
+      return pool.query(`
+        SELECT
           id,
           document_name,
           original_filename,
           mime_type,
           file_size,
           blob_url,
-          created_at
-        FROM qms_chat_documents 
-        WHERE id = $1 AND source_type = 'upload'
-      `, [parseInt(documentId)]);
-    } else {
-      // Try as string (UUID or other format)
-      documentResult = await pool.query(`
-        SELECT 
-          id,
-          document_name,
-          original_filename,
-          mime_type,
-          file_size,
-          blob_url,
-          created_at
-        FROM qms_chat_documents 
-        WHERE id::text = $1 AND source_type = 'upload'
-      `, [documentId]);
-    }
-    
-    // If not found, try searching by document_name or original_filename
-    if (documentResult.rows.length === 0) {
-      documentResult = await pool.query(`
-        SELECT 
-          id,
-          document_name,
-          original_filename,
-          mime_type,
-          file_size,
-          blob_url,
-          created_at
-        FROM qms_chat_documents 
-        WHERE (document_name ILIKE $1 OR original_filename ILIKE $1) AND source_type = 'upload'
+          content,
+          created_at,
+          source_type
+        FROM qms_chat_documents
+        WHERE ${condition}
         ORDER BY created_at DESC
         LIMIT 5
-      `, [`%${documentId}%`]);
+      `, params);
+    };
+
+    // Try to find document by ID (both as integer and as string)
+    let documentResult;
+
+    if (/^\d+$/.test(documentId)) {
+      documentResult = await executeDocumentLookup('id = $1', [parseInt(documentId, 10)]);
     }
+
+    if (!documentResult || documentResult.rows.length === 0) {
+      documentResult = await executeDocumentLookup('id::text = $1', [documentId]);
+    }
+
+    // If not found, try matching by blob key
+    if (documentResult.rows.length === 0) {
+      documentResult = await executeDocumentLookup('blob_url = $1', [documentId]);
+    }
+
+    // If still not found, try searching by name or original filename (loose match)
+    if (documentResult.rows.length === 0) {
+      documentResult = await executeDocumentLookup('document_name ILIKE $1 OR original_filename ILIKE $1', [`%${documentId}%`]);
+    }
+
+    // Filter results to only include upload-backed documents
+    documentResult.rows = documentResult.rows.filter(row => !row.source_type || uploadSourceTypes.includes(row.source_type));
 
     if (documentResult.rows.length === 0) {
       return {
@@ -97,12 +92,13 @@ export const handler = async (event) => {
       original_filename: document.original_filename,
       blob_url: document.blob_url,
       file_size: document.file_size,
-      mime_type: document.mime_type
+      mime_type: document.mime_type,
+      source_type: document.source_type
     });
-    
+
     if (!document.blob_url) {
       console.log('Document has no blob_url, checking if content is available in database');
-      
+
       // If no blob_url, try to return the content from the database
       if (document.content) {
         console.log('Returning content from database');
