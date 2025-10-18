@@ -594,41 +594,46 @@ The documents will be automatically included in the comparison analysis.
   const handleOpenDocument = (document) => {
     console.log('StaticChatPane handleOpenDocument called with:', document);
     
-    // Check if this is an uploaded document
-    if (document.isUploaded || document.source_type === 'upload') {
-      // Handle uploaded document
-      const url = downloadUploadedDocumentUrl({ documentId: document.id || document.document_id });
-      const a = window.document.createElement('a');
-      a.href = url;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.download = document.original_filename || document.document_name || 'document';
-      window.document.body.appendChild(a);
-      a.click();
-      a.remove();
-    } else if (onOpenDocumentInPane) {
-      // Open Veeva document in the selected documents pane
+    if (onOpenDocumentInPane) {
+      // Route document to the right pane (both Veeva and uploaded documents)
       const mappedDocument = {
         veeva_document_id: document.id,
         document_name: document.name,
         document_type: document.type,
         version: document.version,
-        document_number: document.number
+        document_number: document.number,
+        // Add uploaded document properties
+        isUploaded: document.isUploaded || document.source_type === 'upload',
+        source_type: document.source_type || 'veeva'
       };
       console.log('Mapped document for pane:', mappedDocument);
       onOpenDocumentInPane(mappedDocument);
     } else {
-      // Fallback to direct download for Veeva documents
-      const [major, minor] = document.version.split('.');
-      const url = `/api/download-file?docId=${document.id}&major=${major}&minor=${minor}`;
-      const a = window.document.createElement('a');
-      a.href = url;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.download = '';
-      window.document.body.appendChild(a);
-      a.click();
-      a.remove();
+      // Fallback to direct download if no callback provided
+      if (document.isUploaded || document.source_type === 'upload') {
+        // For uploaded documents, use the download API
+        const url = downloadUploadedDocumentUrl({ documentId: document.id || document.document_id });
+        const a = window.document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.download = document.original_filename || document.document_name || 'document';
+        window.document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } else {
+        // For Veeva documents, use the regular download API
+        const [major, minor] = document.version.split('.');
+        const url = `/api/download-file?docId=${document.id}&major=${major}&minor=${minor}`;
+        const a = window.document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.download = document.name;
+        window.document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
     }
   };
 
