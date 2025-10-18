@@ -765,20 +765,50 @@ export const handler = async (event) => {
         
         // Upload to Netlify Blob storage
         try {
+          console.log(`=== BLOB STORAGE DEBUG ===`);
           console.log(`Uploading ${file.fileName} to Netlify Blob storage...`);
-          const store = getStore('documents');
-          const uniqueFileName = `${Date.now()}-${file.fileName}`;
-          blobKey = await store.set(uniqueFileName, file.buffer, {
-            metadata: {
-              originalName: file.fileName,
-              mimeType: mimeType,
-              size: file.size,
-              uploadedAt: new Date().toISOString()
+          console.log(`File size: ${file.size} bytes`);
+          console.log(`MIME type: ${mimeType}`);
+          console.log(`Buffer length: ${file.buffer.length}`);
+          
+          // Check if blob storage is properly configured
+          if (!process.env.NETLIFY_BLOBS_SITE_ID || !process.env.NETLIFY_BLOBS_TOKEN) {
+            console.warn('Blob storage not configured - missing NETLIFY_BLOBS_SITE_ID or NETLIFY_BLOBS_TOKEN');
+            blobKey = null;
+          } else {
+            console.log('Blob storage configuration found, proceeding with upload...');
+            const store = getStore('documents');
+            const uniqueFileName = `${Date.now()}-${file.fileName}`;
+            console.log(`Generated unique filename: ${uniqueFileName}`);
+            
+            blobKey = await store.set(uniqueFileName, file.buffer, {
+              metadata: {
+                originalName: file.fileName,
+                mimeType: mimeType,
+                size: file.size,
+                uploadedAt: new Date().toISOString()
+              }
+            });
+            console.log(`Successfully uploaded to blob storage: ${blobKey}`);
+            console.log(`Blob key type: ${typeof blobKey}`);
+            console.log(`Blob key length: ${blobKey ? blobKey.length : 'null'}`);
+            
+            // Verify the blob key is valid
+            if (!blobKey || blobKey === '') {
+              console.warn('Blob key is empty or null - blob upload may have failed silently');
+              blobKey = null;
+            } else {
+              console.log('Blob key appears valid');
             }
-          });
-          console.log(`Successfully uploaded to blob storage: ${blobKey}`);
+          }
         } catch (blobError) {
           console.error(`Blob storage upload failed for ${file.fileName}:`, blobError);
+          console.error('Blob error details:', {
+            message: blobError.message,
+            code: blobError.code,
+            status: blobError.status,
+            name: blobError.name
+          });
           // Continue without blob storage - don't fail the entire upload
           blobKey = null;
         }
@@ -831,6 +861,8 @@ export const handler = async (event) => {
         console.log(`=== DATABASE STORAGE DEBUG ===`);
         console.log(`Storing document in database: ${file.fileName}`);
         console.log(`Document details: ${extractedText.length} chars, ${file.size} bytes`);
+        console.log(`Blob key to store: ${blobKey || 'null'}`);
+        console.log(`MIME type: ${mimeType}`);
         
         const storeStartTime = Date.now();
         const documentId = await storeDocument(
