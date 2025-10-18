@@ -786,20 +786,25 @@ export const handler = async (event) => {
               tokenValue: process.env.NETLIFY_BLOBS_TOKEN ? process.env.NETLIFY_BLOBS_TOKEN.substring(0, 10) + '...' : 'missing'
             });
             
-            // Try the original getStore approach without parameters
-            // Since environment variables are valid, this should work
-            console.log('Using getStore without parameters (original working approach)...');
+            const siteID = process.env.NETLIFY_BLOBS_SITE_ID;
+            const token = process.env.NETLIFY_BLOBS_TOKEN;
+
+            console.log('Initializing blob store with explicit credentials...');
             console.log('Environment variable values:', {
-              siteID: process.env.NETLIFY_BLOBS_SITE_ID,
-              token: process.env.NETLIFY_BLOBS_TOKEN ? process.env.NETLIFY_BLOBS_TOKEN.substring(0, 20) + '...' : 'missing'
+              siteID: siteID ? siteID.substring(0, 20) + '...' : 'missing',
+              token: token ? token.substring(0, 20) + '...' : 'missing'
             });
-            
-            const store = getStore('documents');
+
+            const store = await getStore({
+              name: 'documents',
+              siteID,
+              token
+            });
             console.log('Blob store retrieved successfully');
             const uniqueFileName = `${Date.now()}-${file.fileName}`;
             console.log(`Generated unique filename: ${uniqueFileName}`);
-            
-            blobKey = await store.set(uniqueFileName, file.buffer, {
+
+            const uploadResult = await store.set(uniqueFileName, file.buffer, {
               metadata: {
                 originalName: file.fileName,
                 mimeType: mimeType,
@@ -807,17 +812,22 @@ export const handler = async (event) => {
                 uploadedAt: new Date().toISOString()
               }
             });
-            console.log(`Successfully uploaded to blob storage: ${blobKey}`);
+            console.log('Blob upload result:', uploadResult);
+
+            if (uploadResult && typeof uploadResult === 'object' && 'key' in uploadResult) {
+              blobKey = uploadResult.key;
+              console.log(`Resolved blob key from upload result: ${blobKey}`);
+            } else if (typeof uploadResult === 'string') {
+              blobKey = uploadResult;
+              console.log(`Upload result returned string key: ${blobKey}`);
+            } else {
+              // Fall back to the unique filename within the store namespace
+              blobKey = `documents/${uniqueFileName}`;
+              console.warn('Upload result did not include a key, falling back to derived blob key:', blobKey);
+            }
+
             console.log(`Blob key type: ${typeof blobKey}`);
             console.log(`Blob key length: ${blobKey ? blobKey.length : 'null'}`);
-            
-            // Verify the blob key is valid
-            if (!blobKey || blobKey === '') {
-              console.warn('Blob key is empty or null - blob upload may have failed silently');
-              blobKey = null;
-            } else {
-              console.log('Blob key appears valid');
-            }
           }
         } catch (blobError) {
           console.error(`Blob storage upload failed for ${file.fileName}:`, blobError);
