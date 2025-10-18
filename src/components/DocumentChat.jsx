@@ -42,6 +42,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
   const fileInputRef = useRef(null);
   const chatPromptBoxRef = useRef(null);
   const uploadedBlobKeysRef = useRef([]);
+  const prevLoadingRef = useRef(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -197,8 +198,13 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
   };
 
   useEffect(() => {
-    // Scroll to bottom when new messages are added
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Only scroll to bottom when user sends a message (isLoading becomes true)
+    // Don't scroll when AI responds (isLoading becomes false)
+    if (isLoading && !prevLoadingRef.current) {
+      // User just sent a message - scroll to bottom
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevLoadingRef.current = isLoading;
   }, [conversationHistory, isLoading]);
 
   useEffect(() => {
