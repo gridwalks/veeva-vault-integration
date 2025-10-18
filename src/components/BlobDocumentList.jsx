@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getUploadedDocuments, deleteDocument, downloadUploadedDocumentUrl } from "../api";
+import { getBlobDocuments, deleteDocument, downloadUploadedDocumentUrl } from "../api";
 import DocumentViewer from "./DocumentViewer.jsx";
 
 export default function BlobDocumentList({ userId, onDocumentDeleted }) {
@@ -26,7 +26,7 @@ export default function BlobDocumentList({ userId, onDocumentDeleted }) {
     
     try {
       console.log('Loading blob documents...', { userId, offset, search });
-      const result = await getUploadedDocuments({
+      const result = await getBlobDocuments({
         userId,
         limit: pagination.pageSize,
         offset,

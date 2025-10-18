@@ -324,6 +324,50 @@ export async function getUploadedDocuments({ limit = 50, offset = 0, search = ''
   }
 }
 
+export async function getBlobDocuments({ limit = 50, offset = 0, search = '', userId } = {}) {
+  const startTime = Date.now();
+  console.log('Fetching blob documents...', { limit, offset, search, userId });
+
+  try {
+    const params = new URLSearchParams({ limit, offset, userId });
+    if (search) params.set('search', search);
+
+    const res = await fetch(`/api/list-blob-documents?${params}`);
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to load blob documents:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText,
+        url: res.url,
+        params: { limit, offset, search }
+      });
+      throw new Error(`Failed to load blob documents: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Blob documents fetched in ${duration}ms:`, {
+      total: data.total,
+      itemsReturned: data.items?.length || 0,
+      pageOffset: data.pageOffset,
+      pageSize: data.pageSize,
+      source: data.source
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error fetching blob documents after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack,
+      params: { limit, offset, search }
+    });
+    throw error;
+  }
+}
+
 export async function updateUploadedDocumentMetadata({
   documentId,
   userId,

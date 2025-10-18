@@ -1,12 +1,9 @@
 import { Pool } from 'pg';
-import { getStore } from '@netlify/blobs';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
-
-const STORE_NAME = 'uploaded-documents';
 
 export const handler = async (event) => {
   console.log('=== LIST UPLOADED DOCUMENTS ===');
@@ -52,60 +49,94 @@ export const handler = async (event) => {
 
     console.log('Query parameters:', { limit, offset, search, userId });
 
-    // Get the blob store
-    const store = getStore(STORE_NAME);
-    
-    // List all blobs from the store
-    console.log('Listing blobs from store:', STORE_NAME);
-    const blobList = await store.list();
-    console.log(`Found ${blobList.length} blobs in storage`);
+    // Note: userId is no longer required for filtering, but kept for logging purposes
+    console.log('User ID provided:', userId || 'Not provided');
 
-    // Convert blobs to document format and apply search filter
-    let documents = blobList.map((blob, index) => ({
-      id: blob.key, // Use blob key as ID
-      document_id: blob.key,
-      document_name: blob.key, // Use blob key as name
-      document_type: 'uploaded_document',
-      version: '1.0',
-      ai_summary: null, // Not available from blob metadata
-      file_size: blob.size,
-      extraction_method: 'blob_storage',
-      blob_url: blob.key, // The blob key is the URL
-      original_filename: blob.key,
-      mime_type: blob.contentType || 'application/octet-stream',
-      chunk_count: 0, // Not available from blob metadata
-      created_at: blob.lastModified ? new Date(blob.lastModified).toISOString() : new Date().toISOString(),
-      updated_at: blob.lastModified ? new Date(blob.lastModified).toISOString() : new Date().toISOString(),
-      source_type: 'upload',
-      isUploaded: true,
-      blob_metadata: {
-        key: blob.key,
-        size: blob.size,
-        contentType: blob.contentType,
-        lastModified: blob.lastModified,
-        etag: blob.etag
-      }
-    }));
+    // Build the WHERE clause for search
+    // Show all uploaded documents regardless of user_id
+    let baseWhereClause = "WHERE d.source_type = 'upload'";
+    const queryParams = [];
+    let paramIndex = 1;
 
-    // Apply search filter if provided
     if (search) {
-      const searchLower = search.toLowerCase();
-      documents = documents.filter(doc => 
-        doc.document_name.toLowerCase().includes(searchLower) ||
-        doc.original_filename.toLowerCase().includes(searchLower)
-      );
-      console.log(`Filtered to ${documents.length} documents matching search: "${search}"`);
+      baseWhereClause += ` AND (d.document_name ILIKE $${paramIndex} OR d.ai_summary ILIKE $${paramIndex})`;
+      queryParams.push(`%${search}%`);
+      paramIndex++;
     }
 
-    // Sort by creation date (newest first)
-    documents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    // Get total count
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM qms_chat_documents d
+      ${baseWhereClause}
+    `;
+    
+    console.log('Executing count query:', countQuery);
+    const countResult = await pool.query(countQuery, queryParams);
+    const total = parseInt(countResult.rows[0].total, 10);
+    console.log(`Found ${total} total uploaded documents`);
 
-    // Apply pagination
-    const total = documents.length;
-    const paginatedDocuments = documents.slice(offset, offset + limit);
+    // Get paginated documents with chunk counts
+    queryParams.push(limit, offset);
+    
+    // Build WHERE clause for documents query with table aliases
+    // Use the same logic as the count query
+    let documentsWhereClause = baseWhereClause;
+    if (search) {
+      const searchParamIndex = queryParams.length;
+      documentsWhereClause += ` AND (d.document_name ILIKE $${searchParamIndex} OR d.ai_summary ILIKE $${searchParamIndex})`;
+    }
+    
+    const documentsQuery = `
+      SELECT 
+        d.id,
+        d.document_name,
+        d.document_type,
+        d.version,
+        d.content,
+        d.ai_summary,
+        d.file_size,
+        d.extraction_method,
+        d.blob_url,
+        d.original_filename,
+        d.mime_type,
+        d.created_at,
+        d.updated_at,
+        COUNT(c.id) as chunk_count
+      FROM qms_chat_documents d
+      LEFT JOIN qms_chat_document_chunks c ON d.id = c.document_id
+      ${documentsWhereClause}
+      GROUP BY d.id, d.document_name, d.document_type, d.version, d.content, 
+               d.ai_summary, d.file_size, d.extraction_method, d.blob_url, 
+               d.original_filename, d.mime_type, d.created_at, d.updated_at
+      ORDER BY d.created_at DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+
+    console.log('Executing documents query with params:', queryParams);
+    const documentsResult = await pool.query(documentsQuery, queryParams);
+    
+    const documents = documentsResult.rows.map(doc => ({
+      id: doc.id,
+      document_id: doc.id,
+      document_name: doc.document_name,
+      document_type: doc.document_type,
+      version: doc.version,
+      ai_summary: doc.ai_summary,
+      file_size: doc.file_size,
+      extraction_method: doc.extraction_method,
+      blob_url: doc.blob_url,
+      original_filename: doc.original_filename,
+      mime_type: doc.mime_type,
+      chunk_count: parseInt(doc.chunk_count, 10),
+      created_at: doc.created_at,
+      updated_at: doc.updated_at,
+      source_type: 'upload',
+      isUploaded: true
+    }));
 
     const duration = Date.now() - startTime;
-    console.log(`Blob query completed in ${duration}ms, returning ${paginatedDocuments.length} documents`);
+    console.log(`Query completed in ${duration}ms, returning ${documents.length} documents`);
 
     return {
       statusCode: 200,
@@ -118,11 +149,10 @@ export const handler = async (event) => {
       body: JSON.stringify({
         success: true,
         total,
-        items: paginatedDocuments,
+        items: documents,
         pageSize: limit,
         pageOffset: offset,
-        duration: `${duration}ms`,
-        source: 'blob_storage'
+        duration: `${duration}ms`
       })
     };
 
