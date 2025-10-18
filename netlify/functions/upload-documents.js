@@ -410,7 +410,14 @@ async function createChunksTable() {
 }
 
 // Helper function to chunk and embed document
-async function chunkAndEmbedDocument(documentText, documentId, fileName, userId) {
+async function chunkAndEmbedDocument(
+  documentText,
+  documentId,
+  fileName,
+  userId,
+  processingStartTime = Date.now(),
+  maxProcessingTime = Infinity
+) {
   try {
     console.log(`Chunking and embedding document ${fileName}...`);
     
@@ -457,7 +464,7 @@ async function chunkAndEmbedDocument(documentText, documentId, fileName, userId)
     for (let i = 0; i < chunks.length; i += batchSize) {
       // Check if we're approaching timeout during chunking
       const chunkElapsedTime = Date.now() - processingStartTime;
-      if (chunkElapsedTime > MAX_PROCESSING_TIME) {
+      if (chunkElapsedTime > maxProcessingTime) {
         console.warn(`Chunking timeout warning: ${chunkElapsedTime}ms elapsed, stopping chunk processing`);
         break;
       }
@@ -746,7 +753,9 @@ export const handler = async (event) => {
           extractedText,
           documentId,
           file.fileName,
-          userId
+          userId,
+          processingStartTime,
+          MAX_PROCESSING_TIME
         );
         const chunkDuration = Date.now() - chunkStartTime;
         console.log(`Chunking and embedding completed in ${chunkDuration}ms for: ${file.fileName}`);
