@@ -6,7 +6,7 @@ import Groq from 'groq-sdk';
 // import { parseDocument } from 'docx-parser';
 // import pdfParse from 'pdf-parse';
 // import { chunkText, validateChunks } from './chunking-utils.js';
-// import { getStore } from '@netlify/blobs'; // Disabled for now
+import { getStore } from '@netlify/blobs';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -615,8 +615,9 @@ export const handler = async (event) => {
       hasDatabaseUrl: !!process.env.DATABASE_URL,
       hasOpenaiKey: !!process.env.OPENAI_API_KEY,
       hasGroqKey: !!process.env.GROQ_API_KEY,
-      blobStorage: 'DISABLED',
-      focus: 'text_extraction_and_chunking'
+      blobStorage: 'ENABLED',
+      hasBlobSiteId: !!process.env.NETLIFY_BLOBS_SITE_ID,
+      hasBlobToken: !!process.env.NETLIFY_BLOBS_TOKEN
     }
   });
 
@@ -750,11 +751,7 @@ export const handler = async (event) => {
         let blobKey = null;
         let mimeType = 'application/octet-stream';
         
-        // Skip blob storage for now - focus on core functionality
-        console.log(`Skipping blob storage for ${file.fileName} - focusing on text extraction and chunking`);
-        blobKey = null;
-        
-        // Still determine MIME type for database storage
+        // Determine MIME type
         const fileExtension = file.fileName.split('.').pop()?.toLowerCase() || '';
         const mimeTypeMap = {
           'pdf': 'application/pdf',
@@ -765,6 +762,26 @@ export const handler = async (event) => {
           'rtf': 'application/rtf'
         };
         mimeType = mimeTypeMap[fileExtension] || 'application/octet-stream';
+        
+        // Upload to Netlify Blob storage
+        try {
+          console.log(`Uploading ${file.fileName} to Netlify Blob storage...`);
+          const store = getStore('documents');
+          const uniqueFileName = `${Date.now()}-${file.fileName}`;
+          blobKey = await store.set(uniqueFileName, file.buffer, {
+            metadata: {
+              originalName: file.fileName,
+              mimeType: mimeType,
+              size: file.size,
+              uploadedAt: new Date().toISOString()
+            }
+          });
+          console.log(`Successfully uploaded to blob storage: ${blobKey}`);
+        } catch (blobError) {
+          console.error(`Blob storage upload failed for ${file.fileName}:`, blobError);
+          // Continue without blob storage - don't fail the entire upload
+          blobKey = null;
+        }
 
         // Extract text from file
         const { text: extractedText, method: extractionMethod } = await extractTextFromFile(
