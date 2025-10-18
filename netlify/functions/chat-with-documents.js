@@ -476,17 +476,18 @@ export const handler = async (event) => {
             `(document_name ILIKE $${index + 1} OR ai_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1} OR original_filename ILIKE $${index + 1})`
           ).join(' OR ');
           
+          const uploadedSearchParams = searchTerms.map(term => `%${term}%`);
           const uploadedQuery = `
             SELECT id as document_id, document_name, 
                    document_type, ai_summary, file_size, original_filename,
                    'upload' as source_type
             FROM qms_chat_documents 
-            WHERE (${uploadedSearchConditions}) AND user_id = $${searchParams.length + 1}
+            WHERE (${uploadedSearchConditions}) AND user_id = $${uploadedSearchParams.length + 1}
             ORDER BY 
               CASE 
-                WHEN document_name ILIKE ANY($${searchParams.length + 2}) THEN 1
-                WHEN ai_summary ILIKE ANY($${searchParams.length + 3}) THEN 2
-                WHEN original_filename ILIKE ANY($${searchParams.length + 4}) THEN 3
+                WHEN document_name ILIKE ANY($${uploadedSearchParams.length + 2}) THEN 1
+                WHEN ai_summary ILIKE ANY($${uploadedSearchParams.length + 3}) THEN 2
+                WHEN original_filename ILIKE ANY($${uploadedSearchParams.length + 4}) THEN 3
                 ELSE 4
               END,
               document_name
@@ -494,7 +495,7 @@ export const handler = async (event) => {
           `;
           
           console.log('Uploaded documents keyword search query:', uploadedQuery);
-          const uploadedResult = await pool.query(uploadedQuery, [...searchParams, userId, searchParams, searchParams, searchParams]);
+          const uploadedResult = await pool.query(uploadedQuery, [...uploadedSearchParams, userId, uploadedSearchParams, uploadedSearchParams, uploadedSearchParams]);
           const uploadedKeywordDocuments = uploadedResult.rows;
           
           console.log(`Found ${uploadedKeywordDocuments.length} uploaded documents based on keyword search`);
