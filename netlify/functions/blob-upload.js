@@ -110,8 +110,34 @@ async function extractTextFromFile(fileBuffer, fileName) {
   try {
     switch (fileExtension) {
       case 'pdf':
-        // PDF parsing would go here - for now, return placeholder
-        return { text: `[PDF content from ${fileName} - text extraction not implemented]`, method: 'pdf' };
+        try {
+          // Use the PDF extraction wrapper to handle pdf-parse issues
+          const { extractTextFromPDF, createPDFFallbackText, createScannedPDFText } = await import('./pdf-extraction-wrapper.js');
+          
+          const pdfResult = await extractTextFromPDF(fileBuffer, fileName);
+          
+          if (pdfResult.text && pdfResult.text.trim().length >= 10) {
+            return { text: pdfResult.text, method: pdfResult.method };
+          } else if (pdfResult.method === 'pdf_extraction_failed') {
+            // Use the structured fallback text
+            return { 
+              text: createPDFFallbackText(fileName, fileBuffer.length, pdfResult.error), 
+              method: 'pdf_extraction_failed' 
+            };
+          } else {
+            // PDF was processed but appears to be scanned
+            return { 
+              text: createScannedPDFText(fileName, fileBuffer.length), 
+              method: 'pdf_scanned_document' 
+            };
+          }
+        } catch (pdfError) {
+          console.error(`PDF extraction failed for ${fileName}:`, pdfError);
+          return { 
+            text: `[PDF Content: ${fileName}] - PDF text extraction failed: ${pdfError.message}`, 
+            method: 'pdf_error_fallback' 
+          };
+        }
         
       case 'docx':
         const docxResult = await parseDocument(fileBuffer);

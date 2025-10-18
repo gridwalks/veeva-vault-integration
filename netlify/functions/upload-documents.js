@@ -112,50 +112,30 @@ async function extractTextFromFile(fileBuffer, fileName) {
       try {
         console.log(`Attempting PDF text extraction for ${fileName}...`);
         
-        // Use pdf-parse library for actual PDF text extraction
-        try {
-          const pdfParse = await import('pdf-parse');
-          const pdfData = await pdfParse.default(fileBuffer);
-          
-          extractedText = pdfData.text;
-          extractionMethod = 'pdf_parse';
+        // Use the PDF extraction wrapper to handle pdf-parse issues
+        const { extractTextFromPDF, createPDFFallbackText, createScannedPDFText } = await import('./pdf-extraction-wrapper.js');
+        
+        const pdfResult = await extractTextFromPDF(fileBuffer, fileName);
+        
+        if (pdfResult.text && pdfResult.text.trim().length >= 10) {
+          extractedText = pdfResult.text;
+          extractionMethod = pdfResult.method;
           
           console.log('PDF extraction successful:', {
-            pages: pdfData.numpages,
-            info: pdfData.info,
-            metadata: pdfData.metadata,
-            textLength: pdfData.text.length
+            method: pdfResult.method,
+            pages: pdfResult.pages,
+            textLength: pdfResult.text.length
           });
-          
-          // Check if PDF appears to be scanned (no text or very little text)
-          if (!extractedText || extractedText.trim().length < 10) {
-            console.warn('PDF appears to be scanned or image-based - minimal text extracted');
-            const fileSizeKB = Math.round(fileBuffer.length / 1024);
-            extractedText = `[PDF Document: ${fileName} - Scanned Document]
-
-Document Information:
-- File Size: ${fileSizeKB} KB
-- Upload Date: ${new Date().toISOString()}
-- Status: Successfully uploaded but appears to be scanned/image-based
-
-Note: This PDF appears to be a scanned document or image-based PDF. Text extraction is limited. The document is available in the knowledge base and can be referenced in conversations, though full text search within the PDF content is currently limited. Consider using OCR services for better text extraction results.`;
-            extractionMethod = 'pdf_scanned_document';
-          }
-          
-        } catch (pdfError) {
-          console.error(`PDF extraction failed for ${fileName}:`, pdfError);
-          // Fallback to placeholder if pdf-parse fails
-          const fileSizeKB = Math.round(fileBuffer.length / 1024);
-          extractedText = `[PDF Document: ${fileName} - Extraction Failed]
-
-Document Information:
-- File Size: ${fileSizeKB} KB
-- Upload Date: ${new Date().toISOString()}
-- Status: Successfully uploaded but text extraction failed
-
-Note: This PDF document has been successfully uploaded to the system and is available for download. However, text extraction failed: ${pdfError.message}. The document structure and metadata have been preserved.`;
+        } else if (pdfResult.method === 'pdf_extraction_failed') {
+          // Use the structured fallback text
+          extractedText = createPDFFallbackText(fileName, fileBuffer.length, pdfResult.error);
           extractionMethod = 'pdf_extraction_failed';
+        } else {
+          // PDF was processed but appears to be scanned
+          extractedText = createScannedPDFText(fileName, fileBuffer.length);
+          extractionMethod = 'pdf_scanned_document';
         }
+        
       } catch (pdfError) {
         console.error(`PDF extraction failed for ${fileName}:`, pdfError);
         extractedText = `[PDF Content: ${fileName}] - PDF text extraction failed: ${pdfError.message}`;
