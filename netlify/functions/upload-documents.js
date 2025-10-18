@@ -170,11 +170,24 @@ async function extractTextFromFile(fileBuffer, fileName) {
 // Helper function to generate AI summary
 async function generateSummary(text, fileName) {
   try {
+    // Check if text is valid
+    if (!text || text.length === 0) {
+      console.log(`No text provided for summary generation: ${fileName}`);
+      return `Document: ${fileName} - No text available for summary`;
+    }
+
     // Very conservative approach - only use first 1000 characters
     const maxTextLength = Math.min(1000, text.length);
     const truncatedText = text.substring(0, maxTextLength);
     
     console.log(`Generating summary for ${fileName}: ${text.length} chars -> ${truncatedText.length} chars`);
+    console.log(`Text preview: ${truncatedText.substring(0, 100)}...`);
+    
+    // Check if Groq API key is available
+    if (!process.env.GROQ_API_KEY) {
+      console.log('GROQ_API_KEY not configured, creating basic summary');
+      return `Document: ${fileName} (${text.length} characters) - AI summary not available (API key missing)`;
+    }
     
     console.log(`Attempting Groq API call with model: openai/gpt-oss-20b`);
     console.log(`Text length being sent: ${truncatedText.length} characters`);
@@ -196,8 +209,10 @@ async function generateSummary(text, fileName) {
     });
     
     console.log(`Groq API call successful for ${fileName}`);
+    const summary = response.choices[0].message.content.trim();
+    console.log(`Generated summary: ${summary.substring(0, 100)}...`);
 
-    return response.choices[0].message.content.trim();
+    return summary;
   } catch (error) {
     console.error('Error generating summary:', {
       fileName,
@@ -208,7 +223,8 @@ async function generateSummary(text, fileName) {
       errorCode: error.code,
       errorType: error.type,
       fullError: error,
-      model: "openai/gpt-oss-20b"
+      model: "openai/gpt-oss-20b",
+      hasGroqKey: !!process.env.GROQ_API_KEY
     });
     
     // Check if this is a model-related error
@@ -730,10 +746,15 @@ export const handler = async (event) => {
         // Generate AI summary (skip for large files to avoid token limits and timeouts)
         console.log(`=== FILE PROCESSING DEBUG ===`);
         console.log(`File: ${file.fileName}, Text length: ${extractedText.length} chars`);
+        console.log(`Extraction method: ${extractionMethod}`);
+        console.log(`Text preview: ${extractedText.substring(0, 200)}...`);
         console.log(`Summary generation: ${extractedText.length > 5000 ? 'SKIPPED' : 'PROCEEDING'}`);
         
         let summary = '';
-        if (extractedText.length > 5000) {
+        if (extractedText.length === 0) {
+          console.log(`No text extracted from ${file.fileName}, creating placeholder summary`);
+          summary = `Document: ${file.fileName} - No text could be extracted from this file`;
+        } else if (extractedText.length > 5000) {
           console.log(`Skipping AI summary generation for large file: ${file.fileName} (${extractedText.length} chars)`);
           // Create a basic text-based summary instead
           summary = `Document: ${file.fileName} (${extractedText.length} characters)`;
@@ -741,6 +762,7 @@ export const handler = async (event) => {
         } else {
           try {
             console.log(`Generating AI summary for: ${file.fileName}`);
+            console.log(`Text being sent to AI: ${extractedText.substring(0, 100)}...`);
             const summaryStartTime = Date.now();
             summary = await generateSummary(extractedText, file.fileName);
             const summaryDuration = Date.now() - summaryStartTime;
@@ -778,20 +800,35 @@ export const handler = async (event) => {
         console.log(`=== CHUNKING PROCESS ===`);
         console.log(`Starting chunking for: ${file.fileName}`);
         console.log(`Text length: ${extractedText.length} characters`);
+        console.log(`Document ID: ${documentId}`);
+        console.log(`User ID: ${userId}`);
         const chunkStartTime = Date.now();
         
-        const { chunksCreated, error: chunkError } = await chunkAndEmbedDocument(
-          extractedText,
-          documentId,
-          file.fileName,
-          userId,
-          processingStartTime,
-          MAX_PROCESSING_TIME
-        );
+        let chunksCreated = 0;
+        let chunkError = null;
+        
+        if (extractedText.length === 0) {
+          console.log(`Skipping chunking for ${file.fileName} - no text extracted`);
+          chunkError = 'No text extracted from document';
+        } else {
+          const chunkResult = await chunkAndEmbedDocument(
+            extractedText,
+            documentId,
+            file.fileName,
+            userId,
+            processingStartTime,
+            MAX_PROCESSING_TIME
+          );
+          chunksCreated = chunkResult.chunksCreated;
+          chunkError = chunkResult.error;
+        }
         
         const chunkDuration = Date.now() - chunkStartTime;
         console.log(`Chunking and embedding completed in ${chunkDuration}ms for: ${file.fileName}`);
         console.log(`Chunks created: ${chunksCreated}`);
+        if (chunkError) {
+          console.log(`Chunking error: ${chunkError}`);
+        }
 
         totalChunksCreated += chunksCreated;
 
