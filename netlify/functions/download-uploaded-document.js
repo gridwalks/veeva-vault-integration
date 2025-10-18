@@ -160,137 +160,162 @@ export const handler = async (event) => {
       };
     }
 
-    // Get the blob store and retrieve the file using the blob key
-    let store;
-    try {
-      const siteID = process.env.NETLIFY_BLOBS_SITE_ID;
-      const token = process.env.NETLIFY_BLOBS_TOKEN;
-
-      console.log('Environment variables check:', {
-        siteID: siteID ? 'present' : 'missing',
-        token: token ? 'present' : 'missing',
-        siteIDLength: siteID ? siteID.length : 0,
-        tokenLength: token ? token.length : 0
-      });
-
-      store = await getStore({
-        name: 'uploaded-documents',
-        siteID,
-        token
-      });
-      console.log('Blob store retrieved successfully for download');
-    } catch (storeError) {
-      console.error('Error initializing blob store for download:', storeError);
-      return {
-        statusCode: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({
-          error: 'Failed to initialize blob store',
-          details: storeError.message
-        })
-      };
-    }
-    
     const blobKey = document.blob_url;
 
-    const candidateBlobKeys = [blobKey];
+    const buildCandidateBlobKeys = (key) => {
+      const variants = [];
 
-    // If the stored key contains characters that are typically encoded in blob storage,
-    // attempt encoded variants as fallbacks. This specifically covers cases where the
-    // database stored the human-friendly key with spaces while the blob storage encoded
-    // them as %20 during the upload process.
-    const shouldAddEncodedVariant = blobKey && /[\s#?]/.test(blobKey) && !/%[0-9A-Fa-f]{2}/.test(blobKey);
-    if (shouldAddEncodedVariant) {
-      const encodedKey = encodeURI(blobKey);
-      if (!candidateBlobKeys.includes(encodedKey)) {
-        candidateBlobKeys.push(encodedKey);
+      const addVariant = (value) => {
+        if (!value) return;
+        if (!variants.includes(value)) {
+          variants.push(value);
+        }
+      };
+
+      if (key) {
+        addVariant(key);
+
+        // If the key looks like it contains a namespace/prefix, also try the suffix portion.
+        const slashIndex = key.indexOf('/');
+        if (slashIndex !== -1 && slashIndex < key.length - 1) {
+          addVariant(key.slice(slashIndex + 1));
+        }
       }
-    }
+
+      // After collecting raw variants, add encoded versions when appropriate.
+      const encodedVariants = variants
+        .filter(value => /[\s#?]/.test(value) && !/%[0-9A-Fa-f]{2}/.test(value))
+        .map(value => encodeURI(value));
+
+      for (const value of encodedVariants) {
+        addVariant(value);
+      }
+
+      return variants;
+    };
+
+    const candidateBlobKeys = buildCandidateBlobKeys(blobKey);
+
+    const inferStoreFromKey = (key) => {
+      if (!key) return null;
+      const prefix = key.split('/')[0];
+      if (prefix && prefix.length > 0 && prefix.length < 64) {
+        return prefix;
+      }
+      return null;
+    };
+
+    const inferredStoreName = inferStoreFromKey(blobKey);
+
+    const siteID = process.env.NETLIFY_BLOBS_SITE_ID;
+    const token = process.env.NETLIFY_BLOBS_TOKEN;
+
+    console.log('Environment variables check:', {
+      siteID: siteID ? 'present' : 'missing',
+      token: token ? 'present' : 'missing',
+      siteIDLength: siteID ? siteID.length : 0,
+      tokenLength: token ? token.length : 0
+    });
+
+    const storeCandidates = [
+      inferredStoreName,
+      'uploaded-documents',
+      'documents',
+      'chat-uploads'
+    ].filter(Boolean);
+
+    const uniqueStoreCandidates = [...new Set(storeCandidates)];
 
     console.log('Attempting to retrieve file from blob storage:', {
       blobKey,
       blobKeyLength: blobKey ? blobKey.length : 0,
-      candidateBlobKeys
+      candidateBlobKeys,
+      uniqueStoreCandidates
     });
 
-    try {
-      let fileBuffer = null;
-      let successfulKey = null;
+    let fileBuffer = null;
+    let successfulKey = null;
+    let successfulStore = null;
+
+    for (const storeName of uniqueStoreCandidates) {
+      let store;
+      try {
+        store = await getStore({
+          name: storeName,
+          siteID,
+          token
+        });
+      } catch (storeError) {
+        console.warn('Failed to initialize blob store candidate:', storeName, storeError);
+        continue;
+      }
+
+      console.log('Blob store retrieved successfully for download attempt:', storeName);
 
       for (const candidateKey of candidateBlobKeys) {
         try {
           fileBuffer = await store.get(candidateKey, { type: 'arrayBuffer' });
         } catch (candidateError) {
-          console.warn('Blob retrieval attempt failed for key:', candidateKey, candidateError);
+          console.warn('Blob retrieval attempt failed for key:', candidateKey, 'in store:', storeName, candidateError);
           continue;
         }
 
         if (fileBuffer) {
           successfulKey = candidateKey;
+          successfulStore = storeName;
           break;
         }
       }
 
-      console.log('Blob retrieval result:', {
-        hasFileBuffer: !!fileBuffer,
-        fileBufferSize: fileBuffer ? fileBuffer.byteLength : 0,
-        successfulKey
-      });
-
-      if (!fileBuffer) {
-        console.log('File not found in blob storage after trying candidates, returning 404');
-        return {
-          statusCode: 404,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          },
-          body: JSON.stringify({
-            error: 'File not found in blob storage',
-            attemptedKeys: candidateBlobKeys
-          })
-        };
+      if (fileBuffer) {
+        break;
       }
+    }
 
-      // Determine filename for download
-      const downloadFilename = document.original_filename || document.document_name;
-      const mimeType = document.mime_type || 'application/octet-stream';
+    console.log('Blob retrieval result:', {
+      hasFileBuffer: !!fileBuffer,
+      fileBufferSize: fileBuffer ? fileBuffer.byteLength : 0,
+      successfulKey,
+      successfulStore
+    });
 
-      // Convert ArrayBuffer to Buffer
-      const buffer = Buffer.from(fileBuffer);
-
-      console.log(`Downloading file: ${downloadFilename} (${buffer.length} bytes)`);
-
+    if (!fileBuffer) {
+      console.log('File not found in blob storage after trying candidates, returning 404');
       return {
-        statusCode: 200,
-        headers: {
-          'Content-Type': mimeType,
-          'Content-Disposition': `attachment; filename="${downloadFilename}"`,
-          'Content-Length': buffer.length,
-          'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'public, max-age=3600'
-        },
-        body: buffer.toString('base64'),
-        isBase64Encoded: true
-      };
-
-    } catch (blobError) {
-      console.error('Error retrieving file from blob storage:', blobError);
-
-      return {
-        statusCode: 500,
+        statusCode: 404,
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*'
         },
         body: JSON.stringify({
-          error: 'Failed to retrieve file from storage'
+          error: 'File not found in blob storage',
+          attemptedStores: uniqueStoreCandidates,
+          attemptedKeys: candidateBlobKeys
         })
       };
     }
+
+    // Determine filename for download
+    const downloadFilename = document.original_filename || document.document_name;
+    const mimeType = document.mime_type || 'application/octet-stream';
+
+    // Convert ArrayBuffer to Buffer
+    const buffer = Buffer.from(fileBuffer);
+
+    console.log(`Downloading file: ${downloadFilename} (${buffer.length} bytes) from store ${successfulStore}`);
+
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': mimeType,
+        'Content-Disposition': `attachment; filename="${downloadFilename}"`,
+        'Content-Length': buffer.length,
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=3600'
+      },
+      body: buffer.toString('base64'),
+      isBase64Encoded: true
+    };
 
   } catch (error) {
     console.error('Download error:', error);
