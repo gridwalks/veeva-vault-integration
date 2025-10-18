@@ -49,52 +49,14 @@ export const handler = async (event) => {
 
     console.log('Query parameters:', { limit, offset, search, userId });
 
-    // Validate userId is provided
-    if (!userId) {
-      return {
-        statusCode: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({
-          success: false,
-          error: 'User ID is required to list uploaded documents'
-        })
-      };
-    }
+    // Note: userId is no longer required for filtering, but kept for logging purposes
+    console.log('User ID provided:', userId || 'Not provided');
 
     // Build the WHERE clause for search
-    // First check if user_id column exists, then build appropriate query
-    let baseWhereClause;
-    const queryParams = [userId];
-    let paramIndex = 2;
-
-    try {
-      // Check if user_id column exists
-      const columnCheck = await pool.query(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'qms_chat_documents' 
-        AND column_name = 'user_id'
-      `);
-      
-      if (columnCheck.rows.length > 0) {
-        // Column exists - include both user-specific and legacy documents
-        baseWhereClause = "WHERE d.source_type = 'upload' AND (d.user_id = $1 OR d.user_id IS NULL)";
-      } else {
-        // Column doesn't exist - show all uploaded documents
-        baseWhereClause = "WHERE d.source_type = 'upload'";
-        queryParams.length = 0; // Remove userId from params
-        paramIndex = 1;
-      }
-    } catch (error) {
-      console.log('Column check failed, using fallback query:', error.message);
-      // Fallback to showing all uploaded documents
-      baseWhereClause = "WHERE d.source_type = 'upload'";
-      queryParams.length = 0; // Remove userId from params
-      paramIndex = 1;
-    }
+    // Show all uploaded documents regardless of user_id
+    let baseWhereClause = "WHERE d.source_type = 'upload'";
+    const queryParams = [];
+    let paramIndex = 1;
 
     if (search) {
       baseWhereClause += ` AND (d.document_name ILIKE $${paramIndex} OR d.ai_summary ILIKE $${paramIndex})`;
