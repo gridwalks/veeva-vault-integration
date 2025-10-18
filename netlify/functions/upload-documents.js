@@ -6,7 +6,7 @@ import Groq from 'groq-sdk';
 // import { parseDocument } from 'docx-parser';
 // import pdfParse from 'pdf-parse';
 // import { chunkText, validateChunks } from './chunking-utils.js';
-import { getStore, createStore } from '@netlify/blobs';
+import { getStore } from '@netlify/blobs';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -786,19 +786,16 @@ export const handler = async (event) => {
               tokenValue: process.env.NETLIFY_BLOBS_TOKEN ? process.env.NETLIFY_BLOBS_TOKEN.substring(0, 10) + '...' : 'missing'
             });
             
-            // Try createStore with explicit configuration
-            console.log('Creating blob store with explicit configuration...');
+            // Try the original getStore approach without parameters
+            // Since environment variables are valid, this should work
+            console.log('Using getStore without parameters (original working approach)...');
             console.log('Environment variable values:', {
               siteID: process.env.NETLIFY_BLOBS_SITE_ID,
               token: process.env.NETLIFY_BLOBS_TOKEN ? process.env.NETLIFY_BLOBS_TOKEN.substring(0, 20) + '...' : 'missing'
             });
             
-            const store = createStore({
-              name: 'documents',
-              siteID: process.env.NETLIFY_BLOBS_SITE_ID,
-              token: process.env.NETLIFY_BLOBS_TOKEN
-            });
-            console.log('Blob store created successfully');
+            const store = getStore('documents');
+            console.log('Blob store retrieved successfully');
             const uniqueFileName = `${Date.now()}-${file.fileName}`;
             console.log(`Generated unique filename: ${uniqueFileName}`);
             
