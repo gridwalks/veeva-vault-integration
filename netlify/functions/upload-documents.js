@@ -777,7 +777,10 @@ export const handler = async (event) => {
             blobKey = null;
           } else {
             console.log('Blob storage configuration found, proceeding with upload...');
-            const store = getStore('documents');
+            const store = getStore('documents', {
+              siteID: process.env.NETLIFY_BLOBS_SITE_ID,
+              token: process.env.NETLIFY_BLOBS_TOKEN
+            });
             const uniqueFileName = `${Date.now()}-${file.fileName}`;
             console.log(`Generated unique filename: ${uniqueFileName}`);
             
