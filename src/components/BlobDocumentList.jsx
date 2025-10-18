@@ -63,7 +63,17 @@ export default function BlobDocumentList({ userId, onDocumentDeleted }) {
   };
 
   const handleViewDocument = (doc) => {
-    const url = downloadUploadedDocumentUrl({ documentId: doc.id });
+    // For blob storage, we can either use the blob key directly or the download API
+    let url;
+    if (doc.blob_metadata && doc.blob_metadata.key) {
+      // If we have blob metadata, we can construct a direct blob URL
+      // or use the download API with the blob key
+      url = downloadUploadedDocumentUrl({ documentId: doc.blob_metadata.key });
+    } else {
+      // Fallback to using the document ID
+      url = downloadUploadedDocumentUrl({ documentId: doc.id });
+    }
+    
     setSelectedDocument({
       url: url,
       name: doc.document_name || doc.original_filename
@@ -81,11 +91,24 @@ export default function BlobDocumentList({ userId, onDocumentDeleted }) {
     setDeleteError(null);
     
     try {
-      console.log('Deleting blob document...', { documentId: doc.id });
-      await deleteDocument({
-        documentId: doc.id,
-        sourceType: 'upload'
+      console.log('Deleting blob document...', { documentId: doc.id, blobKey: doc.blob_metadata?.key });
+      
+      // Use the blob key for deletion
+      const blobKey = doc.blob_metadata?.key || doc.id;
+      
+      // Call the blob-delete API directly
+      const response = await fetch('/api/blob-delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ key: blobKey })
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete blob');
+      }
       
       console.log('Blob document deleted successfully');
       
@@ -207,6 +230,11 @@ export default function BlobDocumentList({ userId, onDocumentDeleted }) {
                       <div style={{ fontWeight: '500', color: '#495057' }}>
                         {doc.document_name || doc.original_filename || 'Untitled'}
                       </div>
+                      {doc.blob_metadata && (
+                        <div style={{ fontSize: '11px', color: '#6c757d', marginTop: '2px' }}>
+                          Key: {doc.blob_metadata.key}
+                        </div>
+                      )}
                       {doc.ai_summary && (
                         <div style={{ fontSize: '11px', color: '#6c757d', marginTop: '2px' }}>
                           {doc.ai_summary.substring(0, 100)}...
