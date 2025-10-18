@@ -786,12 +786,19 @@ export const handler = async (event) => {
               tokenValue: process.env.NETLIFY_BLOBS_TOKEN ? process.env.NETLIFY_BLOBS_TOKEN.substring(0, 10) + '...' : 'missing'
             });
             
-            // Try the original getStore approach that was working before
-            // But now we need to pass the environment variables explicitly
-            const store = getStore('documents', {
+            // Try createStore with explicit configuration
+            console.log('Creating blob store with explicit configuration...');
+            console.log('Environment variable values:', {
+              siteID: process.env.NETLIFY_BLOBS_SITE_ID,
+              token: process.env.NETLIFY_BLOBS_TOKEN ? process.env.NETLIFY_BLOBS_TOKEN.substring(0, 20) + '...' : 'missing'
+            });
+            
+            const store = createStore({
+              name: 'documents',
               siteID: process.env.NETLIFY_BLOBS_SITE_ID,
               token: process.env.NETLIFY_BLOBS_TOKEN
             });
+            console.log('Blob store created successfully');
             const uniqueFileName = `${Date.now()}-${file.fileName}`;
             console.log(`Generated unique filename: ${uniqueFileName}`);
             
