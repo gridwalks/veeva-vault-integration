@@ -617,7 +617,9 @@ export const handler = async (event) => {
       hasGroqKey: !!process.env.GROQ_API_KEY,
       blobStorage: 'ENABLED',
       hasBlobSiteId: !!process.env.NETLIFY_BLOBS_SITE_ID,
-      hasBlobToken: !!process.env.NETLIFY_BLOBS_TOKEN
+      hasBlobToken: !!process.env.NETLIFY_BLOBS_TOKEN,
+      blobSiteIdPreview: process.env.NETLIFY_BLOBS_SITE_ID ? process.env.NETLIFY_BLOBS_SITE_ID.substring(0, 10) + '...' : 'missing',
+      blobTokenPreview: process.env.NETLIFY_BLOBS_TOKEN ? process.env.NETLIFY_BLOBS_TOKEN.substring(0, 10) + '...' : 'missing'
     }
   });
 
@@ -779,14 +781,13 @@ export const handler = async (event) => {
             console.log('Blob storage configuration found, proceeding with upload...');
             console.log('Environment variables:', {
               siteID: process.env.NETLIFY_BLOBS_SITE_ID ? 'present' : 'missing',
-              token: process.env.NETLIFY_BLOBS_TOKEN ? 'present' : 'missing'
+              token: process.env.NETLIFY_BLOBS_TOKEN ? 'present' : 'missing',
+              siteIDValue: process.env.NETLIFY_BLOBS_SITE_ID ? process.env.NETLIFY_BLOBS_SITE_ID.substring(0, 10) + '...' : 'missing',
+              tokenValue: process.env.NETLIFY_BLOBS_TOKEN ? process.env.NETLIFY_BLOBS_TOKEN.substring(0, 10) + '...' : 'missing'
             });
             
-            const store = createStore({
-              name: 'documents',
-              siteID: process.env.NETLIFY_BLOBS_SITE_ID,
-              token: process.env.NETLIFY_BLOBS_TOKEN
-            });
+            // Try the original getStore approach that was working before
+            const store = getStore('documents');
             const uniqueFileName = `${Date.now()}-${file.fileName}`;
             console.log(`Generated unique filename: ${uniqueFileName}`);
             
