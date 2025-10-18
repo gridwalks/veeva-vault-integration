@@ -199,10 +199,10 @@ async function extractTextFromFile(fileBuffer, fileName, fileExtension) {
 
   try {
     if (normalizedExtension === 'pdf') {
-      // Extract text from PDF files using pdf-parse
-      const pdfParse = await import('pdf-parse');
-      const pdfData = await pdfParse.default(fileBuffer);
-      return pdfData.text;
+      // Extract text from PDF files using pdf-parse wrapper
+      const { extractTextFromPDF } = await import('./pdf-extraction-wrapper.js');
+      const pdfResult = await extractTextFromPDF(fileBuffer, fileName);
+      return pdfResult.text || '';
     } else if (normalizedExtension === 'docx' || looksLikeDocx(fileBuffer)) {
       // Extract text from DOCX using mammoth
       const mammoth = await import('mammoth');

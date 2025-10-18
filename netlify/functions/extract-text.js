@@ -72,26 +72,28 @@ export const handler = async (event) => {
       // DOC files are binary and harder to parse
       throw new Error('DOC files are not supported. Please convert to DOCX or TXT format.');
     } else if (fileExtension === 'pdf') {
-      // Extract text from PDF files using pdf-parse
+      // Extract text from PDF files using pdf-parse wrapper
       try {
-        // Dynamic import for pdf-parse to handle potential import issues
-        const pdfParse = await import('pdf-parse');
-        const pdfData = await pdfParse.default(fileBuffer);
+        // Use the PDF extraction wrapper to handle pdf-parse issues
+        const { extractTextFromPDF, createPDFFallbackText, createScannedPDFText } = await import('./pdf-extraction-wrapper.js');
         
-        extractedText = pdfData.text;
-        extractionMethod = 'pdf_parse';
+        const pdfResult = await extractTextFromPDF(fileBuffer, fileName);
         
-        console.log('PDF extraction successful:', {
-          pages: pdfData.numpages,
-          info: pdfData.info,
-          metadata: pdfData.metadata,
-          textLength: pdfData.text.length
-        });
-        
-        // Check if PDF appears to be scanned (no text or very little text)
-        if (!extractedText || extractedText.trim().length < 10) {
-          console.warn('PDF appears to be scanned or image-based - minimal text extracted');
-          extractedText = 'This PDF appears to be a scanned document or image-based PDF. Text extraction is limited. Consider using OCR services for better results.';
+        if (pdfResult.text && pdfResult.text.trim().length >= 10) {
+          extractedText = pdfResult.text;
+          extractionMethod = pdfResult.method;
+          
+          console.log('PDF extraction successful:', {
+            method: pdfResult.method,
+            pages: pdfResult.pages,
+            textLength: pdfResult.text.length
+          });
+        } else if (pdfResult.method === 'pdf_extraction_failed') {
+          extractedText = createPDFFallbackText(fileName, fileBuffer.length, pdfResult.error);
+          extractionMethod = 'pdf_extraction_failed';
+        } else {
+          extractedText = createScannedPDFText(fileName, fileBuffer.length);
+          extractionMethod = 'pdf_scanned_document';
         }
       } catch (error) {
         console.error('PDF extraction failed:', error);

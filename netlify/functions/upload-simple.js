@@ -50,13 +50,32 @@ async function extractTextSimple(fileBuffer, fileName) {
     const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
     
     if (fileExtension === 'pdf') {
-      // Dynamic import for PDF parsing
-      const pdfParse = await import('pdf-parse');
-      const pdfResult = await pdfParse.default(fileBuffer);
-      return {
-        text: pdfResult.text || 'No text extracted from PDF',
-        method: 'pdf_parse'
-      };
+      try {
+        // Use the PDF extraction wrapper to handle pdf-parse issues
+        const { extractTextFromPDF, createPDFFallbackText, createScannedPDFText } = await import('./pdf-extraction-wrapper.js');
+        
+        const pdfResult = await extractTextFromPDF(fileBuffer, fileName);
+        
+        if (pdfResult.text && pdfResult.text.trim().length >= 10) {
+          return { text: pdfResult.text, method: pdfResult.method };
+        } else if (pdfResult.method === 'pdf_extraction_failed') {
+          return { 
+            text: createPDFFallbackText(fileName, fileBuffer.length, pdfResult.error), 
+            method: 'pdf_extraction_failed' 
+          };
+        } else {
+          return { 
+            text: createScannedPDFText(fileName, fileBuffer.length), 
+            method: 'pdf_scanned_document' 
+          };
+        }
+      } catch (pdfError) {
+        console.error(`PDF extraction failed for ${fileName}:`, pdfError);
+        return { 
+          text: `[PDF Content: ${fileName}] - PDF text extraction failed: ${pdfError.message}`, 
+          method: 'pdf_error_fallback' 
+        };
+      }
     } else if (fileExtension === 'docx') {
       // Dynamic import for DOCX parsing
       const mammoth = await import('mammoth');
