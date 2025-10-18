@@ -195,23 +195,53 @@ export const handler = async (event) => {
     }
     
     const blobKey = document.blob_url;
-    
+
+    const candidateBlobKeys = [blobKey];
+
+    // If the stored key contains characters that are typically encoded in blob storage,
+    // attempt encoded variants as fallbacks. This specifically covers cases where the
+    // database stored the human-friendly key with spaces while the blob storage encoded
+    // them as %20 during the upload process.
+    const shouldAddEncodedVariant = blobKey && /[\s#?]/.test(blobKey) && !/%[0-9A-Fa-f]{2}/.test(blobKey);
+    if (shouldAddEncodedVariant) {
+      const encodedKey = encodeURI(blobKey);
+      if (!candidateBlobKeys.includes(encodedKey)) {
+        candidateBlobKeys.push(encodedKey);
+      }
+    }
+
     console.log('Attempting to retrieve file from blob storage:', {
-      blobKey: blobKey,
-      blobKeyLength: blobKey ? blobKey.length : 0
+      blobKey,
+      blobKeyLength: blobKey ? blobKey.length : 0,
+      candidateBlobKeys
     });
-    
+
     try {
-      // Get file from Netlify Blob storage
-      const fileBuffer = await store.get(blobKey, { type: 'arrayBuffer' });
-      
+      let fileBuffer = null;
+      let successfulKey = null;
+
+      for (const candidateKey of candidateBlobKeys) {
+        try {
+          fileBuffer = await store.get(candidateKey, { type: 'arrayBuffer' });
+        } catch (candidateError) {
+          console.warn('Blob retrieval attempt failed for key:', candidateKey, candidateError);
+          continue;
+        }
+
+        if (fileBuffer) {
+          successfulKey = candidateKey;
+          break;
+        }
+      }
+
       console.log('Blob retrieval result:', {
         hasFileBuffer: !!fileBuffer,
-        fileBufferSize: fileBuffer ? fileBuffer.byteLength : 0
+        fileBufferSize: fileBuffer ? fileBuffer.byteLength : 0,
+        successfulKey
       });
-      
+
       if (!fileBuffer) {
-        console.log('File not found in blob storage, returning 404');
+        console.log('File not found in blob storage after trying candidates, returning 404');
         return {
           statusCode: 404,
           headers: {
@@ -220,7 +250,7 @@ export const handler = async (event) => {
           },
           body: JSON.stringify({
             error: 'File not found in blob storage',
-            blobKey: blobKey
+            attemptedKeys: candidateBlobKeys
           })
         };
       }
@@ -231,7 +261,7 @@ export const handler = async (event) => {
 
       // Convert ArrayBuffer to Buffer
       const buffer = Buffer.from(fileBuffer);
-      
+
       console.log(`Downloading file: ${downloadFilename} (${buffer.length} bytes)`);
 
       return {
@@ -249,7 +279,7 @@ export const handler = async (event) => {
 
     } catch (blobError) {
       console.error('Error retrieving file from blob storage:', blobError);
-      
+
       return {
         statusCode: 500,
         headers: {
