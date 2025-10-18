@@ -53,39 +53,64 @@ export const handler = async (event) => {
     await initDatabase();
     const pool = getPool();
     
-    // Get document count
-    const docCountResult = await pool.query(
+    // Get document count from both tables
+    const veevaDocCountResult = await pool.query(
       'SELECT COUNT(*) as count FROM Veeva_Doc_Chat_document_index'
     );
-    const docCount = parseInt(docCountResult.rows[0].count);
+    const uploadedDocCountResult = await pool.query(
+      'SELECT COUNT(*) as count FROM qms_chat_documents'
+    );
+    const docCount = parseInt(veevaDocCountResult.rows[0].count) + parseInt(uploadedDocCountResult.rows[0].count);
     
-    // Get chunk count
-    const chunkCountResult = await pool.query(
+    // Get chunk count from both tables
+    const veevaChunkCountResult = await pool.query(
       'SELECT COUNT(*) as count FROM Veeva_Doc_Chat_document_chunks'
     );
-    const chunkCount = parseInt(chunkCountResult.rows[0].count);
+    const uploadedChunkCountResult = await pool.query(
+      'SELECT COUNT(*) as count FROM qms_chat_document_chunks'
+    );
+    const chunkCount = parseInt(veevaChunkCountResult.rows[0].count) + parseInt(uploadedChunkCountResult.rows[0].count);
     
-    // Get documents with chunk counts and embedding validation
-    const docChunkStats = await pool.query(`
+    // Get documents with chunk counts and embedding validation from both tables
+    const veevaDocChunkStats = await pool.query(`
       SELECT 
         di.id,
         di.veeva_document_id,
         di.document_name,
         COUNT(dc.id) as chunk_count,
         COUNT(CASE WHEN dc.embedding IS NOT NULL THEN 1 END) as chunks_with_embeddings,
-        COUNT(CASE WHEN dc.embedding IS NOT NULL AND array_length(dc.embedding, 1) = 1536 THEN 1 END) as chunks_with_valid_embeddings
+        COUNT(CASE WHEN dc.embedding IS NOT NULL AND array_length(dc.embedding, 1) = 1536 THEN 1 END) as chunks_with_valid_embeddings,
+        'veeva' as source_type
       FROM Veeva_Doc_Chat_document_index di
       LEFT JOIN Veeva_Doc_Chat_document_chunks dc ON di.id = dc.document_id
       GROUP BY di.id, di.veeva_document_id, di.document_name
-      ORDER BY chunk_count DESC, di.document_name
     `);
+    
+    const uploadedDocChunkStats = await pool.query(`
+      SELECT 
+        d.id,
+        d.original_filename as veeva_document_id,
+        d.document_name,
+        COUNT(c.id) as chunk_count,
+        COUNT(CASE WHEN c.embedding IS NOT NULL THEN 1 END) as chunks_with_embeddings,
+        COUNT(CASE WHEN c.embedding IS NOT NULL AND array_length(c.embedding, 1) = 1536 THEN 1 END) as chunks_with_valid_embeddings,
+        'upload' as source_type
+      FROM qms_chat_documents d
+      LEFT JOIN qms_chat_document_chunks c ON d.id = c.document_id
+      GROUP BY d.id, d.original_filename, d.document_name
+    `);
+    
+    // Combine both result sets
+    const docChunkStats = {
+      rows: [...veevaDocChunkStats.rows, ...uploadedDocChunkStats.rows]
+    };
     
     const docsWithChunks = docChunkStats.rows.filter(row => row.chunk_count > 0).length;
     const docsWithoutChunks = docChunkStats.rows.filter(row => row.chunk_count === 0).length;
     const docsWithValidEmbeddings = docChunkStats.rows.filter(row => row.chunks_with_valid_embeddings > 0).length;
     
-    // Check for chunks with invalid embeddings
-    const invalidEmbeddingStats = await pool.query(`
+    // Check for chunks with invalid embeddings from both tables
+    const veevaInvalidEmbeddingStats = await pool.query(`
       SELECT 
         COUNT(CASE WHEN embedding IS NULL THEN 1 END) as chunks_without_embeddings,
         COUNT(CASE WHEN embedding IS NOT NULL AND array_length(embedding, 1) != 1536 THEN 1 END) as chunks_with_invalid_embeddings,
@@ -94,7 +119,24 @@ export const handler = async (event) => {
       FROM Veeva_Doc_Chat_document_chunks
     `);
     
-    const invalidStats = invalidEmbeddingStats.rows[0];
+    const uploadedInvalidEmbeddingStats = await pool.query(`
+      SELECT 
+        COUNT(CASE WHEN embedding IS NULL THEN 1 END) as chunks_without_embeddings,
+        COUNT(CASE WHEN embedding IS NOT NULL AND array_length(embedding, 1) != 1536 THEN 1 END) as chunks_with_invalid_embeddings,
+        COUNT(CASE WHEN chunk_text IS NULL OR chunk_text = '' THEN 1 END) as empty_chunks,
+        COUNT(CASE WHEN LENGTH(chunk_text) < 10 THEN 1 END) as short_chunks
+      FROM qms_chat_document_chunks
+    `);
+    
+    // Combine the stats
+    const invalidStats = {
+      chunks_without_embeddings: parseInt(veevaInvalidEmbeddingStats.rows[0].chunks_without_embeddings) + parseInt(uploadedInvalidEmbeddingStats.rows[0].chunks_without_embeddings),
+      chunks_with_invalid_embeddings: parseInt(veevaInvalidEmbeddingStats.rows[0].chunks_with_invalid_embeddings) + parseInt(uploadedInvalidEmbeddingStats.rows[0].chunks_with_invalid_embeddings),
+      empty_chunks: parseInt(veevaInvalidEmbeddingStats.rows[0].empty_chunks) + parseInt(uploadedInvalidEmbeddingStats.rows[0].empty_chunks),
+      short_chunks: parseInt(veevaInvalidEmbeddingStats.rows[0].short_chunks) + parseInt(uploadedInvalidEmbeddingStats.rows[0].short_chunks)
+    };
+    
+    // Remove the old line since we already have invalidStats defined above
     
     console.log('Chunk statistics:', {
       totalDocuments: docCount,
@@ -103,10 +145,10 @@ export const handler = async (event) => {
       documentsWithoutChunks: docsWithoutChunks,
       documentsWithValidEmbeddings: docsWithValidEmbeddings,
       averageChunksPerDoc: docsWithChunks > 0 ? (chunkCount / docsWithChunks).toFixed(1) : 0,
-      chunksWithoutEmbeddings: parseInt(invalidStats.chunks_without_embeddings),
-      chunksWithInvalidEmbeddings: parseInt(invalidStats.chunks_with_invalid_embeddings),
-      emptyChunks: parseInt(invalidStats.empty_chunks),
-      shortChunks: parseInt(invalidStats.short_chunks)
+      chunksWithoutEmbeddings: invalidStats.chunks_without_embeddings,
+      chunksWithInvalidEmbeddings: invalidStats.chunks_with_invalid_embeddings,
+      emptyChunks: invalidStats.empty_chunks,
+      shortChunks: invalidStats.short_chunks
     });
     
     // Test vector search if possible
