@@ -112,32 +112,49 @@ async function extractTextFromFile(fileBuffer, fileName) {
       try {
         console.log(`Attempting PDF text extraction for ${fileName}...`);
         
-        // Try a different approach - use a basic PDF text extraction
-        // that doesn't rely on problematic modules
+        // Use pdf-parse library for actual PDF text extraction
         try {
-          // For now, let's create a more useful placeholder that includes file info
-          // and indicates the document was processed successfully
-          const fileSizeKB = Math.round(fileBuffer.length / 1024);
-          const fileSizeMB = (fileBuffer.length / (1024 * 1024)).toFixed(2);
+          const pdfParse = await import('pdf-parse');
+          const pdfData = await pdfParse.default(fileBuffer);
           
-          extractedText = `[PDF Document: ${fileName}]
+          extractedText = pdfData.text;
+          extractionMethod = 'pdf_parse';
+          
+          console.log('PDF extraction successful:', {
+            pages: pdfData.numpages,
+            info: pdfData.info,
+            metadata: pdfData.metadata,
+            textLength: pdfData.text.length
+          });
+          
+          // Check if PDF appears to be scanned (no text or very little text)
+          if (!extractedText || extractedText.trim().length < 10) {
+            console.warn('PDF appears to be scanned or image-based - minimal text extracted');
+            const fileSizeKB = Math.round(fileBuffer.length / 1024);
+            extractedText = `[PDF Document: ${fileName} - Scanned Document]
 
 Document Information:
-- File Size: ${fileSizeKB} KB (${fileSizeMB} MB)
+- File Size: ${fileSizeKB} KB
 - Upload Date: ${new Date().toISOString()}
-- Status: Successfully uploaded and processed
+- Status: Successfully uploaded but appears to be scanned/image-based
 
-Note: This PDF document has been successfully uploaded to the system and is available for download. The document structure and metadata have been preserved. For full text extraction and search capabilities, the PDF text extraction feature is being enhanced.
-
-The document is now indexed in the knowledge base and can be referenced in conversations, though full text search within the PDF content is currently limited.`;
-
-          extractionMethod = 'pdf_uploaded_successfully';
-          console.log(`PDF processing completed for ${fileName}: ${extractedText.length} chars using ${extractionMethod}`);
+Note: This PDF appears to be a scanned document or image-based PDF. Text extraction is limited. The document is available in the knowledge base and can be referenced in conversations, though full text search within the PDF content is currently limited. Consider using OCR services for better text extraction results.`;
+            extractionMethod = 'pdf_scanned_document';
+          }
           
         } catch (pdfError) {
-          console.error(`PDF processing failed for ${fileName}:`, pdfError);
-          extractedText = `[PDF Content: ${fileName}] - PDF processing failed: ${pdfError.message}`;
-          extractionMethod = 'pdf_error_fallback';
+          console.error(`PDF extraction failed for ${fileName}:`, pdfError);
+          // Fallback to placeholder if pdf-parse fails
+          const fileSizeKB = Math.round(fileBuffer.length / 1024);
+          extractedText = `[PDF Document: ${fileName} - Extraction Failed]
+
+Document Information:
+- File Size: ${fileSizeKB} KB
+- Upload Date: ${new Date().toISOString()}
+- Status: Successfully uploaded but text extraction failed
+
+Note: This PDF document has been successfully uploaded to the system and is available for download. However, text extraction failed: ${pdfError.message}. The document structure and metadata have been preserved.`;
+          extractionMethod = 'pdf_extraction_failed';
         }
       } catch (pdfError) {
         console.error(`PDF extraction failed for ${fileName}:`, pdfError);
@@ -858,11 +875,21 @@ export const handler = async (event) => {
         if (extractedText.length === 0) {
           console.log(`No text extracted from ${file.fileName}, creating placeholder summary`);
           summary = `Document: ${file.fileName} - No text could be extracted from this file`;
-        } else if (extractionMethod === 'pdf_uploaded_successfully') {
-          // For PDFs with placeholder text, create a more appropriate summary
-          console.log(`Creating PDF-specific summary for: ${file.fileName}`);
+        } else if (extractionMethod === 'pdf_parse') {
+          // For PDFs with successfully extracted text, create a proper summary
+          console.log(`Creating PDF summary for: ${file.fileName}`);
           const fileSizeKB = Math.round(file.size / 1024);
-          summary = `PDF Document: ${file.fileName} (${fileSizeKB} KB) - Successfully uploaded and indexed. This document is available in the knowledge base and can be referenced in conversations. The document structure and metadata have been preserved.`;
+          summary = `PDF Document: ${file.fileName} (${fileSizeKB} KB) - Successfully uploaded and indexed with full text extraction. This document is available in the knowledge base and can be referenced in conversations with full text search capabilities.`;
+        } else if (extractionMethod === 'pdf_scanned_document') {
+          // For scanned PDFs, create appropriate summary
+          console.log(`Creating scanned PDF summary for: ${file.fileName}`);
+          const fileSizeKB = Math.round(file.size / 1024);
+          summary = `PDF Document: ${file.fileName} (${fileSizeKB} KB) - Successfully uploaded and indexed. This appears to be a scanned document with limited text extraction. The document is available in the knowledge base and can be referenced in conversations.`;
+        } else if (extractionMethod === 'pdf_extraction_failed') {
+          // For PDFs where extraction failed, create appropriate summary
+          console.log(`Creating failed PDF summary for: ${file.fileName}`);
+          const fileSizeKB = Math.round(file.size / 1024);
+          summary = `PDF Document: ${file.fileName} (${fileSizeKB} KB) - Successfully uploaded and indexed but text extraction failed. The document is available in the knowledge base and can be referenced in conversations.`;
         } else if (extractedText.length > 5000) {
           console.log(`Skipping AI summary generation for large file: ${file.fileName} (${extractedText.length} chars)`);
           // Create a basic text-based summary instead
