@@ -728,23 +728,48 @@ Status: ${doc.status || 'Unknown'}`;
       // Fallback to document summaries
       console.log('Building context from document summaries (keyword search fallback)');
       documentContext = relevantDocuments.map(doc => {
-        let context = `**${doc.document_name}** (${doc.document_number} v${doc.major_version}.${doc.minor_version})
+        // Handle both Veeva and uploaded documents
+        const isVeevaDoc = doc.source_type === 'veeva';
+        const isUploadedDoc = doc.source_type === 'upload';
+        
+        let context = '';
+        
+        if (isVeevaDoc) {
+          context = `**${doc.document_name}** (${doc.document_number} v${doc.major_version}.${doc.minor_version})
 Type: ${doc.document_type || 'Unknown'}
 Status: ${doc.status || 'Unknown'}`;
 
-        // Add AI summary if available
-        if (doc.summary) {
-          context += `\nAI Summary: ${doc.summary}`;
-        }
+          // Add AI summary if available
+          if (doc.summary) {
+            context += `\nAI Summary: ${doc.summary}`;
+          }
 
-        // Add manual summary if available
-        if (doc.manual_summary) {
-          context += `\nManual Summary: ${doc.manual_summary}`;
-        }
+          // Add manual summary if available
+          if (doc.manual_summary) {
+            context += `\nManual Summary: ${doc.manual_summary}`;
+          }
 
-        // If no summaries available
-        if (!doc.summary && !doc.manual_summary) {
-          context += `\nSummary: No summary available`;
+          // If no summaries available
+          if (!doc.summary && !doc.manual_summary) {
+            context += `\nSummary: No summary available`;
+          }
+        } else if (isUploadedDoc) {
+          const fileSizeKB = doc.file_size ? Math.round(doc.file_size / 1024) : 'Unknown';
+          context = `**${doc.document_name}** (Uploaded Document)
+Type: ${doc.document_type || 'uploaded_document'}
+File Size: ${fileSizeKB} KB
+Original Filename: ${doc.original_filename || doc.document_name}`;
+
+          // Add AI summary if available
+          if (doc.ai_summary) {
+            context += `\nAI Summary: ${doc.ai_summary}`;
+          } else {
+            context += `\nSummary: No AI summary available for this uploaded document.`;
+          }
+        } else {
+          // Fallback for unknown document types
+          context = `**${doc.document_name}** (${doc.source_type || 'unknown'} document)
+Type: ${doc.document_type || 'Unknown'}`;
         }
 
         context += '\n\n---';
