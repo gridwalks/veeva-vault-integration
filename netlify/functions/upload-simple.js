@@ -1,10 +1,11 @@
 import { Pool } from 'pg';
 import { OpenAI } from 'openai';
 import Groq from 'groq-sdk';
-import mammoth from 'mammoth';
-import { parseDocument } from 'docx-parser';
-import pdfParse from 'pdf-parse';
-import { chunkText, validateChunks } from './chunking-utils.js';
+// Dynamic imports to avoid test file issues
+// import mammoth from 'mammoth';
+// import { parseDocument } from 'docx-parser';
+// import pdfParse from 'pdf-parse';
+// import { chunkText, validateChunks } from './chunking-utils.js';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -41,13 +42,43 @@ function parseMultipartSimple(body, contentType) {
   }
 }
 
-// Simple text extraction
+// Simple text extraction with dynamic imports
 async function extractTextSimple(fileBuffer, fileName) {
   console.log(`Extracting text from ${fileName}`);
-  return {
-    text: fileBuffer.toString('utf-8'),
-    method: 'simple_utf8'
-  };
+  
+  try {
+    const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+    
+    if (fileExtension === 'pdf') {
+      // Dynamic import for PDF parsing
+      const pdfParse = await import('pdf-parse');
+      const pdfResult = await pdfParse.default(fileBuffer);
+      return {
+        text: pdfResult.text || 'No text extracted from PDF',
+        method: 'pdf_parse'
+      };
+    } else if (fileExtension === 'docx') {
+      // Dynamic import for DOCX parsing
+      const mammoth = await import('mammoth');
+      const result = await mammoth.default.extractRawText({ buffer: fileBuffer });
+      return {
+        text: result.value || 'No text extracted from DOCX',
+        method: 'mammoth'
+      };
+    } else {
+      // Default to UTF-8 for text files
+      return {
+        text: fileBuffer.toString('utf-8'),
+        method: 'simple_utf8'
+      };
+    }
+  } catch (error) {
+    console.error(`Error extracting text from ${fileName}:`, error);
+    return {
+      text: `Error extracting text from ${fileName}: ${error.message}`,
+      method: 'error'
+    };
+  }
 }
 
 // Simple summary generation

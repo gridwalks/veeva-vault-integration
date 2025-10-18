@@ -1,10 +1,11 @@
 import { Pool } from 'pg';
 import { OpenAI } from 'openai';
 import Groq from 'groq-sdk';
-import mammoth from 'mammoth';
-import { parseDocument } from 'docx-parser';
-import pdfParse from 'pdf-parse';
-import { chunkText, validateChunks } from './chunking-utils.js';
+// Dynamic imports to avoid test file issues
+// import mammoth from 'mammoth';
+// import { parseDocument } from 'docx-parser';
+// import pdfParse from 'pdf-parse';
+// import { chunkText, validateChunks } from './chunking-utils.js';
 // import { getStore } from '@netlify/blobs'; // Disabled for now
 
 const pool = new Pool({
@@ -109,7 +110,8 @@ async function extractTextFromFile(fileBuffer, fileName) {
       extractionMethod = 'utf8';
     } else if (fileExtension === 'pdf') {
       try {
-        const pdfResult = await pdfParse(fileBuffer);
+        const pdfParse = await import('pdf-parse');
+        const pdfResult = await pdfParse.default(fileBuffer);
         extractedText = (pdfResult.text || '').replace(/\u0000/g, '').trim();
 
         if (!extractedText) {
@@ -126,12 +128,14 @@ async function extractTextFromFile(fileBuffer, fileName) {
       }
     } else if (fileExtension === 'docx') {
       try {
-        const result = await mammoth.extractRawText({ buffer: fileBuffer });
+        const mammoth = await import('mammoth');
+        const result = await mammoth.default.extractRawText({ buffer: fileBuffer });
         extractedText = result.value;
         extractionMethod = 'mammoth';
       } catch (mammothError) {
         console.log('Mammoth failed, trying docx-parser...');
         try {
+          const { parseDocument } = await import('docx-parser');
           const docxResult = await parseDocument(fileBuffer);
           extractedText = docxResult.text || '';
           extractionMethod = 'docx_parser';
@@ -394,11 +398,12 @@ async function chunkAndEmbedDocument(
         console.log(`Document text length: ${documentText.length} chars`);
         console.log(`Starting chunking with 8192 tokens per chunk...`);
         
-    const rawChunks = chunkText(documentText, 8192, 400);
-    console.log(`Created ${rawChunks.length} raw chunks for ${fileName}`);
+        const { chunkText, validateChunks } = await import('./chunking-utils.js');
+        const rawChunks = chunkText(documentText, 8192, 400);
+        console.log(`Created ${rawChunks.length} raw chunks for ${fileName}`);
 
-    const chunks = validateChunks(rawChunks);
-    console.log(`Validated chunk count for ${fileName}: ${chunks.length}`);
+        const chunks = validateChunks(rawChunks);
+        console.log(`Validated chunk count for ${fileName}: ${chunks.length}`);
 
     if (chunks.length === 0) {
       console.log(`No valid chunks created for ${fileName}`);
