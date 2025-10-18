@@ -46,8 +46,55 @@ export const handler = async (event) => {
 
     console.log('Query parameters:', { limit, offset, search, userId });
 
-    // Get the blob store
-    const store = getStore(STORE_NAME);
+    // Get the blob store with proper configuration
+    let store;
+    try {
+      // Check if blob storage is properly configured
+      if (!process.env.NETLIFY_BLOBS_SITE_ID || !process.env.NETLIFY_BLOBS_TOKEN) {
+        console.warn('Blob storage not configured - missing NETLIFY_BLOBS_SITE_ID or NETLIFY_BLOBS_TOKEN');
+        return {
+          statusCode: 500,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS'
+          },
+          body: JSON.stringify({
+            success: false,
+            error: 'Blob storage not configured',
+            details: 'Missing required properties when creating a store: siteID, token'
+          })
+        };
+      }
+
+      console.log('Blob storage configuration found, initializing store...');
+      const siteID = process.env.NETLIFY_BLOBS_SITE_ID;
+      const token = process.env.NETLIFY_BLOBS_TOKEN;
+
+      store = await getStore({
+        name: STORE_NAME,
+        siteID,
+        token
+      });
+      console.log('Blob store retrieved successfully');
+    } catch (storeError) {
+      console.error('Error initializing blob store:', storeError);
+      return {
+        statusCode: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS'
+        },
+        body: JSON.stringify({
+          success: false,
+          error: 'Failed to initialize blob store',
+          details: storeError.message
+        })
+      };
+    }
     
     // List all blobs from the store
     console.log('Listing blobs from store:', STORE_NAME);
