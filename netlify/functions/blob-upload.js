@@ -186,24 +186,31 @@ async function processAndIndexDocument(fileBuffer, fileName, blobKey, userId = n
     }
     
     // Create document record
-    const documentId = randomUUID();
     const now = new Date().toISOString();
     
-    await pool.query(`
+    const documentResult = await pool.query(`
       INSERT INTO qms_chat_documents 
-      (id, document_name, document_type, version, document_number, user_id, created_at, updated_at, source)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      (document_name, document_type, version, content, ai_summary, file_size, extraction_method, source_type, blob_url, original_filename, mime_type, user_id, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING id
     `, [
-      documentId,
       fileName,
-      'uploaded',
+      'uploaded_document',
       '1.0',
-      `UPLOAD-${Date.now()}`,
+      extractedText,
+      null, // ai_summary will be generated later
+      buffer.length,
+      extractionMethod,
+      'upload',
+      blobKey,
+      fileName,
+      contentType,
       userId,
       now,
-      now,
-      'blob_upload'
+      now
     ]);
+    
+    const documentId = documentResult.rows[0].id;
     
     // Chunk the text
     const chunks = chunkText(extractedText, 1000, 200); // 1000 chars, 200 overlap
