@@ -29,11 +29,21 @@ function ensureApiKey() {
 function buildUrl(path, apiKey, params = {}) {
   const url = new URL(`${API_BASE_URL}${path}`);
   url.searchParams.set('api_key', apiKey);
+
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
       url.searchParams.set(key, String(value));
     }
   });
+
+  if (params.lastModifiedStart) {
+    const encoded = encodeURIComponent(String(params.lastModifiedStart));
+    url.search = url.search.replace(
+      `lastModifiedStart=${encoded}`,
+      `lastModifiedStart=${String(params.lastModifiedStart)}`
+    );
+  }
+
   return url;
 }
 
