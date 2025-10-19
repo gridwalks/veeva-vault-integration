@@ -135,6 +135,8 @@ async function fetchTitlePackages(apiKey) {
     console.log('CFR API request URL:', url.toString());
     console.log('URL search params:', Object.fromEntries(url.searchParams.entries()));
     console.log('URL search params count:', url.searchParams.size);
+    console.log('API_BASE_URL:', API_BASE_URL);
+    console.log('path:', path);
 
     console.log('Making request to eCFR API...');
     const response = await fetch(url.toString(), {
