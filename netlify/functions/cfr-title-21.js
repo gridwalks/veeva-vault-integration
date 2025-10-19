@@ -18,6 +18,21 @@ const RESPONSE_HEADERS = {
 // triggering the "Use proper date format" validation error.
 const DEFAULT_LAST_MODIFIED_START = '1900-01-01T00:00:00Z';
 
+function isTitle21Package(pkg) {
+  if (!pkg) {
+    return false;
+  }
+
+  const titleText = (pkg.title || '').toString().toLowerCase();
+  const packageId = (pkg.packageId || '').toString().toLowerCase();
+
+  return (
+    titleText.includes(`title ${TITLE_NUMBER}`) ||
+    titleText.includes('food and drugs') ||
+    packageId.includes(`title${TITLE_NUMBER}`)
+  );
+}
+
 function getApiKey() {
   return process.env.GPO_API_KEY || process.env.API_GOVINFO_KEY;
 }
@@ -96,6 +111,8 @@ async function fetchTitlePackages(apiKey, { lastModifiedStart } = {}) {
   const path = `/collections/CFR/${encodeURIComponent(effectiveStart)}`;
   let offset = 0;
   let totalCount = null;
+  let rawPackageCount = 0;
+  let filteredOutCount = 0;
   const packages = [];
 
   while (true) {
@@ -107,9 +124,13 @@ async function fetchTitlePackages(apiKey, { lastModifiedStart } = {}) {
 
     const data = await fetchJson(url, apiKey);
     const pagePackages = data.packages || [];
+    const title21Packages = pagePackages.filter(isTitle21Package);
+
+    rawPackageCount += pagePackages.length;
+    filteredOutCount += pagePackages.length - title21Packages.length;
 
     packages.push(
-      ...pagePackages.map(pkg => ({
+      ...title21Packages.map(pkg => ({
         packageId: pkg.packageId || null,
         title: pkg.title || null,
         collectionCode: pkg.collectionCode || pkg.collection || null,
@@ -121,13 +142,13 @@ async function fetchTitlePackages(apiKey, { lastModifiedStart } = {}) {
       }))
     );
 
-    totalCount = data.count ?? totalCount ?? packages.length;
+    totalCount = data.count ?? totalCount ?? rawPackageCount;
 
     if (!pagePackages.length) {
       break;
     }
 
-    if (packages.length >= totalCount) {
+    if (totalCount !== null && rawPackageCount >= totalCount) {
       break;
     }
 
@@ -138,7 +159,9 @@ async function fetchTitlePackages(apiKey, { lastModifiedStart } = {}) {
     title: TITLE_NUMBER,
     lastModifiedStart: effectiveStart,
     totalPackages: packages.length,
-    expectedTotal: totalCount ?? packages.length,
+    totalPackagesBeforeFilter: rawPackageCount,
+    filteredOutCount,
+    expectedTotal: totalCount ?? rawPackageCount,
     packages
   };
 }

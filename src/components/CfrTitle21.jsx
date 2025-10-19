@@ -25,8 +25,10 @@ export default function CfrTitle21() {
       setPackages(data.packages || []);
       setSummary({
         totalPackages: data.totalPackages || data.packages?.length || 0,
-        expectedTotal: data.expectedTotal || data.totalPackages || data.packages?.length || 0,
-        retrievedAt: data.retrievedAt
+        expectedTotal: data.expectedTotal || data.totalPackagesBeforeFilter || data.totalPackages || data.packages?.length || 0,
+        retrievedAt: data.retrievedAt,
+        totalPackagesBeforeFilter: data.totalPackagesBeforeFilter ?? null,
+        filteredOutCount: data.filteredOutCount || 0
       });
     } catch (err) {
       console.error("Failed to load CFR Title 21 packages", err);
@@ -124,7 +126,13 @@ export default function CfrTitle21() {
 
         {summary && (
           <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-            <SummaryItem label="Volumes Loaded" value={summary.totalPackages} />
+            <SummaryItem label="Title 21 Volumes" value={summary.totalPackages} />
+            {summary.totalPackagesBeforeFilter != null && (
+              <SummaryItem label="Total Volumes Retrieved" value={summary.totalPackagesBeforeFilter} />
+            )}
+            {summary.filteredOutCount > 0 && (
+              <SummaryItem label="Non-Title 21 Discarded" value={summary.filteredOutCount} />
+            )}
             <SummaryItem label="Expected Volumes" value={summary.expectedTotal} />
             {summary.retrievedAt && (
               <SummaryItem label="Last Updated" value={new Date(summary.retrievedAt).toLocaleString()} />
@@ -146,7 +154,7 @@ export default function CfrTitle21() {
             }}
           />
           <div style={{ fontSize: "12px", color: "#6b7280", alignSelf: "center" }}>
-            Showing {filteredPackages.length} of {packages.length} volumes
+            Showing {filteredPackages.length} of {packages.length} Title 21 volumes
           </div>
         </div>
       </div>
