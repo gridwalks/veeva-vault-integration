@@ -85,7 +85,27 @@ async function fetchJson(url, apiKey) {
   return response.json();
 }
 
-function mapGranule(granule) {
+function buildGovInfoDetailsUrl({ packageId, granuleId = null }) {
+  if (!packageId) {
+    return null;
+  }
+
+  if (granuleId) {
+    return `https://www.govinfo.gov/app/details/${packageId}/${granuleId}`;
+  }
+
+  return `https://www.govinfo.gov/app/details/${packageId}`;
+}
+
+function buildGovInfoPdfUrl({ packageId, granuleId = null }) {
+  if (!packageId || !granuleId) {
+    return null;
+  }
+
+  return `https://www.govinfo.gov/content/pkg/${packageId}/pdf/${granuleId}.pdf`;
+}
+
+function mapGranule(granule, packageId) {
   if (!granule) {
     return null;
   }
@@ -98,8 +118,16 @@ function mapGranule(granule) {
     title: granule.title || null,
     granuleClass: granule.granuleClass || null,
     dateIssued: granule.dateIssued || granule.issueDate || null,
-    detailsLink: granule.detailsLink || granule.granuleLink || links.details || null,
-    pdfLink: granule.pdfLink || download.pdf || links.pdf || null,
+    detailsLink:
+      granule.detailsLink ||
+      granule.granuleLink ||
+      links.details ||
+      buildGovInfoDetailsUrl({ packageId, granuleId: granule.granuleId }),
+    pdfLink:
+      granule.pdfLink ||
+      download.pdf ||
+      links.pdf ||
+      buildGovInfoPdfUrl({ packageId, granuleId: granule.granuleId }),
     htmlLink: granule.htmlLink || download.html || links.html || null,
     xmlLink: granule.xmlLink || download.xml || links.xml || null,
     txtLink: granule.txtLink || download.txt || download.text || links.txt || links.text || null
@@ -137,7 +165,7 @@ async function fetchTitlePackages(apiKey, { lastModifiedStart } = {}) {
         lastModified: pkg.lastModified || null,
         dateIssued: pkg.dateIssued || null,
         packageLink: pkg.packageLink || null,
-        detailsLink: pkg.detailsLink || null,
+        detailsLink: pkg.detailsLink || buildGovInfoDetailsUrl({ packageId: pkg.packageId }),
         granuleCount: pkg.granuleCount || null
       }))
     );
@@ -191,7 +219,9 @@ async function fetchPackageGranules(apiKey, packageId) {
     });
 
     const data = await fetchJson(url, apiKey);
-    const pageGranules = (data.granules || []).map(mapGranule).filter(Boolean);
+    const pageGranules = (data.granules || [])
+      .map(granule => mapGranule(granule, packageId))
+      .filter(Boolean);
 
     granules.push(...pageGranules);
     totalCount = data.count ?? totalCount ?? granules.length;
