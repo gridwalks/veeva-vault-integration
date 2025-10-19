@@ -92,16 +92,17 @@ function mapGranule(granule) {
 }
 
 async function fetchTitlePackages(apiKey, { lastModifiedStart } = {}) {
+  const effectiveStart = lastModifiedStart || DEFAULT_LAST_MODIFIED_START;
+  const path = `/collections/CFR/${encodeURIComponent(effectiveStart)}`;
   let offset = 0;
   let totalCount = null;
   const packages = [];
 
   while (true) {
-    const url = buildUrl('/collections/CFR', apiKey, {
+    const url = buildUrl(path, apiKey, {
       offset,
       pageSize: PACKAGE_PAGE_SIZE,
-      title: TITLE_NUMBER,
-      lastModifiedStart
+      title: TITLE_NUMBER
     });
 
     const data = await fetchJson(url, apiKey);
@@ -135,6 +136,7 @@ async function fetchTitlePackages(apiKey, { lastModifiedStart } = {}) {
 
   return {
     title: TITLE_NUMBER,
+    lastModifiedStart: effectiveStart,
     totalPackages: packages.length,
     expectedTotal: totalCount ?? packages.length,
     packages
