@@ -262,7 +262,7 @@ function missingApiKeyResponse() {
 }
 
 export const handler = async (event) => {
-  console.log('=== CFR Title 21 handler invoked ===', {
+  console.log('=== CFR Title 21 handler invoked (updated) ===', {
     method: event.httpMethod,
     path: event.path,
     query: event.queryStringParameters
