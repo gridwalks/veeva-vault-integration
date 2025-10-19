@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://www.ecfr.gov/api/v1';
+const API_BASE_URL = 'https://www.ecfr.gov/api';
 const TITLE_NUMBER = '21';
 const PACKAGE_PAGE_SIZE = 100;
 // GovInfo API enforces a maximum granule page size of 100. Larger values
