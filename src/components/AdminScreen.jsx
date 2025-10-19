@@ -7,7 +7,7 @@ import ExternalResources from "./ExternalResources.jsx";
 import QAManagement from "./QAManagement.jsx";
 import WorkflowManagement from "./WorkflowManagement.jsx";
 import IndexingLogs from "./IndexingLogs.jsx";
-import CfrTitle22 from "./CfrTitle22.jsx";
+import CfrTitle21 from "./CfrTitle21.jsx";
 
 export default function AdminScreen({ userId }) {
   const [q, setQ] = useState("");
@@ -257,7 +257,7 @@ export default function AdminScreen({ userId }) {
         </button>
         <button
           onClick={() => {
-            console.log('Switching to CFR Title 22 tab');
+            console.log('Switching to CFR Title 21 tab');
             setActiveTab("cfr");
           }}
           style={{
@@ -273,7 +273,7 @@ export default function AdminScreen({ userId }) {
             transition: 'all 0.2s ease'
           }}
         >
-          CFR Title 22
+          CFR Title 21
         </button>
         <button
           onClick={() => {
@@ -501,7 +501,7 @@ export default function AdminScreen({ userId }) {
       ) : activeTab === "external" ? (
         <ExternalResources />
       ) : activeTab === "cfr" ? (
-        <CfrTitle22 />
+        <CfrTitle21 />
       ) : activeTab === "qa" ? (
         <QAManagement />
       ) : activeTab === "workflow" ? (
