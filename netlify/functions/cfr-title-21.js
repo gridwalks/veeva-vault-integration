@@ -315,16 +315,27 @@ export const handler = async (event) => {
   try {
     const apiKey = ensureApiKey(); // Optional for eCFR API
     const packageId = event.queryStringParameters?.packageId;
+    console.log('CFR Title 21 handler invoked with packageId:', packageId);
+    console.log('Query parameters:', event.queryStringParameters);
     // eCFR API doesn't use lastModifiedStart parameter
 
     if (packageId) {
       console.log('Fetching granules for package', { packageId });
-      const details = await fetchPackageGranules(apiKey, packageId);
-      return createResponse(200, {
-        success: true,
-        retrievedAt: new Date().toISOString(),
-        ...details
-      });
+      try {
+        const details = await fetchPackageGranules(apiKey, packageId);
+        return createResponse(200, {
+          success: true,
+          retrievedAt: new Date().toISOString(),
+          ...details
+        });
+      } catch (error) {
+        console.error('Error fetching granules:', error);
+        return createResponse(500, {
+          success: false,
+          error: error.message,
+          packageId
+        });
+      }
     }
 
     console.log('Fetching CFR Title 21 package list');
