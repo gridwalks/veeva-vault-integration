@@ -135,25 +135,38 @@ async function fetchTitlePackages(apiKey) {
     console.log('CFR API request URL:', url.toString());
     console.log('URL search params:', Object.fromEntries(url.searchParams.entries()));
 
+    console.log('Making request to eCFR API...');
     const response = await fetch(url.toString(), {
       headers: {
         'User-Agent': 'veeva-vault-integration/1.0 (+https://github.com/)'
       }
     });
     
+    console.log('eCFR API response status:', response.status);
+    
     if (!response.ok) {
       throw new Error(`Request failed with status ${response.status}`);
     }
     
-    const xmlText = await response.text();
+    console.log('eCFR API response received, processing...');
+    
     // For now, return a simple response indicating we got the XML
+    // Don't try to parse the large XML response yet
     const pagePackages = [{ 
       title: 'CFR Title 21 - Food and Drugs',
       packageId: 'title-21',
       description: 'Electronic Code of Federal Regulations Title 21',
-      url: 'https://www.ecfr.gov/title-21'
+      url: 'https://www.ecfr.gov/title-21',
+      lastModified: new Date().toISOString(),
+      dateIssued: '2024-01-01',
+      collectionCode: 'CFR',
+      packageLink: 'https://www.ecfr.gov/title-21',
+      detailsLink: 'https://www.ecfr.gov/title-21',
+      granuleCount: null
     }];
     const title21Packages = pagePackages;
+    
+    console.log('Processed pagePackages:', pagePackages.length);
 
     rawPackageCount += pagePackages.length;
     filteredOutCount += pagePackages.length - title21Packages.length;
@@ -316,7 +329,8 @@ export const handler = async (event) => {
       message: error.message,
       statusCode: error.statusCode,
       url: error.url,
-      details: error.details
+      details: error.details,
+      stack: error.stack
     });
 
     const status = error.statusCode && Number.isInteger(error.statusCode)
@@ -327,7 +341,8 @@ export const handler = async (event) => {
       success: false,
       error: error.message,
       code: error.code || 'CFR_API_ERROR',
-      details: error.details || null
+      details: error.details || null,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
