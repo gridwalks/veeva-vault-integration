@@ -280,7 +280,7 @@ function missingApiKeyResponse() {
 }
 
 export const handler = async (event) => {
-  console.log('=== CFR Title 21 handler invoked (v2) ===', {
+  console.log('=== CFR Title 21 handler invoked (v3) ===', {
     method: event.httpMethod,
     path: event.path,
     query: event.queryStringParameters,
@@ -303,6 +303,15 @@ export const handler = async (event) => {
   }
 
   try {
+    // Simple test response first
+    if (event.queryStringParameters?.test === 'true') {
+      return createResponse(200, {
+        success: true,
+        message: 'CFR Title 21 test response',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
     const apiKey = ensureApiKey(); // Optional for eCFR API
     const packageId = event.queryStringParameters?.packageId;
     // eCFR API doesn't use lastModifiedStart parameter
