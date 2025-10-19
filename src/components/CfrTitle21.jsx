@@ -265,51 +265,7 @@ export default function CfrTitle21() {
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "320px", overflow: "auto" }}>
                         {details.granules.map(granule => (
-                          <div
-                            key={granule.granuleId || granule.title}
-                            style={{
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "4px",
-                              padding: "8px",
-                              backgroundColor: "#ffffff"
-                            }}
-                          >
-                            <div style={{ fontSize: "13px", fontWeight: 600, color: "#1f2937", marginBottom: "4px" }}>
-                              {granule.title || granule.granuleId || "Untitled Section"}
-                            </div>
-                            <div style={{ display: "flex", gap: "12px", fontSize: "11px", color: "#6b7280", flexWrap: "wrap" }}>
-                              {granule.granuleId && <span>ID: {granule.granuleId}</span>}
-                              {granule.granuleClass && <span>Type: {granule.granuleClass}</span>}
-                              {granule.dateIssued && <span>Issued: {new Date(granule.dateIssued).toLocaleDateString()}</span>}
-                            </div>
-                            <div style={{ display: "flex", gap: "12px", fontSize: "11px", marginTop: "6px", flexWrap: "wrap" }}>
-                              {granule.detailsLink && (
-                                <a href={granule.detailsLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
-                                  View Details
-                                </a>
-                              )}
-                              {granule.pdfLink && (
-                                <a href={granule.pdfLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
-                                  PDF
-                                </a>
-                              )}
-                              {granule.htmlLink && (
-                                <a href={granule.htmlLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
-                                  HTML
-                                </a>
-                              )}
-                              {granule.txtLink && (
-                                <a href={granule.txtLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
-                                  Text
-                                </a>
-                              )}
-                              {granule.xmlLink && (
-                                <a href={granule.xmlLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
-                                  XML
-                                </a>
-                              )}
-                            </div>
-                          </div>
+                          <GranuleItem key={granule.granuleId || granule.title} granule={granule} />
                         ))}
                       </div>
                     </>
@@ -333,6 +289,171 @@ export default function CfrTitle21() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function GranuleItem({ granule }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const hasSubchapters = granule.subchapters && granule.subchapters.length > 0;
+  const hasParts = granule.parts && granule.parts.length > 0;
+
+  return (
+    <div
+      style={{
+        border: "1px solid #e5e7eb",
+        borderRadius: "4px",
+        backgroundColor: "#ffffff"
+      }}
+    >
+      <div
+        style={{
+          padding: "8px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "4px"
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: "13px", fontWeight: 600, color: "#1f2937" }}>
+            {granule.title || granule.granuleId || "Untitled Section"}
+          </div>
+          {hasSubchapters && (
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              style={{
+                padding: "2px 6px",
+                fontSize: "10px",
+                borderRadius: "3px",
+                border: "1px solid #d1d5db",
+                backgroundColor: isExpanded ? "#eef2ff" : "#f9fafb",
+                color: "#4338ca",
+                cursor: "pointer"
+              }}
+            >
+              {isExpanded ? "Hide" : "Show"} Subchapters
+            </button>
+          )}
+        </div>
+        
+        <div style={{ display: "flex", gap: "12px", fontSize: "11px", color: "#6b7280", flexWrap: "wrap" }}>
+          {granule.granuleId && <span>ID: {granule.granuleId}</span>}
+          {granule.granuleClass && <span>Type: {granule.granuleClass}</span>}
+          {granule.dateIssued && <span>Issued: {new Date(granule.dateIssued).toLocaleDateString()}</span>}
+        </div>
+        
+        <div style={{ display: "flex", gap: "12px", fontSize: "11px", marginTop: "6px", flexWrap: "wrap" }}>
+          {granule.detailsLink && (
+            <a href={granule.detailsLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
+              View Details
+            </a>
+          )}
+          {granule.pdfLink && (
+            <a href={granule.pdfLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
+              PDF
+            </a>
+          )}
+          {granule.htmlLink && (
+            <a href={granule.htmlLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
+              HTML
+            </a>
+          )}
+          {granule.txtLink && (
+            <a href={granule.txtLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
+              Text
+            </a>
+          )}
+          {granule.xmlLink && (
+            <a href={granule.xmlLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
+              XML
+            </a>
+          )}
+        </div>
+      </div>
+
+      {isExpanded && hasSubchapters && (
+        <div style={{ borderTop: "1px solid #e5e7eb", padding: "8px", backgroundColor: "#f9fafb" }}>
+          <div style={{ fontSize: "11px", color: "#4b5563", marginBottom: "6px", fontWeight: 600 }}>
+            Subchapters ({granule.subchapters.length}):
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {granule.subchapters.map(subchapter => (
+              <div
+                key={subchapter.granuleId || subchapter.title}
+                style={{
+                  border: "1px solid #d1d5db",
+                  borderRadius: "3px",
+                  padding: "6px",
+                  backgroundColor: "#ffffff"
+                }}
+              >
+                <div style={{ fontSize: "12px", fontWeight: 600, color: "#1f2937", marginBottom: "3px" }}>
+                  {subchapter.title || subchapter.granuleId}
+                </div>
+                <div style={{ display: "flex", gap: "8px", fontSize: "10px", color: "#6b7280", flexWrap: "wrap" }}>
+                  {subchapter.granuleId && <span>ID: {subchapter.granuleId}</span>}
+                  {subchapter.granuleClass && <span>Type: {subchapter.granuleClass}</span>}
+                  {subchapter.dateIssued && <span>Issued: {new Date(subchapter.dateIssued).toLocaleDateString()}</span>}
+                </div>
+                <div style={{ display: "flex", gap: "8px", fontSize: "10px", marginTop: "4px", flexWrap: "wrap" }}>
+                  {subchapter.detailsLink && (
+                    <a href={subchapter.detailsLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
+                      View Details
+                    </a>
+                  )}
+                  {subchapter.htmlLink && (
+                    <a href={subchapter.htmlLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
+                      HTML
+                    </a>
+                  )}
+                </div>
+                
+                {subchapter.parts && subchapter.parts.length > 0 && (
+                  <div style={{ marginTop: "6px" }}>
+                    <div style={{ fontSize: "10px", color: "#4b5563", marginBottom: "4px", fontWeight: 600 }}>
+                      Parts ({subchapter.parts.length}):
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      {subchapter.parts.map(part => (
+                        <div
+                          key={part.granuleId || part.title}
+                          style={{
+                            border: "1px solid #e5e7eb",
+                            borderRadius: "2px",
+                            padding: "4px",
+                            backgroundColor: "#f9fafb"
+                          }}
+                        >
+                          <div style={{ fontSize: "11px", fontWeight: 600, color: "#1f2937", marginBottom: "2px" }}>
+                            {part.title || part.granuleId}
+                          </div>
+                          <div style={{ display: "flex", gap: "6px", fontSize: "9px", color: "#6b7280", flexWrap: "wrap" }}>
+                            {part.granuleId && <span>ID: {part.granuleId}</span>}
+                            {part.granuleClass && <span>Type: {part.granuleClass}</span>}
+                            {part.dateIssued && <span>Issued: {new Date(part.dateIssued).toLocaleDateString()}</span>}
+                          </div>
+                          <div style={{ display: "flex", gap: "6px", fontSize: "9px", marginTop: "3px", flexWrap: "wrap" }}>
+                            {part.detailsLink && (
+                              <a href={part.detailsLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
+                                View Details
+                              </a>
+                            )}
+                            {part.htmlLink && (
+                              <a href={part.htmlLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
+                                HTML
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
