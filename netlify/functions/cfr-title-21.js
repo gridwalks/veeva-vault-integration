@@ -119,7 +119,7 @@ async function fetchTitlePackages(apiKey, { lastModifiedStart } = {}) {
     const url = buildUrl(path, apiKey, {
       offset,
       pageSize: PACKAGE_PAGE_SIZE,
-      title: TITLE_NUMBER
+      lastModifiedStart: effectiveStart
     });
 
     const data = await fetchJson(url, apiKey);
