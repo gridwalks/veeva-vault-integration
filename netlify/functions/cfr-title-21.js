@@ -97,9 +97,10 @@ async function fetchTitlePackages(apiKey, { lastModifiedStart } = {}) {
   const packages = [];
 
   while (true) {
-    const url = buildUrl(`/collections/CFR/title/${TITLE_NUMBER}`, apiKey, {
+    const url = buildUrl('/collections/CFR', apiKey, {
       offset,
       pageSize: PACKAGE_PAGE_SIZE,
+      title: TITLE_NUMBER,
       lastModifiedStart
     });
 
