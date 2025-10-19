@@ -7,6 +7,7 @@ import ExternalResources from "./ExternalResources.jsx";
 import QAManagement from "./QAManagement.jsx";
 import WorkflowManagement from "./WorkflowManagement.jsx";
 import IndexingLogs from "./IndexingLogs.jsx";
+import CfrTitle22 from "./CfrTitle22.jsx";
 
 export default function AdminScreen({ userId }) {
   const [q, setQ] = useState("");
@@ -256,6 +257,26 @@ export default function AdminScreen({ userId }) {
         </button>
         <button
           onClick={() => {
+            console.log('Switching to CFR Title 22 tab');
+            setActiveTab("cfr");
+          }}
+          style={{
+            padding: '6px 12px',
+            backgroundColor: activeTab === "cfr" ? '#4338ca' : '#f3f4f6',
+            color: activeTab === "cfr" ? 'white' : '#374151',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: '500',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          CFR Title 22
+        </button>
+        <button
+          onClick={() => {
             console.log('Switching to Q&A management tab');
             setActiveTab("qa");
           }}
@@ -479,6 +500,8 @@ export default function AdminScreen({ userId }) {
         />
       ) : activeTab === "external" ? (
         <ExternalResources />
+      ) : activeTab === "cfr" ? (
+        <CfrTitle22 />
       ) : activeTab === "qa" ? (
         <QAManagement />
       ) : activeTab === "workflow" ? (
