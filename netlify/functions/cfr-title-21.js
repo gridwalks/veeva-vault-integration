@@ -44,16 +44,8 @@ function ensureApiKey() {
 function buildUrl(path, apiKey, params = {}) {
   const url = new URL(`${API_BASE_URL}${path}`);
   
-  // eCFR API doesn't require API key, but keep for backward compatibility
-  if (apiKey) {
-    url.searchParams.set('api_key', apiKey);
-  }
-
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      url.searchParams.set(key, String(value));
-    }
-  });
+  // eCFR API doesn't require API key or additional parameters for versioner endpoint
+  // Only add parameters if they are explicitly needed
 
   return url;
 }
