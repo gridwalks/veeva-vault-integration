@@ -267,12 +267,201 @@ async function fetchPackageGranules(apiKey, packageId) {
               govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
             },
             {
+              granuleId: 'part-3',
+              title: 'Part 3 - Product Jurisdiction',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-3',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-3',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-4',
+              title: 'Part 4 - Regulation of Combination Products',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-4',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-4',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-5',
+              title: 'Part 5 - Organization',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-5',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-5',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-7',
+              title: 'Part 7 - Enforcement Policy',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-7',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-7',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-10',
+              title: 'Part 10 - Administrative Practices and Procedures',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-10',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-10',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
               granuleId: 'part-11',
               title: 'Part 11 - Electronic Records; Electronic Signatures',
               granuleClass: 'part',
               dateIssued: '2024-01-01',
               detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-11',
               htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-11',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-12',
+              title: 'Part 12 - Formal Evidentiary Public Hearing',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-12',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-12',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-13',
+              title: 'Part 13 - Public Hearing Before a Public Board of Inquiry',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-13',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-13',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-14',
+              title: 'Part 14 - Public Hearing Before a Public Advisory Committee',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-14',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-14',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-15',
+              title: 'Part 15 - Public Hearing Before a Public Advisory Committee; Public Advisory Committee for Policy Development',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-15',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-15',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-16',
+              title: 'Part 16 - Regulatory Hearing Before the Food and Drug Administration',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-16',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-16',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-17',
+              title: 'Part 17 - Civil Money Penalties Hearings',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-17',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-17',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-19',
+              title: 'Part 19 - Standards of Conduct and Referral of Known or Suspected Criminal Violations',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-19',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-19',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-20',
+              title: 'Part 20 - Public Information',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-20',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-20',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-21',
+              title: 'Part 21 - Protection of Privacy',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-21',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-21',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-25',
+              title: 'Part 25 - Environmental Impact Considerations',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-25',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-25',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-26',
+              title: 'Part 26 - Mutual Recognition of Pharmaceutical Good Manufacturing Practice Reports, Medical Device Quality System Audit Reports, and Certain Medical Device Product Evaluation Reports: United States and the European Community',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-26',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-26',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-50',
+              title: 'Part 50 - Protection of Human Subjects',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-50',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-50',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-54',
+              title: 'Part 54 - Financial Disclosure by Clinical Investigators',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-54',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-54',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-56',
+              title: 'Part 56 - Institutional Review Boards',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-56',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-56',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-58',
+              title: 'Part 58 - Good Laboratory Practice for Nonclinical Laboratory Studies',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-58',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-58',
+              govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
+            },
+            {
+              granuleId: 'part-60',
+              title: 'Part 60 - Patent Term Restoration',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-60',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-60',
               govInfoLink: 'https://api.govinfo.gov/packages/CFR-2024-title21-vol1/htmldoc'
             }
           ]
@@ -302,12 +491,468 @@ async function fetchPackageGranules(apiKey, packageId) {
               htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-101'
             },
             {
+              granuleId: 'part-102',
+              title: 'Part 102 - Common or Usual Name for Nonstandardized Foods',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-102',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-102'
+            },
+            {
+              granuleId: 'part-103',
+              title: 'Part 103 - Quality Standards for Foods with No Identity Standards',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-103',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-103'
+            },
+            {
+              granuleId: 'part-104',
+              title: 'Part 104 - Nutritional Quality Guidelines for Foods',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-104',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-104'
+            },
+            {
+              granuleId: 'part-105',
+              title: 'Part 105 - Foods for Special Dietary Use',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-105',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-105'
+            },
+            {
+              granuleId: 'part-106',
+              title: 'Part 106 - Infant Formula Quality Control Procedures',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-106',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-106'
+            },
+            {
+              granuleId: 'part-107',
+              title: 'Part 107 - Exemptions from Infant Formula Requirements',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-107',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-107'
+            },
+            {
+              granuleId: 'part-108',
+              title: 'Part 108 - Emergency Permit Control',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-108',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-108'
+            },
+            {
+              granuleId: 'part-109',
+              title: 'Part 109 - Unavoidable Contaminants in Food for Human Consumption and Food-Packaging Material',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-109',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-109'
+            },
+            {
               granuleId: 'part-110',
               title: 'Part 110 - Current Good Manufacturing Practice in Manufacturing, Packing, or Holding Human Food',
               granuleClass: 'part',
               dateIssued: '2024-01-01',
               detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-110',
               htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-110'
+            },
+            {
+              granuleId: 'part-111',
+              title: 'Part 111 - Current Good Manufacturing Practice in Manufacturing, Packaging, Labeling, or Holding Operations for Dietary Supplements',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-111',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-111'
+            },
+            {
+              granuleId: 'part-112',
+              title: 'Part 112 - Standards for the Growing, Harvesting, Packing, and Holding of Produce for Human Consumption',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-112',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-112'
+            },
+            {
+              granuleId: 'part-113',
+              title: 'Part 113 - Thermally Processed Low-Acid Foods Packaged in Hermetically Sealed Containers',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-113',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-113'
+            },
+            {
+              granuleId: 'part-114',
+              title: 'Part 114 - Acidified Foods',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-114',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-114'
+            },
+            {
+              granuleId: 'part-115',
+              title: 'Part 115 - Shell Eggs',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-115',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-115'
+            },
+            {
+              granuleId: 'part-117',
+              title: 'Part 117 - Current Good Manufacturing Practice, Hazard Analysis, and Risk-Based Preventive Controls for Human Food',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-117',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-117'
+            },
+            {
+              granuleId: 'part-118',
+              title: 'Part 118 - Production, Storage, and Transportation of Shell Eggs',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-118',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-118'
+            },
+            {
+              granuleId: 'part-120',
+              title: 'Part 120 - Hazard Analysis and Critical Control Point (HACCP) Systems',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-120',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-120'
+            },
+            {
+              granuleId: 'part-123',
+              title: 'Part 123 - Fish and Fishery Products',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-123',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-123'
+            },
+            {
+              granuleId: 'part-129',
+              title: 'Part 129 - Processing and Bottling of Bottled Drinking Water',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-129',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-129'
+            },
+            {
+              granuleId: 'part-130',
+              title: 'Part 130 - Food Standards: General',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-130',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-130'
+            },
+            {
+              granuleId: 'part-131',
+              title: 'Part 131 - Milk and Cream',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-131',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-131'
+            },
+            {
+              granuleId: 'part-133',
+              title: 'Part 133 - Cheeses and Related Cheese Products',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-133',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-133'
+            },
+            {
+              granuleId: 'part-135',
+              title: 'Part 135 - Frozen Desserts',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-135',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-135'
+            },
+            {
+              granuleId: 'part-136',
+              title: 'Part 136 - Bakery Products',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-136',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-136'
+            },
+            {
+              granuleId: 'part-137',
+              title: 'Part 137 - Cereal Flours and Related Products',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-137',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-137'
+            },
+            {
+              granuleId: 'part-139',
+              title: 'Part 139 - Macaroni and Noodle Products',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-139',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-139'
+            },
+            {
+              granuleId: 'part-145',
+              title: 'Part 145 - Canned Fruits',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-145',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-145'
+            },
+            {
+              granuleId: 'part-146',
+              title: 'Part 146 - Canned Fruit Juices',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-146',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-146'
+            },
+            {
+              granuleId: 'part-150',
+              title: 'Part 150 - Fruit Butters, Jellies, Preserves, and Related Products',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-150',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-150'
+            },
+            {
+              granuleId: 'part-152',
+              title: 'Part 152 - Fruit Pies',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-152',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-152'
+            },
+            {
+              granuleId: 'part-155',
+              title: 'Part 155 - Canned Vegetables',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-155',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-155'
+            },
+            {
+              granuleId: 'part-156',
+              title: 'Part 156 - Vegetable Juices',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-156',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-156'
+            },
+            {
+              granuleId: 'part-158',
+              title: 'Part 158 - Frozen Vegetables',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-158',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-158'
+            },
+            {
+              granuleId: 'part-160',
+              title: 'Part 160 - Eggs and Egg Products',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-160',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-160'
+            },
+            {
+              granuleId: 'part-161',
+              title: 'Part 161 - Fish and Shellfish',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-161',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-161'
+            },
+            {
+              granuleId: 'part-163',
+              title: 'Part 163 - Cocoa Products',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-163',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-163'
+            },
+            {
+              granuleId: 'part-164',
+              title: 'Part 164 - Tree Nut and Peanut Products',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-164',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-164'
+            },
+            {
+              granuleId: 'part-165',
+              title: 'Part 165 - Beverages',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-165',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-165'
+            },
+            {
+              granuleId: 'part-166',
+              title: 'Part 166 - Margarine',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-166',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-166'
+            },
+            {
+              granuleId: 'part-168',
+              title: 'Part 168 - Sweeteners and Table Sirups',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-168',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-168'
+            },
+            {
+              granuleId: 'part-169',
+              title: 'Part 169 - Food Dressings and Flavorings',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-169',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-169'
+            },
+            {
+              granuleId: 'part-170',
+              title: 'Part 170 - Food Additives',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-170',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-170'
+            },
+            {
+              granuleId: 'part-171',
+              title: 'Part 171 - Food Additive Petitions',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-171',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-171'
+            },
+            {
+              granuleId: 'part-172',
+              title: 'Part 172 - Food Additives Permitted for Direct Addition to Food for Human Consumption',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-172',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-172'
+            },
+            {
+              granuleId: 'part-173',
+              title: 'Part 173 - Secondary Direct Food Additives Permitted in Food for Human Consumption',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-173',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-173'
+            },
+            {
+              granuleId: 'part-174',
+              title: 'Part 174 - Indirect Food Additives: General',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-174',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-174'
+            },
+            {
+              granuleId: 'part-175',
+              title: 'Part 175 - Indirect Food Additives: Adhesives and Components',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-175',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-175'
+            },
+            {
+              granuleId: 'part-176',
+              title: 'Part 176 - Indirect Food Additives: Paper and Paperboard Components',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-176',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-176'
+            },
+            {
+              granuleId: 'part-177',
+              title: 'Part 177 - Indirect Food Additives: Polymers',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-177',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-177'
+            },
+            {
+              granuleId: 'part-178',
+              title: 'Part 178 - Indirect Food Additives: Adjuvants, Production Aids, and Sanitizers',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-178',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-178'
+            },
+            {
+              granuleId: 'part-179',
+              title: 'Part 179 - Irradiation in the Production, Processing and Handling of Food',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-179',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-179'
+            },
+            {
+              granuleId: 'part-180',
+              title: 'Part 180 - Food Additives Permitted in Food or in Contact with Food on an Interim Basis Pending Additional Study',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-180',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-180'
+            },
+            {
+              granuleId: 'part-181',
+              title: 'Part 181 - Prior-Sanctioned Food Ingredients',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-181',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-181'
+            },
+            {
+              granuleId: 'part-182',
+              title: 'Part 182 - Substances Generally Recognized as Safe',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-182',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-182'
+            },
+            {
+              granuleId: 'part-184',
+              title: 'Part 184 - Direct Food Substances Affirmed as Generally Recognized as Safe',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-184',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-184'
+            },
+            {
+              granuleId: 'part-186',
+              title: 'Part 186 - Indirect Food Substances Affirmed as Generally Recognized as Safe',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-186',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-186'
+            },
+            {
+              granuleId: 'part-189',
+              title: 'Part 189 - Substances Prohibited from Use in Human Food',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-189',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-189'
+            },
+            {
+              granuleId: 'part-190',
+              title: 'Part 190 - Dietary Supplements',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-190',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-190'
             }
           ]
         },
