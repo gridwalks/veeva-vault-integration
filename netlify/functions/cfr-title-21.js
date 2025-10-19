@@ -14,9 +14,9 @@ const RESPONSE_HEADERS = {
 };
 
 // The collections endpoint requires a lastModifiedStart filter in ISO 8601 format.
-// Using an early default ensures we retrieve all historical packages without
-// triggering the "Use proper date format" validation error.
-const DEFAULT_LAST_MODIFIED_START = '1900-01-01T00:00:00Z';
+// Using a more recent default date to avoid potential API issues with very old dates.
+// Format: yyyy-MM-ddTHH:mm:ssZ (exactly as required by govinfo.gov API)
+const DEFAULT_LAST_MODIFIED_START = '2020-01-01T00:00:00Z';
 
 function isTitle21Package(pkg) {
   if (!pkg) {
@@ -51,14 +51,6 @@ function buildUrl(path, apiKey, params = {}) {
     }
   });
 
-  if (params.lastModifiedStart) {
-    const encoded = encodeURIComponent(String(params.lastModifiedStart));
-    url.search = url.search.replace(
-      `lastModifiedStart=${encoded}`,
-      `lastModifiedStart=${String(params.lastModifiedStart)}`
-    );
-  }
-
   return url;
 }
 
@@ -66,7 +58,6 @@ async function fetchJson(url, apiKey) {
   const start = Date.now();
   const response = await fetch(url.toString(), {
     headers: {
-      'X-Api-Key': apiKey,
       'User-Agent': 'veeva-vault-integration/1.0 (+https://github.com/)' // informational header for API providers
     }
   });
@@ -150,6 +141,9 @@ async function fetchTitlePackages(apiKey, { lastModifiedStart } = {}) {
       lastModifiedStart: effectiveStart
     });
 
+    console.log('CFR API request URL:', url.toString());
+    console.log('lastModifiedStart value:', effectiveStart);
+
     const data = await fetchJson(url, apiKey);
     const pagePackages = data.packages || [];
     const title21Packages = pagePackages.filter(isTitle21Package);
@@ -204,7 +198,10 @@ function formatGovInfoTimestamp(value) {
     throw error;
   }
 
-  return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+  // Format as yyyy-MM-ddTHH:mm:ssZ (exactly as required by govinfo.gov API)
+  // Remove milliseconds and ensure proper format
+  const isoString = date.toISOString();
+  return isoString.replace(/\.\d{3}Z$/, 'Z');
 }
 
 async function fetchPackageGranules(apiKey, packageId) {
