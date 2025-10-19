@@ -1,7 +1,9 @@
 const API_BASE_URL = 'https://api.govinfo.gov';
 const TITLE_NUMBER = '21';
 const PACKAGE_PAGE_SIZE = 100;
-const GRANULE_PAGE_SIZE = 200;
+// GovInfo API enforces a maximum granule page size of 100. Larger values
+// (e.g. 200) trigger a 400 response, so we stay within the documented limit.
+const GRANULE_PAGE_SIZE = 100;
 
 const RESPONSE_HEADERS = {
   'Content-Type': 'application/json',
