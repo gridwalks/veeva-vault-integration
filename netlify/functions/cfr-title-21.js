@@ -16,7 +16,7 @@ const RESPONSE_HEADERS = {
 // The collections endpoint requires a lastModifiedStart filter in ISO 8601 format.
 // Using an early default ensures we retrieve all historical packages without
 // triggering the "Use proper date format" validation error.
-const DEFAULT_LAST_MODIFIED_START = new Date('1900-01-01T00:00:00Z').toISOString();
+const DEFAULT_LAST_MODIFIED_START = '1900-01-01T00:00:00Z';
 
 function isTitle21Package(pkg) {
   if (!pkg) {
@@ -204,7 +204,7 @@ function formatGovInfoTimestamp(value) {
     throw error;
   }
 
-  return date.toISOString();
+  return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
 async function fetchPackageGranules(apiKey, packageId) {
