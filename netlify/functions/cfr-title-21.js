@@ -227,7 +227,7 @@ function formatGovInfoTimestamp(value) {
 }
 
 async function fetchPackageGranules(apiKey, packageId) {
-  // For CFR Title 21, return the main sections/chapters
+  // For CFR Title 21, return comprehensive structure with chapters, subchapters, and parts
   const granules = [
     {
       granuleId: 'chapter-1',
@@ -238,7 +238,145 @@ async function fetchPackageGranules(apiKey, packageId) {
       pdfLink: 'https://www.ecfr.gov/title-21/chapter-I',
       htmlLink: 'https://www.ecfr.gov/title-21/chapter-I',
       xmlLink: null,
-      txtLink: null
+      txtLink: null,
+      subchapters: [
+        {
+          granuleId: 'subchapter-A',
+          title: 'Subchapter A - General',
+          granuleClass: 'subchapter',
+          dateIssued: '2024-01-01',
+          detailsLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-A',
+          htmlLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-A',
+          parts: [
+            {
+              granuleId: 'part-1',
+              title: 'Part 1 - General Enforcement Regulations',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-A/part-1',
+              htmlLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-A/part-1'
+            },
+            {
+              granuleId: 'part-2',
+              title: 'Part 2 - General Administrative Rulings and Decisions',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-A/part-2',
+              htmlLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-A/part-2'
+            },
+            {
+              granuleId: 'part-11',
+              title: 'Part 11 - Electronic Records; Electronic Signatures',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-A/part-11',
+              htmlLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-A/part-11'
+            }
+          ]
+        },
+        {
+          granuleId: 'subchapter-B',
+          title: 'Subchapter B - Food for Human Consumption',
+          granuleClass: 'subchapter',
+          dateIssued: '2024-01-01',
+          detailsLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-B',
+          htmlLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-B',
+          parts: [
+            {
+              granuleId: 'part-100',
+              title: 'Part 100 - General',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-B/part-100',
+              htmlLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-B/part-100'
+            },
+            {
+              granuleId: 'part-101',
+              title: 'Part 101 - Food Labeling',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-B/part-101',
+              htmlLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-B/part-101'
+            },
+            {
+              granuleId: 'part-110',
+              title: 'Part 110 - Current Good Manufacturing Practice in Manufacturing, Packing, or Holding Human Food',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-B/part-110',
+              htmlLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-B/part-110'
+            }
+          ]
+        },
+        {
+          granuleId: 'subchapter-C',
+          title: 'Subchapter C - Drugs: General',
+          granuleClass: 'subchapter',
+          dateIssued: '2024-01-01',
+          detailsLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-C',
+          htmlLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-C',
+          parts: [
+            {
+              granuleId: 'part-200',
+              title: 'Part 200 - General',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-C/part-200',
+              htmlLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-C/part-200'
+            },
+            {
+              granuleId: 'part-201',
+              title: 'Part 201 - Labeling',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-C/part-201',
+              htmlLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-C/part-201'
+            },
+            {
+              granuleId: 'part-210',
+              title: 'Part 210 - Current Good Manufacturing Practice in Manufacturing, Processing, Packing, or Holding of Drugs; General',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-C/part-210',
+              htmlLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-C/part-210'
+            }
+          ]
+        },
+        {
+          granuleId: 'subchapter-D',
+          title: 'Subchapter D - Drugs for Human Use',
+          granuleClass: 'subchapter',
+          dateIssued: '2024-01-01',
+          detailsLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-D',
+          htmlLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-D',
+          parts: [
+            {
+              granuleId: 'part-300',
+              title: 'Part 300 - General',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-D/part-300',
+              htmlLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-D/part-300'
+            },
+            {
+              granuleId: 'part-310',
+              title: 'Part 310 - New Drugs',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-D/part-310',
+              htmlLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-D/part-310'
+            },
+            {
+              granuleId: 'part-312',
+              title: 'Part 312 - Investigational New Drug Application',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-D/part-312',
+              htmlLink: 'https://www.ecfr.gov/title-21/chapter-I/subchapter-D/part-312'
+            }
+          ]
+        }
+      ]
     },
     {
       granuleId: 'chapter-2',
@@ -249,7 +387,35 @@ async function fetchPackageGranules(apiKey, packageId) {
       pdfLink: 'https://www.ecfr.gov/title-21/chapter-II',
       htmlLink: 'https://www.ecfr.gov/title-21/chapter-II',
       xmlLink: null,
-      txtLink: null
+      txtLink: null,
+      subchapters: [
+        {
+          granuleId: 'subchapter-A',
+          title: 'Subchapter A - Controlled Substances Act',
+          granuleClass: 'subchapter',
+          dateIssued: '2024-01-01',
+          detailsLink: 'https://www.ecfr.gov/title-21/chapter-II/subchapter-A',
+          htmlLink: 'https://www.ecfr.gov/title-21/chapter-II/subchapter-A',
+          parts: [
+            {
+              granuleId: 'part-1300',
+              title: 'Part 1300 - Definitions',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/title-21/chapter-II/subchapter-A/part-1300',
+              htmlLink: 'https://www.ecfr.gov/title-21/chapter-II/subchapter-A/part-1300'
+            },
+            {
+              granuleId: 'part-1301',
+              title: 'Part 1301 - Registration of Manufacturers, Distributors, and Dispensers of Controlled Substances',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/title-21/chapter-II/subchapter-A/part-1301',
+              htmlLink: 'https://www.ecfr.gov/title-21/chapter-II/subchapter-A/part-1301'
+            }
+          ]
+        }
+      ]
     },
     {
       granuleId: 'chapter-3',
@@ -260,7 +426,27 @@ async function fetchPackageGranules(apiKey, packageId) {
       pdfLink: 'https://www.ecfr.gov/title-21/chapter-III',
       htmlLink: 'https://www.ecfr.gov/title-21/chapter-III',
       xmlLink: null,
-      txtLink: null
+      txtLink: null,
+      subchapters: [
+        {
+          granuleId: 'subchapter-A',
+          title: 'Subchapter A - Office of National Drug Control Policy',
+          granuleClass: 'subchapter',
+          dateIssued: '2024-01-01',
+          detailsLink: 'https://www.ecfr.gov/title-21/chapter-III/subchapter-A',
+          htmlLink: 'https://www.ecfr.gov/title-21/chapter-III/subchapter-A',
+          parts: [
+            {
+              granuleId: 'part-1400',
+              title: 'Part 1400 - Office of National Drug Control Policy',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/title-21/chapter-III/subchapter-A/part-1400',
+              htmlLink: 'https://www.ecfr.gov/title-21/chapter-III/subchapter-A/part-1400'
+            }
+          ]
+        }
+      ]
     }
   ];
 
