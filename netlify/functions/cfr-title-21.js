@@ -143,6 +143,7 @@ async function fetchTitlePackages(apiKey, { lastModifiedStart } = {}) {
 
     console.log('CFR API request URL:', url.toString());
     console.log('lastModifiedStart value:', effectiveStart);
+    console.log('URL search params:', Object.fromEntries(url.searchParams.entries()));
 
     const data = await fetchJson(url, apiKey);
     const pagePackages = data.packages || [];
