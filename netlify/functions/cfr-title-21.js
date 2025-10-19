@@ -16,7 +16,7 @@ const RESPONSE_HEADERS = {
 // The collections endpoint requires a lastModifiedStart filter in ISO 8601 format.
 // Using an early default ensures we retrieve all historical packages without
 // triggering the "Use proper date format" validation error.
-const DEFAULT_LAST_MODIFIED_START = '1900-01-01T00:00:00Z';
+const DEFAULT_LAST_MODIFIED_START = new Date('1900-01-01T00:00:00Z').toISOString();
 
 function isTitle21Package(pkg) {
   if (!pkg) {
@@ -108,7 +108,7 @@ function mapGranule(granule) {
 
 async function fetchTitlePackages(apiKey, { lastModifiedStart } = {}) {
   const effectiveStart = lastModifiedStart || DEFAULT_LAST_MODIFIED_START;
-  const path = `/collections/CFR/${encodeURIComponent(effectiveStart)}`;
+  const path = `/collections/CFR/title/${TITLE_NUMBER}`;
   let offset = 0;
   let totalCount = null;
   let rawPackageCount = 0;
@@ -176,12 +176,7 @@ function formatGovInfoTimestamp(value) {
     throw error;
   }
 
-  const pad = (num) => String(num).padStart(2, '0');
-
-  return [
-    `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`,
-    `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}Z`
-  ].join('T');
+  return date.toISOString();
 }
 
 async function fetchPackageGranules(apiKey, packageId) {
