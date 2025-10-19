@@ -134,6 +134,7 @@ async function fetchTitlePackages(apiKey) {
 
     console.log('CFR API request URL:', url.toString());
     console.log('URL search params:', Object.fromEntries(url.searchParams.entries()));
+    console.log('URL search params count:', url.searchParams.size);
 
     console.log('Making request to eCFR API...');
     const response = await fetch(url.toString(), {
@@ -279,10 +280,11 @@ function missingApiKeyResponse() {
 }
 
 export const handler = async (event) => {
-  console.log('=== CFR Title 21 handler invoked (updated) ===', {
+  console.log('=== CFR Title 21 handler invoked (v2) ===', {
     method: event.httpMethod,
     path: event.path,
-    query: event.queryStringParameters
+    query: event.queryStringParameters,
+    timestamp: new Date().toISOString()
   });
 
   if (event.httpMethod === 'OPTIONS') {
