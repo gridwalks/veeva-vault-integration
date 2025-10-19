@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://api.govinfo.gov';
+const API_BASE_URL = 'https://www.ecfr.gov/api/v1';
 const TITLE_NUMBER = '21';
 const PACKAGE_PAGE_SIZE = 100;
 // GovInfo API enforces a maximum granule page size of 100. Larger values
@@ -43,7 +43,11 @@ function ensureApiKey() {
 
 function buildUrl(path, apiKey, params = {}) {
   const url = new URL(`${API_BASE_URL}${path}`);
-  url.searchParams.set('api_key', apiKey);
+  
+  // eCFR API doesn't require API key, but keep for backward compatibility
+  if (apiKey) {
+    url.searchParams.set('api_key', apiKey);
+  }
 
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
@@ -125,9 +129,8 @@ function mapGranule(granule, packageId) {
   };
 }
 
-async function fetchTitlePackages(apiKey, { lastModifiedStart } = {}) {
-  const effectiveStart = lastModifiedStart || DEFAULT_LAST_MODIFIED_START;
-  const path = `/collections/CFR/title/${TITLE_NUMBER}`;
+async function fetchTitlePackages(apiKey) {
+  const path = `/search/v1/results`;
   let offset = 0;
   let totalCount = null;
   let rawPackageCount = 0;
@@ -136,36 +139,35 @@ async function fetchTitlePackages(apiKey, { lastModifiedStart } = {}) {
 
   while (true) {
     const url = buildUrl(path, apiKey, {
-      offset,
-      pageSize: PACKAGE_PAGE_SIZE,
-      lastModifiedStart: effectiveStart
+      title: TITLE_NUMBER,
+      per_page: PACKAGE_PAGE_SIZE,
+      page: Math.floor(offset / PACKAGE_PAGE_SIZE) + 1
     });
 
     console.log('CFR API request URL:', url.toString());
-    console.log('lastModifiedStart value:', effectiveStart);
     console.log('URL search params:', Object.fromEntries(url.searchParams.entries()));
 
     const data = await fetchJson(url, apiKey);
-    const pagePackages = data.packages || [];
-    const title21Packages = pagePackages.filter(isTitle21Package);
+    const pagePackages = data.results || [];
+    const title21Packages = pagePackages; // eCFR API already filters by title
 
     rawPackageCount += pagePackages.length;
     filteredOutCount += pagePackages.length - title21Packages.length;
 
     packages.push(
       ...title21Packages.map(pkg => ({
-        packageId: pkg.packageId || null,
-        title: pkg.title || null,
-        collectionCode: pkg.collectionCode || pkg.collection || null,
-        lastModified: pkg.lastModified || null,
-        dateIssued: pkg.dateIssued || null,
-        packageLink: pkg.packageLink || null,
-        detailsLink: pkg.detailsLink || buildGovInfoDetailsUrl({ packageId: pkg.packageId }),
-        granuleCount: pkg.granuleCount || null
+        packageId: pkg.document_id || pkg.id || null,
+        title: pkg.hierarchy_headings ? pkg.hierarchy_headings.join(' > ') : pkg.title || null,
+        collectionCode: 'CFR',
+        lastModified: pkg.last_updated || pkg.lastModified || null,
+        dateIssued: pkg.effective_date || pkg.dateIssued || null,
+        packageLink: pkg.url || null,
+        detailsLink: pkg.url || buildGovInfoDetailsUrl({ packageId: pkg.document_id }),
+        granuleCount: null // eCFR API doesn't provide granule count
       }))
     );
 
-    totalCount = data.count ?? totalCount ?? rawPackageCount;
+    totalCount = data.meta?.total_count ?? totalCount ?? rawPackageCount;
 
     if (!pagePackages.length) {
       break;
@@ -180,7 +182,6 @@ async function fetchTitlePackages(apiKey, { lastModifiedStart } = {}) {
 
   return {
     title: TITLE_NUMBER,
-    lastModifiedStart: effectiveStart,
     totalPackages: packages.length,
     totalPackagesBeforeFilter: rawPackageCount,
     filteredOutCount,
@@ -283,17 +284,9 @@ export const handler = async (event) => {
   }
 
   try {
-    const apiKey = ensureApiKey();
-
-    if (!apiKey) {
-      console.warn('CFR Title 21 request received without API key configured');
-      return missingApiKeyResponse();
-    }
+    const apiKey = ensureApiKey(); // Optional for eCFR API
     const packageId = event.queryStringParameters?.packageId;
-    const fromDateParam = event.queryStringParameters?.fromDate || event.queryStringParameters?.lastModifiedStart;
-    const lastModifiedStart = fromDateParam
-      ? formatGovInfoTimestamp(fromDateParam)
-      : DEFAULT_LAST_MODIFIED_START;
+    // eCFR API doesn't use lastModifiedStart parameter
 
     if (packageId) {
       console.log('Fetching granules for package', { packageId });
@@ -305,10 +298,10 @@ export const handler = async (event) => {
       });
     }
 
-    console.log('Fetching CFR Title 21 package list', { lastModifiedStart });
+    console.log('Fetching CFR Title 21 package list');
     console.log('API Key present:', !!apiKey);
     console.log('API Key length:', apiKey ? apiKey.length : 0);
-    const summary = await fetchTitlePackages(apiKey, { lastModifiedStart });
+    const summary = await fetchTitlePackages(apiKey);
     return createResponse(200, {
       success: true,
       retrievedAt: new Date().toISOString(),
