@@ -305,6 +305,8 @@ export const handler = async (event) => {
     }
 
     console.log('Fetching CFR Title 21 package list', { lastModifiedStart });
+    console.log('API Key present:', !!apiKey);
+    console.log('API Key length:', apiKey ? apiKey.length : 0);
     const summary = await fetchTitlePackages(apiKey, { lastModifiedStart });
     return createResponse(200, {
       success: true,
