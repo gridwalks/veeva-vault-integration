@@ -126,6 +126,54 @@ export async function getIndexedDocuments({ name = "", limit = 50, offset = 0 } 
   }
 }
 
+export async function getCfrTitle21({ packageId = null } = {}) {
+  const startTime = Date.now();
+  console.log('Fetching CFR Title 21 data...', { packageId });
+
+  try {
+    const params = new URLSearchParams();
+    if (packageId) {
+      params.set('packageId', packageId);
+    }
+
+    const url = `/api/cfr-title-21${params.toString() ? `?${params.toString()}` : ''}`;
+    const res = await fetch(url);
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to load CFR Title 21 data:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText,
+        url: res.url,
+        packageId
+      });
+      throw new Error(`Failed to load CFR Title 21 data: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log('CFR Title 21 data fetched successfully', {
+      packageId,
+      hasPackages: Array.isArray(data.packages),
+      packageCount: data.packages?.length || 0,
+      totalGranules: data.totalGranules || null,
+      duration
+    });
+
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error('Error fetching CFR Title 21 data', {
+      message: error.message,
+      stack: error.stack,
+      packageId,
+      duration
+    });
+    throw error;
+  }
+}
+
 export async function getIndexingLogs({ 
   limit = 50, 
   offset = 0, 
