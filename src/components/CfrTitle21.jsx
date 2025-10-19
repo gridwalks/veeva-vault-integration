@@ -106,6 +106,9 @@ export default function CfrTitle21() {
             <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#4b5563" }}>
               Browse the Code of Federal Regulations Title 21 volumes and sections via the GovInfo CFR API.
             </p>
+            <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#6b7280" }}>
+              Note: eCFR.gov links may require manual access verification due to automated access restrictions.
+            </p>
           </div>
           <button
             onClick={loadPackages}
@@ -345,7 +348,7 @@ function GranuleItem({ granule }) {
         <div style={{ display: "flex", gap: "12px", fontSize: "11px", marginTop: "6px", flexWrap: "wrap" }}>
           {granule.detailsLink && (
             <a href={granule.detailsLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
-              View Details
+              eCFR.gov
             </a>
           )}
           {granule.pdfLink && (
@@ -398,7 +401,7 @@ function GranuleItem({ granule }) {
                 <div style={{ display: "flex", gap: "8px", fontSize: "10px", marginTop: "4px", flexWrap: "wrap" }}>
                   {subchapter.detailsLink && (
                     <a href={subchapter.detailsLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
-                      View Details
+                      eCFR.gov
                     </a>
                   )}
                   {subchapter.htmlLink && (
@@ -435,12 +438,17 @@ function GranuleItem({ granule }) {
                           <div style={{ display: "flex", gap: "6px", fontSize: "9px", marginTop: "3px", flexWrap: "wrap" }}>
                             {part.detailsLink && (
                               <a href={part.detailsLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
-                                View Details
+                                eCFR.gov
                               </a>
                             )}
                             {part.htmlLink && (
                               <a href={part.htmlLink} target="_blank" rel="noreferrer" style={{ color: "#4338ca" }}>
                                 HTML
+                              </a>
+                            )}
+                            {part.govInfoLink && (
+                              <a href={part.govInfoLink} target="_blank" rel="noreferrer" style={{ color: "#059669" }}>
+                                GovInfo
                               </a>
                             )}
                           </div>
