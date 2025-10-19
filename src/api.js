@@ -152,6 +152,18 @@ export async function getCfrTitle21({ packageId = null } = {}) {
     }
 
     const data = await res.json();
+
+    if (data && data.success === false) {
+      console.warn('CFR Title 21 API returned an application error', {
+        packageId,
+        code: data.code,
+        error: data.error,
+        details: data.details
+      });
+      const message = data.error || 'Unable to load CFR Title 21 data.';
+      throw new Error(message);
+    }
+
     const duration = Date.now() - startTime;
     console.log('CFR Title 21 data fetched successfully', {
       packageId,

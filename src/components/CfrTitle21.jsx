@@ -161,7 +161,7 @@ export default function CfrTitle21() {
           fontSize: "12px"
         }}>
           <strong>Error:</strong> {error}
-          {error.includes("GPO_API_KEY") && (
+          {/(GPO_API_KEY|GovInfo API key)/i.test(error) && (
             <>
               <br />
               Please configure the <code>GPO_API_KEY</code> environment variable with a valid GovInfo API key.

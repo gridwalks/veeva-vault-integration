@@ -5,7 +5,10 @@ const GRANULE_PAGE_SIZE = 200;
 
 const RESPONSE_HEADERS = {
   'Content-Type': 'application/json',
-  'Cache-Control': 'public, max-age=300'
+  'Cache-Control': 'public, max-age=300',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type'
 };
 
 function getApiKey() {
@@ -13,14 +16,7 @@ function getApiKey() {
 }
 
 function ensureApiKey() {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    throw Object.assign(new Error('The GPO_API_KEY environment variable is not configured.'), {
-      statusCode: 500,
-      code: 'MISSING_API_KEY'
-    });
-  }
-  return apiKey;
+  return getApiKey();
 }
 
 function buildUrl(path, apiKey, params = {}) {
@@ -170,6 +166,15 @@ function createResponse(statusCode, body) {
   };
 }
 
+function missingApiKeyResponse() {
+  return createResponse(200, {
+    success: false,
+    code: 'MISSING_API_KEY',
+    error: 'The GovInfo API key is not configured.',
+    details: 'Set the GPO_API_KEY environment variable (or API_GOVINFO_KEY) before using the CFR Title 21 integration.'
+  });
+}
+
 export const handler = async (event) => {
   console.log('=== CFR Title 21 handler invoked ===', {
     method: event.httpMethod,
@@ -194,6 +199,11 @@ export const handler = async (event) => {
 
   try {
     const apiKey = ensureApiKey();
+
+    if (!apiKey) {
+      console.warn('CFR Title 21 request received without API key configured');
+      return missingApiKeyResponse();
+    }
     const packageId = event.queryStringParameters?.packageId;
 
     if (packageId) {
