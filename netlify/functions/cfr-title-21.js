@@ -130,7 +130,7 @@ function mapGranule(granule, packageId) {
 }
 
 async function fetchTitlePackages(apiKey) {
-  const path = `/search/v1/results`;
+  const path = `/versioner/v1/full/2024-01-01/title-21.xml`;
   let offset = 0;
   let totalCount = null;
   let rawPackageCount = 0;
@@ -138,18 +138,30 @@ async function fetchTitlePackages(apiKey) {
   const packages = [];
 
   while (true) {
-    const url = buildUrl(path, apiKey, {
-      title: TITLE_NUMBER,
-      per_page: PACKAGE_PAGE_SIZE,
-      page: Math.floor(offset / PACKAGE_PAGE_SIZE) + 1
-    });
+    const url = buildUrl(path, apiKey, {});
 
     console.log('CFR API request URL:', url.toString());
     console.log('URL search params:', Object.fromEntries(url.searchParams.entries()));
 
-    const data = await fetchJson(url, apiKey);
-    const pagePackages = data.results || [];
-    const title21Packages = pagePackages; // eCFR API already filters by title
+    const response = await fetch(url.toString(), {
+      headers: {
+        'User-Agent': 'veeva-vault-integration/1.0 (+https://github.com/)'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
+    
+    const xmlText = await response.text();
+    // For now, return a simple response indicating we got the XML
+    const pagePackages = [{ 
+      title: 'CFR Title 21 - Food and Drugs',
+      packageId: 'title-21',
+      description: 'Electronic Code of Federal Regulations Title 21',
+      url: 'https://www.ecfr.gov/title-21'
+    }];
+    const title21Packages = pagePackages;
 
     rawPackageCount += pagePackages.length;
     filteredOutCount += pagePackages.length - title21Packages.length;
