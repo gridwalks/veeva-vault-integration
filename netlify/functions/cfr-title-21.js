@@ -13,6 +13,11 @@ const RESPONSE_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type'
 };
 
+// The collections endpoint requires a lastModifiedStart filter in ISO 8601 format.
+// Using an early default ensures we retrieve all historical packages without
+// triggering the "Use proper date format" validation error.
+const DEFAULT_LAST_MODIFIED_START = '1900-01-01T00:00:00Z';
+
 function getApiKey() {
   return process.env.GPO_API_KEY || process.env.API_GOVINFO_KEY;
 }
@@ -76,7 +81,7 @@ function mapGranule(granule) {
   };
 }
 
-async function fetchTitlePackages(apiKey) {
+async function fetchTitlePackages(apiKey, { lastModifiedStart } = {}) {
   let offset = 0;
   let totalCount = null;
   const packages = [];
@@ -84,7 +89,8 @@ async function fetchTitlePackages(apiKey) {
   while (true) {
     const url = buildUrl(`/collections/CFR/title/${TITLE_NUMBER}`, apiKey, {
       offset,
-      pageSize: PACKAGE_PAGE_SIZE
+      pageSize: PACKAGE_PAGE_SIZE,
+      lastModifiedStart
     });
 
     const data = await fetchJson(url, apiKey);
@@ -122,6 +128,24 @@ async function fetchTitlePackages(apiKey) {
     expectedTotal: totalCount ?? packages.length,
     packages
   };
+}
+
+function formatGovInfoTimestamp(value) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    const error = new Error('Invalid fromDate parameter. Use an ISO 8601 string such as 2024-01-01T00:00:00Z.');
+    error.code = 'INVALID_FROM_DATE';
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const pad = (num) => String(num).padStart(2, '0');
+
+  return [
+    `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`,
+    `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}Z`
+  ].join('T');
 }
 
 async function fetchPackageGranules(apiKey, packageId) {
@@ -207,6 +231,10 @@ export const handler = async (event) => {
       return missingApiKeyResponse();
     }
     const packageId = event.queryStringParameters?.packageId;
+    const fromDateParam = event.queryStringParameters?.fromDate || event.queryStringParameters?.lastModifiedStart;
+    const lastModifiedStart = fromDateParam
+      ? formatGovInfoTimestamp(fromDateParam)
+      : DEFAULT_LAST_MODIFIED_START;
 
     if (packageId) {
       console.log('Fetching granules for package', { packageId });
@@ -218,8 +246,8 @@ export const handler = async (event) => {
       });
     }
 
-    console.log('Fetching CFR Title 21 package list');
-    const summary = await fetchTitlePackages(apiKey);
+    console.log('Fetching CFR Title 21 package list', { lastModifiedStart });
+    const summary = await fetchTitlePackages(apiKey, { lastModifiedStart });
     return createResponse(200, {
       success: true,
       retrievedAt: new Date().toISOString(),

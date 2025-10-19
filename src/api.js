@@ -126,14 +126,17 @@ export async function getIndexedDocuments({ name = "", limit = 50, offset = 0 } 
   }
 }
 
-export async function getCfrTitle21({ packageId = null } = {}) {
+export async function getCfrTitle21({ packageId = null, fromDate = null } = {}) {
   const startTime = Date.now();
-  console.log('Fetching CFR Title 21 data...', { packageId });
+  console.log('Fetching CFR Title 21 data...', { packageId, fromDate });
 
   try {
     const params = new URLSearchParams();
     if (packageId) {
       params.set('packageId', packageId);
+    }
+    if (fromDate) {
+      params.set('fromDate', fromDate);
     }
 
     const url = `/api/cfr-title-21${params.toString() ? `?${params.toString()}` : ''}`;
@@ -146,7 +149,8 @@ export async function getCfrTitle21({ packageId = null } = {}) {
         statusText: res.statusText,
         errorText,
         url: res.url,
-        packageId
+        packageId,
+        fromDate
       });
       throw new Error(`Failed to load CFR Title 21 data: ${res.status} ${res.statusText}`);
     }
@@ -156,6 +160,7 @@ export async function getCfrTitle21({ packageId = null } = {}) {
     if (data && data.success === false) {
       console.warn('CFR Title 21 API returned an application error', {
         packageId,
+        fromDate,
         code: data.code,
         error: data.error,
         details: data.details
@@ -167,6 +172,7 @@ export async function getCfrTitle21({ packageId = null } = {}) {
     const duration = Date.now() - startTime;
     console.log('CFR Title 21 data fetched successfully', {
       packageId,
+      fromDate,
       hasPackages: Array.isArray(data.packages),
       packageCount: data.packages?.length || 0,
       totalGranules: data.totalGranules || null,
@@ -180,6 +186,7 @@ export async function getCfrTitle21({ packageId = null } = {}) {
       message: error.message,
       stack: error.stack,
       packageId,
+      fromDate,
       duration
     });
     throw error;
