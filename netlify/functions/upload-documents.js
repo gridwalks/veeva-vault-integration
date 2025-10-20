@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import { OpenAI } from 'openai';
 import Groq from 'groq-sdk';
+import { createHash } from 'crypto';
 // Dynamic imports to avoid test file issues
 // import mammoth from 'mammoth';
 // import { parseDocument } from 'docx-parser';
@@ -689,6 +690,42 @@ export const handler = async (event) => {
       uploadType,
       fileNames: files.map(f => f.fileName)
     });
+
+    // Deduplicate files in case the multipart parser produced duplicate entries
+    if (files.length > 0) {
+      const seenSignatures = new Set();
+      const uniqueFiles = [];
+
+      for (const file of files) {
+        const hash = createHash('sha1').update(file.buffer).digest('hex');
+        const signature = `${file.fileName}:${file.size}:${hash}`;
+
+        if (seenSignatures.has(signature)) {
+          console.warn('Duplicate file detected in multipart payload, skipping duplicate entry', {
+            fileName: file.fileName,
+            size: file.size
+          });
+          continue;
+        }
+
+        seenSignatures.add(signature);
+        uniqueFiles.push(file);
+      }
+
+      if (uniqueFiles.length !== files.length) {
+        console.log(`Deduplicated file list from ${files.length} to ${uniqueFiles.length}`);
+      }
+
+      if (fileCount && uniqueFiles.length > fileCount) {
+        console.warn('Received more file entries than reported fileCount, trimming extras', {
+          reportedCount: fileCount,
+          actualCount: uniqueFiles.length
+        });
+        files = uniqueFiles.slice(0, fileCount);
+      } else {
+        files = uniqueFiles;
+      }
+    }
 
     if (files.length === 0) {
       return {
