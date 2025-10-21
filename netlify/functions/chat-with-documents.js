@@ -1,6 +1,7 @@
 import { getPool, initDatabase } from "./db.js";
 import OpenAI from "openai";
 import Groq from "groq-sdk";
+import { getStore } from "@netlify/blobs";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -9,6 +10,237 @@ const openai = new OpenAI({
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
+
+const CHAT_UPLOADS_STORE = "chat-uploads";
+const ATTACHMENT_TEXT_LIMIT = 6000;
+
+function normalizeAttachmentName(attachment) {
+  return (
+    attachment?.name ||
+    attachment?.fileName ||
+    attachment?.originalName ||
+    attachment?.document_name ||
+    attachment?.key ||
+    "attachment"
+  );
+}
+
+function guessExtensionFromType(contentType = "") {
+  if (!contentType) return null;
+  const type = contentType.split(";")[0].toLowerCase();
+  const map = {
+    "application/pdf": "pdf",
+    "application/msword": "doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "text/plain": "txt",
+    "text/csv": "csv",
+    "application/rtf": "rtf"
+  };
+  return map[type] || null;
+}
+
+function truncateForContext(text = "") {
+  if (!text) return "";
+  if (text.length <= ATTACHMENT_TEXT_LIMIT) {
+    return text;
+  }
+  return `${text.substring(0, ATTACHMENT_TEXT_LIMIT)}...`;
+}
+
+async function fetchAttachmentBuffer(attachment) {
+  const key = attachment?.key || attachment?.blobKey || attachment?.id || null;
+  const url = attachment?.url || attachment?.signedUrl || null;
+  const siteID = process.env.NETLIFY_BLOBS_SITE_ID;
+  const token = process.env.NETLIFY_BLOBS_TOKEN;
+  const attemptedSources = [];
+
+  if (url) {
+    try {
+      attemptedSources.push({ type: "signed_url", value: url });
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.warn("Signed URL fetch failed for attachment", {
+          status: response.status,
+          statusText: response.statusText,
+          url
+        });
+      } else {
+        const arrayBuffer = await response.arrayBuffer();
+        return {
+          buffer: Buffer.from(arrayBuffer),
+          source: "signed_url",
+          key,
+          attemptedSources
+        };
+      }
+    } catch (error) {
+      console.warn("Error fetching attachment via signed URL", { error: error.message, url });
+    }
+  }
+
+  if (key) {
+    const candidateStores = [
+      attachment?.store,
+      key.includes("/") ? key.split("/")[0] : null,
+      CHAT_UPLOADS_STORE,
+      "uploaded-documents",
+      "documents"
+    ].filter(Boolean);
+
+    for (const storeName of [...new Set(candidateStores)]) {
+      let store;
+      try {
+        attemptedSources.push({ type: "blob_store", value: storeName });
+        store = await getStore({ name: storeName, siteID, token });
+      } catch (error) {
+        console.warn("Failed to initialize blob store for attachment", { storeName, error: error.message });
+        continue;
+      }
+
+      if (!store) continue;
+
+      try {
+        const arrayBuffer = await store.get(key, { type: "arrayBuffer" });
+        if (arrayBuffer) {
+          return {
+            buffer: Buffer.from(arrayBuffer),
+            source: `blob_store:${storeName}`,
+            key,
+            attemptedSources
+          };
+        }
+      } catch (error) {
+        console.warn("Failed to retrieve attachment from blob store", { storeName, key, error: error.message });
+      }
+    }
+  }
+
+  console.warn("Unable to retrieve attachment buffer", { key, url, attemptedSources });
+  return null;
+}
+
+async function extractTextFromAttachment(buffer, fileName, contentType) {
+  const extensionFromName = fileName?.split(".").pop()?.toLowerCase() || null;
+  const extension = extensionFromName || guessExtensionFromType(contentType) || "";
+
+  if (!buffer || buffer.length === 0) {
+    return { text: "", method: "empty_buffer" };
+  }
+
+  try {
+    if (extension === "pdf") {
+      try {
+        const { extractTextFromPDF, createPDFFallbackText, createScannedPDFText } = await import("./pdf-extraction-wrapper.js");
+        const pdfResult = await extractTextFromPDF(buffer, fileName);
+        if (pdfResult.text && pdfResult.text.trim().length >= 10) {
+          return { text: pdfResult.text, method: pdfResult.method };
+        }
+        if (pdfResult.method === "pdf_extraction_failed") {
+          return { text: createPDFFallbackText(fileName, buffer.length, pdfResult.error), method: "pdf_extraction_failed" };
+        }
+        return { text: createScannedPDFText(fileName, buffer.length), method: "pdf_scanned_document" };
+      } catch (error) {
+        console.error("PDF extraction failed for attachment", { fileName, error: error.message });
+        return { text: `[PDF Content: ${fileName}] - PDF text extraction failed: ${error.message}`, method: "pdf_error_fallback" };
+      }
+    }
+
+    if (extension === "docx") {
+      try {
+        const mammoth = await import("mammoth");
+        const result = await mammoth.default.extractRawText({ buffer });
+        return { text: result.value || "", method: "mammoth" };
+      } catch (error) {
+        console.warn("Mammoth failed for DOCX attachment, trying docx-parser", { fileName, error: error.message });
+        try {
+          const { parseDocument } = await import("docx-parser");
+          const docxResult = await parseDocument(buffer);
+          return { text: docxResult.text || "", method: "docx_parser" };
+        } catch (docxError) {
+          console.error("DOCX extraction failed for attachment", { fileName, error: docxError.message });
+          return { text: `[DOCX Content: ${fileName}] - Text extraction failed`, method: "docx_extraction_failed" };
+        }
+      }
+    }
+
+    if (extension === "doc") {
+      try {
+        const mammoth = await import("mammoth");
+        const result = await mammoth.extractRawText({ buffer });
+        return { text: result.value || "", method: "mammoth_doc" };
+      } catch (error) {
+        console.error("DOC extraction failed for attachment", { fileName, error: error.message });
+        return { text: `[DOC Content: ${fileName}] - DOC text extraction failed`, method: "doc_extraction_failed" };
+      }
+    }
+
+    if (extension === "txt" || extension === "rtf" || extension === "csv") {
+      return { text: buffer.toString("utf-8"), method: extension };
+    }
+
+    return { text: buffer.toString("utf-8"), method: extension || "unknown" };
+  } catch (error) {
+    console.error("Unexpected error extracting attachment text", { fileName, error: error.message });
+    return { text: `[Error extracting text from ${fileName}: ${error.message}]`, method: "error" };
+  }
+}
+
+async function processAttachments(attachments = []) {
+  if (!Array.isArray(attachments) || attachments.length === 0) {
+    return [];
+  }
+
+  const processed = [];
+
+  for (const attachment of attachments) {
+    const name = normalizeAttachmentName(attachment);
+    const type = attachment?.type || attachment?.contentType || null;
+    const size = attachment?.size || attachment?.bytes || null;
+
+    try {
+      const bufferResult = await fetchAttachmentBuffer(attachment);
+      if (!bufferResult?.buffer) {
+        console.warn("Skipping attachment without retrievable buffer", { name, key: attachment?.key });
+        processed.push({
+          name,
+          type,
+          size,
+          key: attachment?.key || null,
+          extractionMethod: "unavailable",
+          text: "",
+          error: "File content could not be retrieved"
+        });
+        continue;
+      }
+
+      const { text, method } = await extractTextFromAttachment(bufferResult.buffer, name, type);
+      processed.push({
+        name,
+        type,
+        size,
+        key: bufferResult.key || attachment?.key || null,
+        extractionMethod: method,
+        text,
+        bytes: bufferResult.buffer.length,
+        retrievalSource: bufferResult.source,
+        attemptedSources: bufferResult.attemptedSources || []
+      });
+    } catch (error) {
+      console.error("Error processing attachment", { name, error: error.message });
+      processed.push({
+        name,
+        type,
+        size,
+        key: attachment?.key || null,
+        extractionMethod: "error",
+        text: "",
+        error: error.message
+      });
+    }
+  }
+
+  return processed;
+}
 
 // Function to detect comparison intent in user messages
 function detectComparisonIntent(message) {
@@ -156,6 +388,35 @@ export const handler = async (event) => {
       historyLength: conversationHistory.length,
       attachmentCount: Array.isArray(attachments) ? attachments.length : 0
     });
+
+    let processedAttachments = [];
+    if (Array.isArray(attachments) && attachments.length > 0) {
+      console.log('Processing user-provided attachments for chat context...', {
+        attachmentCount: attachments.length
+      });
+      try {
+        processedAttachments = await processAttachments(attachments);
+        console.log('Attachment processing completed', {
+          processedCount: processedAttachments.length,
+          successful: processedAttachments.filter(att => att.text && att.text.length > 0).length,
+          failed: processedAttachments.filter(att => att.error).length
+        });
+      } catch (attachmentError) {
+        console.error('Error processing attachments', {
+          message: attachmentError.message,
+          stack: attachmentError.stack
+        });
+        processedAttachments = attachments.map(attachment => ({
+          name: normalizeAttachmentName(attachment),
+          key: attachment?.key || null,
+          type: attachment?.type || attachment?.contentType || null,
+          size: attachment?.size || attachment?.bytes || null,
+          extractionMethod: 'error',
+          text: '',
+          error: attachmentError.message
+        }));
+      }
+    }
 
     // Generate embedding for the query
     console.log('Generating embedding for user query...');
@@ -716,25 +977,37 @@ export const handler = async (event) => {
       relevantExternalResources = [];
     }
 
-    if (relevantDocuments.length === 0 && relevantChunks.length === 0 && relevantExternalResources.length === 0) {
+    if (
+      relevantDocuments.length === 0 &&
+      relevantChunks.length === 0 &&
+      relevantExternalResources.length === 0 &&
+      processedAttachments.filter(att => att.text && att.text.trim().length > 0).length === 0
+    ) {
+      const attachmentIssues = processedAttachments.filter(att => !att.text || att.text.trim().length === 0);
+
       console.log('No relevant content found for query:', {
         message: message.substring(0, 100),
         vectorSearchFailed,
         documentIdsProvided: documentIds && documentIds.length > 0,
-        documentIdsCount: documentIds ? documentIds.length : 0
+        documentIdsCount: documentIds ? documentIds.length : 0,
+        attachmentIssues: attachmentIssues.length
       });
-      
+
+      const attachmentTroubleshooting = attachmentIssues.length > 0
+        ? `\n- ${attachmentIssues.length} attachment(s) could not be processed. Please confirm the files contain readable text and try re-uploading.`
+        : '';
+
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          response: `I couldn't find any relevant documents or external resources to answer your question. 
+          response: `I couldn't find any relevant documents or external resources to answer your question.
 
 **Troubleshooting:**
 - ${vectorSearchFailed ? 'Vector search is not available (using keyword search fallback)' : 'Vector search completed but found no matches'}
 - ${documentIds && documentIds.length > 0 ? `You selected ${documentIds.length} document(s), but none contained relevant content` : 'No specific documents were selected'}
 - Please make sure documents have been indexed and contain relevant content
-- Try rephrasing your question or selecting different documents`,
+- Try rephrasing your question or selecting different documents${attachmentTroubleshooting}`,
           documents: [],
           externalResources: [],
           conversationHistory: [...conversationHistory, { role: 'user', content: message }],
@@ -745,7 +1018,8 @@ export const handler = async (event) => {
             externalResourcesUsed: 0,
             usingRAG: false,
             responseTime: 0,
-            tokensUsed: 0
+            tokensUsed: 0,
+            attachmentsProcessed: processedAttachments.length
           }
         })
       };
@@ -872,6 +1146,43 @@ Type: ${doc.document_type || 'Unknown'}`;
         }).join('\n\n');
     }
 
+    let attachmentsContext = '';
+    if (processedAttachments.length > 0) {
+      const attachmentsWithText = processedAttachments.map((attachment, index) => {
+        const truncatedText = truncateForContext(attachment.text || '');
+        const sizeLabel = typeof attachment.size === 'number'
+          ? `Size: ${(attachment.size / 1024).toFixed(1)} KB`
+          : attachment.bytes
+            ? `Size: ${(attachment.bytes / 1024).toFixed(1)} KB`
+            : null;
+        const methodLabel = attachment.extractionMethod
+          ? `Extraction: ${attachment.extractionMethod}`
+          : 'Extraction: unknown';
+        const retrievalLabel = attachment.retrievalSource
+          ? `Retrieved via: ${attachment.retrievalSource}`
+          : null;
+        const headerDetails = [sizeLabel, methodLabel, retrievalLabel]
+          .filter(Boolean)
+          .join(' | ');
+
+        return `**Attachment ${index + 1}: ${attachment.name}**${attachment.type ? ` (${attachment.type})` : ''}` +
+          (headerDetails ? `\n${headerDetails}` : '') +
+          (truncatedText
+            ? `\n\n${truncatedText}`
+            : '\n\n_No readable text was extracted from this attachment._');
+      }).join('\n\n---\n\n');
+
+      attachmentsContext = attachmentsWithText
+        ? `\n\n**User-Provided Attachments:**\n${attachmentsWithText}`
+        : '';
+    }
+
+    if (attachmentsContext) {
+      documentContext = documentContext
+        ? `${documentContext}${attachmentsContext}`
+        : attachmentsContext.replace(/^\n\n/, '');
+    }
+
     // Prepare the system prompt based on whether this is a comparison query
     const systemPrompt = isComparisonQuery && relevantChunks.length > 0
       ? `You are an AI assistant specialized in comparing pharmaceutical documents. You have access to content from multiple documents and need to perform a comprehensive comparison analysis.
@@ -977,7 +1288,8 @@ ${externalResourcesContext}`;
       totalContextLength: systemPrompt.length + message.length,
       systemPromptLength: systemPrompt.length,
       documentContextLength: documentContext.length,
-      vectorSearchFailed
+      vectorSearchFailed,
+      attachmentContextIncluded: processedAttachments.length
     });
 
     // Call Groq API
@@ -1107,35 +1419,49 @@ ${externalResourcesContext}`;
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         response, // Keep for backward compatibility
-        documents: relevantDocuments.map(doc => {
-          // Handle both Veeva and uploaded documents
-          const isVeevaDoc = doc.source_type === 'veeva';
-          const isUploadedDoc = doc.source_type === 'upload';
-          
-          if (isUploadedDoc) {
-            return {
-              id: doc.document_id || doc.id,
-              name: doc.document_name,
-              number: doc.original_filename || doc.document_name, // Use filename as number for uploaded docs
-              version: doc.version || '1.0',
-              type: doc.document_type || 'uploaded_document',
-              status: 'uploaded',
-              source_type: 'upload',
-              isUploaded: true
-            };
-          } else {
-            // Veeva document
-            return {
-              id: doc.veeva_document_id,
-              name: doc.document_name,
-              number: doc.document_number,
-              version: `${doc.major_version}.${doc.minor_version}`,
-              type: doc.document_type,
-              status: doc.status,
-              source_type: 'veeva'
-            };
-          }
-        }),
+        documents: [
+          ...relevantDocuments.map(doc => {
+            // Handle both Veeva and uploaded documents
+            const isVeevaDoc = doc.source_type === 'veeva';
+            const isUploadedDoc = doc.source_type === 'upload';
+
+            if (isUploadedDoc) {
+              return {
+                id: doc.document_id || doc.id,
+                name: doc.document_name,
+                number: doc.original_filename || doc.document_name, // Use filename as number for uploaded docs
+                version: doc.version || '1.0',
+                type: doc.document_type || 'uploaded_document',
+                status: 'uploaded',
+                source_type: 'upload',
+                isUploaded: true
+              };
+            } else {
+              // Veeva document
+              return {
+                id: doc.veeva_document_id,
+                name: doc.document_name,
+                number: doc.document_number,
+                version: `${doc.major_version}.${doc.minor_version}`,
+                type: doc.document_type,
+                status: doc.status,
+                source_type: 'veeva'
+              };
+            }
+          }),
+          ...processedAttachments.map((attachment, index) => ({
+            id: attachment.key || `attachment_${index}`,
+            name: attachment.name,
+            number: attachment.name,
+            version: 'attachment',
+            type: attachment.type || 'user_attachment',
+            status: attachment.text && attachment.text.length > 0 ? 'processed' : 'unavailable',
+            source_type: 'attachment',
+            isUploaded: true,
+            isAttachment: true,
+            extraction_method: attachment.extractionMethod
+          }))
+        ],
         externalResources: relevantExternalResources.map(resource => ({
           id: resource.id,
           title: resource.title,
@@ -1150,14 +1476,15 @@ ${externalResourcesContext}`;
           { role: 'assistant', content: response }
         ],
         metadata: {
-          documentsUsed: relevantDocuments.length,
+          documentsUsed: relevantDocuments.length + processedAttachments.length,
           chunksUsed: relevantChunks.length,
           externalResourcesUsed: relevantExternalResources.length,
           usingRAG: relevantChunks.length > 0,
           responseTime: groqDuration,
           tokensUsed: completion?.usage?.total_tokens || 0,
           isComparisonQuery: isComparisonQuery,
-          modelUsed: groqModelUsed
+          modelUsed: groqModelUsed,
+          attachmentsProcessed: processedAttachments.length
         }
       })
     };
