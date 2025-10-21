@@ -14,6 +14,38 @@ const groq = new Groq({
 const CHAT_UPLOADS_STORE = "chat-uploads";
 const ATTACHMENT_TEXT_LIMIT = 6000;
 
+function extractChoiceContent(choice) {
+  if (!choice) return "";
+
+  const messageContent = choice.message?.content;
+
+  if (typeof messageContent === "string" && messageContent.trim()) {
+    return messageContent.trim();
+  }
+
+  if (Array.isArray(messageContent)) {
+    const combined = messageContent
+      .map((part) => {
+        if (!part) return "";
+        if (typeof part === "string") return part;
+        if (typeof part.text === "string") return part.text;
+        return "";
+      })
+      .join("")
+      .trim();
+
+    if (combined) {
+      return combined;
+    }
+  }
+
+  if (typeof choice.text === "string" && choice.text.trim()) {
+    return choice.text.trim();
+  }
+
+  return "";
+}
+
 function normalizeAttachmentName(attachment) {
   return (
     attachment?.name ||
@@ -422,7 +454,8 @@ export const handler = async (event) => {
     console.log('Generating embedding for user query...');
     const embeddingStartTime = Date.now();
     let queryEmbedding = null;
-    
+    let vectorSearchFailed = false;
+
     try {
       const embeddingResponse = await openai.embeddings.create({
         model: "text-embedding-ada-002",
@@ -452,7 +485,6 @@ export const handler = async (event) => {
     let relevantChunks = [];
     let relevantDocuments = [];
     let relevantExternalResources = [];
-    let vectorSearchFailed = false;
     
     if (queryEmbedding) {
       // Perform vector similarity search
@@ -1292,85 +1324,97 @@ ${externalResourcesContext}`;
       attachmentContextIncluded: processedAttachments.length
     });
 
-    // Call Groq API
-    const groqStartTime = Date.now();
+    // Call language model API with Groq primary and OpenAI fallback
+    const primaryModel = "openai/gpt-oss-20b";
+    const llmStartTime = Date.now();
     let completion;
-    let response;
-    let groqDuration = 0;
-    let groqModelUsed = "openai/gpt-oss-20b";
-    
+    let response = "";
+    let modelDuration = 0;
+    let modelUsed = primaryModel;
+    let totalTokensUsed = 0;
+
     try {
       completion = await groq.chat.completions.create({
-        model: groqModelUsed,
-        messages: messages,
+        model: primaryModel,
+        messages,
         max_tokens: 2000,
         temperature: 0.3,
       });
 
-      groqDuration = Date.now() - groqStartTime;
-      response = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
-      
+      modelDuration = Date.now() - llmStartTime;
+      totalTokensUsed = completion?.usage?.total_tokens || 0;
+      response = extractChoiceContent(completion?.choices?.[0]);
+
+      if (!response) {
+        const finishReason = completion?.choices?.[0]?.finish_reason;
+        throw new Error(
+          `Groq returned an empty response${finishReason ? ` (finish_reason: ${finishReason})` : ""}`
+        );
+      }
+
       console.log('Groq response received:', {
-        responseTime: `${groqDuration}ms`,
+        responseTime: `${modelDuration}ms`,
         responseLength: response.length,
         responsePreview: response.substring(0, 200) + (response.length > 200 ? '...' : ''),
-        tokensUsed: completion?.usage?.total_tokens || 0,
+        tokensUsed: totalTokensUsed,
         promptTokens: completion?.usage?.prompt_tokens || 0,
         completionTokens: completion?.usage?.completion_tokens || 0,
-        finishReason: completion.choices[0]?.finish_reason,
-        model: groqModelUsed
+        finishReason: completion?.choices?.[0]?.finish_reason,
+        model: modelUsed
       });
     } catch (groqError) {
-      console.error('Groq API error:', {
+      console.error('Groq completion failed:', {
         message: groqError.message,
         status: groqError.status,
         code: groqError.code,
         type: groqError.type,
-        stack: groqError.stack,
-        model: "llama-3.1-70b-versatile",
+        model: primaryModel,
         messageCount: messages.length,
-        totalTokens: messages.reduce((sum, msg) => sum + (msg.content?.length || 0), 0)
+        totalPromptCharacters: messages.reduce((sum, msg) => sum + (msg.content?.length || 0), 0)
       });
-      
-      // Try fallback to a different model
+
       try {
-        const fallbackModel = "mixtral-8x7b-32768";
-        console.log(`Attempting fallback to ${fallbackModel}...`);
-        const fallbackStartTime = Date.now();
-        const fallbackCompletion = await groq.chat.completions.create({
+        const fallbackModel = "gpt-4o-mini";
+        const fallbackStart = Date.now();
+        const fallbackCompletion = await openai.chat.completions.create({
           model: fallbackModel,
-          messages: messages,
+          messages,
           max_tokens: 2000,
           temperature: 0.3,
         });
 
         completion = fallbackCompletion;
-        response = fallbackCompletion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
-        groqDuration = Date.now() - fallbackStartTime;
-        groqModelUsed = fallbackModel;
+        modelUsed = fallbackModel;
+        modelDuration = Date.now() - fallbackStart;
+        totalTokensUsed = fallbackCompletion?.usage?.total_tokens || 0;
+        response = extractChoiceContent(fallbackCompletion?.choices?.[0]);
 
-        console.log('Fallback model succeeded', {
-          responseTime: `${groqDuration}ms`,
+        if (!response) {
+          const finishReason = fallbackCompletion?.choices?.[0]?.finish_reason;
+          throw new Error(
+            `OpenAI fallback returned an empty response${finishReason ? ` (finish_reason: ${finishReason})` : ""}`
+          );
+        }
+
+        console.log('OpenAI fallback response received:', {
+          model: fallbackModel,
+          responseTime: `${modelDuration}ms`,
           responseLength: response.length,
-          model: groqModelUsed
+          responsePreview: response.substring(0, 200) + (response.length > 200 ? '...' : ''),
+          tokensUsed: totalTokensUsed,
+          finishReason: fallbackCompletion?.choices?.[0]?.finish_reason
         });
-        
       } catch (fallbackError) {
-        console.error('Fallback model also failed:', {
+        console.error('OpenAI fallback failed:', {
           message: fallbackError.message,
           status: fallbackError.status,
-          code: fallbackError.code
+          code: fallbackError.code,
+          type: fallbackError.type
         });
-        
-        return {
-          statusCode: 500,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            error: "AI service temporarily unavailable",
-            details: `Primary model failed: ${groqError.message}. Fallback model failed: ${fallbackError.message}`,
-            response: "I'm sorry, I encountered an error while processing your request. Please try again in a moment."
-          })
-        };
+
+        modelDuration = Date.now() - llmStartTime;
+        modelUsed = 'unavailable';
+        response = "I reviewed the provided context but could not generate a response. Please try simplifying your request or removing large attachments.";
       }
     }
 
@@ -1480,10 +1524,10 @@ ${externalResourcesContext}`;
           chunksUsed: relevantChunks.length,
           externalResourcesUsed: relevantExternalResources.length,
           usingRAG: relevantChunks.length > 0,
-          responseTime: groqDuration,
-          tokensUsed: completion?.usage?.total_tokens || 0,
+          responseTime: modelDuration,
+          tokensUsed: totalTokensUsed,
           isComparisonQuery: isComparisonQuery,
-          modelUsed: groqModelUsed,
+          modelUsed: modelUsed,
           attachmentsProcessed: processedAttachments.length
         }
       })
