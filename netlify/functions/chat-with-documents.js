@@ -19,6 +19,10 @@ function parseDuration(value, fallback) {
 const OPENAI_TIMEOUT_MS = parseDuration(process.env.OPENAI_TIMEOUT_MS, 20000);
 const GROQ_TIMEOUT_MS = parseDuration(process.env.GROQ_TIMEOUT_MS, 20000);
 const FUNCTION_TIMEOUT_MS = parseDuration(process.env.CHAT_FUNCTION_TIMEOUT_MS, 25000);
+const RESPONSE_FINALIZATION_BUFFER_MS = parseDuration(
+  process.env.CHAT_FINALIZATION_BUFFER_MS,
+  1200
+);
 const MIN_LLM_TIME_BUDGET_MS = Math.min(
   parseDuration(process.env.CHAT_MIN_LLM_BUDGET_MS, 6000),
   FUNCTION_TIMEOUT_MS
@@ -67,6 +71,45 @@ function extractChoiceContent(choice) {
   }
 
   return "";
+}
+
+function createTimeoutError(label, timeoutMs, originalError) {
+  const error = new Error(
+    `${label || "Operation"} timed out after ${timeoutMs}ms`
+  );
+  error.name = "TimeoutError";
+  error.code = "timeout";
+  error.timeoutMs = timeoutMs;
+  error.cause = originalError;
+  return error;
+}
+
+async function runChatCompletionWithTimeout(client, args, { timeoutMs, label }) {
+  if (!timeoutMs || timeoutMs <= 0) {
+    return client.chat.completions.create(args);
+  }
+
+  const abortController = new AbortController();
+  const timer = setTimeout(() => abortController.abort(), timeoutMs);
+
+  try {
+    return await client.chat.completions.create(args, {
+      signal: abortController.signal,
+      timeout: timeoutMs,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError" || error?.code === "ABORT_ERR") {
+      throw createTimeoutError(label, timeoutMs, error);
+    }
+
+    if (error?.code === "timeout" || error?.name === "TimeoutError") {
+      throw error;
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function normalizeAttachmentName(attachment) {
@@ -1379,11 +1422,13 @@ ${externalResourcesContext}`;
 
     const elapsedBeforeLLM = Date.now() - startTime;
     const remainingBudget = FUNCTION_TIMEOUT_MS - elapsedBeforeLLM;
+    const usableModelBudget = remainingBudget - RESPONSE_FINALIZATION_BUFFER_MS;
 
-    if (remainingBudget <= MIN_LLM_TIME_BUDGET_MS) {
+    if (usableModelBudget <= MIN_LLM_TIME_BUDGET_MS) {
       console.warn("Skipping LLM call due to low time budget", {
         elapsedBeforeLLM,
         remainingBudget,
+        usableModelBudget,
         functionTimeoutMs: FUNCTION_TIMEOUT_MS,
         minLlmBudgetMs: MIN_LLM_TIME_BUDGET_MS,
         attachmentCount: processedAttachments.length,
@@ -1419,14 +1464,15 @@ ${externalResourcesContext}`;
             tokensUsed: 0,
             isComparisonQuery,
             modelUsed: 'skipped',
-            attachmentsProcessed: processedAttachments.length,
-            timedOutBeforeModel: true,
-            remainingTimeBudgetMs: Math.max(remainingBudget, 0),
-            functionTimeoutMs: FUNCTION_TIMEOUT_MS,
-            minModelBudgetMs: MIN_LLM_TIME_BUDGET_MS,
-          },
-        }),
-      };
+          attachmentsProcessed: processedAttachments.length,
+          timedOutBeforeModel: true,
+          remainingTimeBudgetMs: Math.max(remainingBudget, 0),
+          usableModelBudgetMs: Math.max(usableModelBudget, 0),
+          functionTimeoutMs: FUNCTION_TIMEOUT_MS,
+          minModelBudgetMs: MIN_LLM_TIME_BUDGET_MS,
+        },
+      }),
+    };
     }
 
     // Prepare conversation messages
@@ -1467,19 +1513,24 @@ ${externalResourcesContext}`;
 
     // Call language model API with Groq primary and OpenAI fallback
     const primaryModel = "openai/gpt-oss-20b";
+    const groqTimeBudget = Math.min(usableModelBudget, GROQ_TIMEOUT_MS);
     const llmStartTime = Date.now();
     let completion;
     let response = "";
     let modelDuration = 0;
     let modelUsed = primaryModel;
     let totalTokensUsed = 0;
+    let llmBudgetMs = groqTimeBudget;
 
     try {
-      completion = await groq.chat.completions.create({
+      completion = await runChatCompletionWithTimeout(groq, {
         model: primaryModel,
         messages,
         max_tokens: 2000,
         temperature: 0.3,
+      }, {
+        timeoutMs: groqTimeBudget,
+        label: "Groq chat completion",
       });
 
       modelDuration = Date.now() - llmStartTime;
@@ -1501,9 +1552,11 @@ ${externalResourcesContext}`;
         promptTokens: completion?.usage?.prompt_tokens || 0,
         completionTokens: completion?.usage?.completion_tokens || 0,
         finishReason: completion?.choices?.[0]?.finish_reason,
-        model: modelUsed
+        model: modelUsed,
+        timeoutBudgetMs: groqTimeBudget,
       });
     } catch (groqError) {
+      const groqDuration = Date.now() - llmStartTime;
       console.error('Groq completion failed:', {
         message: groqError.message,
         status: groqError.status,
@@ -1511,51 +1564,83 @@ ${externalResourcesContext}`;
         type: groqError.type,
         model: primaryModel,
         messageCount: messages.length,
-        totalPromptCharacters: messages.reduce((sum, msg) => sum + (msg.content?.length || 0), 0)
+        totalPromptCharacters: messages.reduce((sum, msg) => sum + (msg.content?.length || 0), 0),
+        durationMs: groqDuration,
+        timeoutBudgetMs: groqTimeBudget,
       });
 
-      try {
+      const elapsedAfterGroqAttempt = Date.now() - startTime;
+      const remainingAfterGroq = FUNCTION_TIMEOUT_MS - elapsedAfterGroqAttempt;
+      const fallbackUsableBudget = remainingAfterGroq - RESPONSE_FINALIZATION_BUFFER_MS;
+
+      if (fallbackUsableBudget <= MIN_LLM_TIME_BUDGET_MS) {
+        console.warn('Skipping OpenAI fallback due to low remaining budget', {
+          fallbackUsableBudget,
+          remainingAfterGroq,
+          responseFinalizationBufferMs: RESPONSE_FINALIZATION_BUFFER_MS,
+          minLlmBudgetMs: MIN_LLM_TIME_BUDGET_MS,
+          groqErrorCode: groqError.code,
+        });
+
+        modelDuration = groqDuration;
+        modelUsed = groqError?.code === 'timeout' ? 'groq_timeout' : 'groq_error';
+        response = "I started analyzing the provided documents but ran out of time before completing the response. Please try again with fewer attachments or a narrower question.";
+        totalTokensUsed = 0;
+      } else {
         const fallbackModel = "gpt-4o-mini";
-        const fallbackStart = Date.now();
-        const fallbackCompletion = await openai.chat.completions.create({
-          model: fallbackModel,
-          messages,
-          max_tokens: 2000,
-          temperature: 0.3,
-        });
+        const openaiTimeBudget = Math.min(fallbackUsableBudget, OPENAI_TIMEOUT_MS);
+        llmBudgetMs = openaiTimeBudget;
 
-        completion = fallbackCompletion;
-        modelUsed = fallbackModel;
-        modelDuration = Date.now() - fallbackStart;
-        totalTokensUsed = fallbackCompletion?.usage?.total_tokens || 0;
-        response = extractChoiceContent(fallbackCompletion?.choices?.[0]);
+        try {
+          const fallbackStart = Date.now();
+          const fallbackCompletion = await runChatCompletionWithTimeout(openai, {
+            model: fallbackModel,
+            messages,
+            max_tokens: 2000,
+            temperature: 0.3,
+          }, {
+            timeoutMs: openaiTimeBudget,
+            label: "OpenAI fallback chat completion",
+          });
 
-        if (!response) {
-          const finishReason = fallbackCompletion?.choices?.[0]?.finish_reason;
-          throw new Error(
-            `OpenAI fallback returned an empty response${finishReason ? ` (finish_reason: ${finishReason})` : ""}`
-          );
+          completion = fallbackCompletion;
+          modelUsed = fallbackModel;
+          modelDuration = Date.now() - fallbackStart;
+          totalTokensUsed = fallbackCompletion?.usage?.total_tokens || 0;
+          response = extractChoiceContent(fallbackCompletion?.choices?.[0]);
+
+          if (!response) {
+            const finishReason = fallbackCompletion?.choices?.[0]?.finish_reason;
+            throw new Error(
+              `OpenAI fallback returned an empty response${finishReason ? ` (finish_reason: ${finishReason})` : ""}`
+            );
+          }
+
+          console.log('OpenAI fallback response received:', {
+            model: fallbackModel,
+            responseTime: `${modelDuration}ms`,
+            responseLength: response.length,
+            responsePreview: response.substring(0, 200) + (response.length > 200 ? '...' : ''),
+            tokensUsed: totalTokensUsed,
+            finishReason: fallbackCompletion?.choices?.[0]?.finish_reason,
+            timeoutBudgetMs: openaiTimeBudget,
+          });
+        } catch (fallbackError) {
+          console.error('OpenAI fallback failed:', {
+            message: fallbackError.message,
+            status: fallbackError.status,
+            code: fallbackError.code,
+            type: fallbackError.type,
+            timeoutBudgetMs: openaiTimeBudget,
+          });
+
+          modelDuration = Date.now() - llmStartTime;
+          modelUsed = fallbackError?.code === 'timeout' ? 'openai_timeout' : 'unavailable';
+          response = fallbackError?.code === 'timeout'
+            ? "I started analyzing the provided documents but ran out of time before completing the response. Please try again with fewer attachments or a narrower question."
+            : "I reviewed the provided context but could not generate a response. Please try simplifying your request or removing large attachments.";
+          totalTokensUsed = 0;
         }
-
-        console.log('OpenAI fallback response received:', {
-          model: fallbackModel,
-          responseTime: `${modelDuration}ms`,
-          responseLength: response.length,
-          responsePreview: response.substring(0, 200) + (response.length > 200 ? '...' : ''),
-          tokensUsed: totalTokensUsed,
-          finishReason: fallbackCompletion?.choices?.[0]?.finish_reason
-        });
-      } catch (fallbackError) {
-        console.error('OpenAI fallback failed:', {
-          message: fallbackError.message,
-          status: fallbackError.status,
-          code: fallbackError.code,
-          type: fallbackError.type
-        });
-
-        modelDuration = Date.now() - llmStartTime;
-        modelUsed = 'unavailable';
-        response = "I reviewed the provided context but could not generate a response. Please try simplifying your request or removing large attachments.";
       }
     }
 
@@ -1593,6 +1678,8 @@ ${externalResourcesContext}`;
     const totalDuration = Date.now() - startTime;
     console.log('Chat with documents completed:', {
       totalDuration: `${totalDuration}ms`,
+      modelDuration: `${modelDuration}ms`,
+      modelTimeoutBudgetMs: llmBudgetMs,
       documentsUsed: relevantDocuments.length,
       externalResourcesUsed: relevantExternalResources.length,
       isComparisonQuery,
@@ -1623,7 +1710,9 @@ ${externalResourcesContext}`;
           attachmentsProcessed: processedAttachments.length,
           timedOutBeforeModel: false,
           functionTimeoutMs: FUNCTION_TIMEOUT_MS,
-          minModelBudgetMs: MIN_LLM_TIME_BUDGET_MS
+          minModelBudgetMs: MIN_LLM_TIME_BUDGET_MS,
+          modelTimeoutBudgetMs: llmBudgetMs,
+          responseFinalizationBufferMs: RESPONSE_FINALIZATION_BUFFER_MS
         }
       })
     };
