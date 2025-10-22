@@ -1,14 +1,401 @@
 import { getPool, initDatabase } from "./db.js";
 import OpenAI from "openai";
 import Groq from "groq-sdk";
+import { getStore } from "@netlify/blobs";
+
+function parseDuration(value, fallback) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  }
+
+  return fallback;
+}
+
+const OPENAI_TIMEOUT_MS = parseDuration(process.env.OPENAI_TIMEOUT_MS, 20000);
+const GROQ_TIMEOUT_MS = parseDuration(process.env.GROQ_TIMEOUT_MS, 20000);
+const FUNCTION_TIMEOUT_MS = parseDuration(process.env.CHAT_FUNCTION_TIMEOUT_MS, 25000);
+const RESPONSE_FINALIZATION_BUFFER_MS = parseDuration(
+  process.env.CHAT_FINALIZATION_BUFFER_MS,
+  1200
+);
+const MIN_LLM_TIME_BUDGET_MS = Math.min(
+  parseDuration(process.env.CHAT_MIN_LLM_BUDGET_MS, 6000),
+  FUNCTION_TIMEOUT_MS
+);
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  timeout: OPENAI_TIMEOUT_MS,
 });
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
+  timeout: GROQ_TIMEOUT_MS,
 });
+
+const CHAT_UPLOADS_STORE = "chat-uploads";
+const ATTACHMENT_TEXT_LIMIT = 6000;
+
+function extractChoiceContent(choice) {
+  if (!choice) return "";
+
+  const messageContent = choice.message?.content;
+
+  if (typeof messageContent === "string" && messageContent.trim()) {
+    return messageContent.trim();
+  }
+
+  if (Array.isArray(messageContent)) {
+    const combined = messageContent
+      .map((part) => {
+        if (!part) return "";
+        if (typeof part === "string") return part;
+        if (typeof part.text === "string") return part.text;
+        return "";
+      })
+      .join("")
+      .trim();
+
+    if (combined) {
+      return combined;
+    }
+  }
+
+  if (typeof choice.text === "string" && choice.text.trim()) {
+    return choice.text.trim();
+  }
+
+  return "";
+}
+
+function createTimeoutError(label, timeoutMs, originalError) {
+  const error = new Error(
+    `${label || "Operation"} timed out after ${timeoutMs}ms`
+  );
+  error.name = "TimeoutError";
+  error.code = "timeout";
+  error.timeoutMs = timeoutMs;
+  error.cause = originalError;
+  return error;
+}
+
+async function runChatCompletionWithTimeout(client, args, { timeoutMs, label }) {
+  if (!timeoutMs || timeoutMs <= 0) {
+    return client.chat.completions.create(args);
+  }
+
+  const abortController = new AbortController();
+  const timer = setTimeout(() => abortController.abort(), timeoutMs);
+
+  try {
+    return await client.chat.completions.create(args, {
+      signal: abortController.signal,
+      timeout: timeoutMs,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError" || error?.code === "ABORT_ERR") {
+      throw createTimeoutError(label, timeoutMs, error);
+    }
+
+    if (error?.code === "timeout" || error?.name === "TimeoutError") {
+      throw error;
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function normalizeAttachmentName(attachment) {
+  return (
+    attachment?.name ||
+    attachment?.fileName ||
+    attachment?.originalName ||
+    attachment?.document_name ||
+    attachment?.key ||
+    "attachment"
+  );
+}
+
+function guessExtensionFromType(contentType = "") {
+  if (!contentType) return null;
+  const type = contentType.split(";")[0].toLowerCase();
+  const map = {
+    "application/pdf": "pdf",
+    "application/msword": "doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "text/plain": "txt",
+    "text/csv": "csv",
+    "application/rtf": "rtf"
+  };
+  return map[type] || null;
+}
+
+function truncateForContext(text = "") {
+  if (!text) return "";
+  if (text.length <= ATTACHMENT_TEXT_LIMIT) {
+    return text;
+  }
+  return `${text.substring(0, ATTACHMENT_TEXT_LIMIT)}...`;
+}
+
+async function fetchAttachmentBuffer(attachment) {
+  const key = attachment?.key || attachment?.blobKey || attachment?.id || null;
+  const url = attachment?.url || attachment?.signedUrl || null;
+  const siteID = process.env.NETLIFY_BLOBS_SITE_ID;
+  const token = process.env.NETLIFY_BLOBS_TOKEN;
+  const attemptedSources = [];
+
+  if (url) {
+    try {
+      attemptedSources.push({ type: "signed_url", value: url });
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.warn("Signed URL fetch failed for attachment", {
+          status: response.status,
+          statusText: response.statusText,
+          url
+        });
+      } else {
+        const arrayBuffer = await response.arrayBuffer();
+        return {
+          buffer: Buffer.from(arrayBuffer),
+          source: "signed_url",
+          key,
+          attemptedSources
+        };
+      }
+    } catch (error) {
+      console.warn("Error fetching attachment via signed URL", { error: error.message, url });
+    }
+  }
+
+  if (key) {
+    const candidateStores = [
+      attachment?.store,
+      key.includes("/") ? key.split("/")[0] : null,
+      CHAT_UPLOADS_STORE,
+      "uploaded-documents",
+      "documents"
+    ].filter(Boolean);
+
+    for (const storeName of [...new Set(candidateStores)]) {
+      let store;
+      try {
+        attemptedSources.push({ type: "blob_store", value: storeName });
+        store = await getStore({ name: storeName, siteID, token });
+      } catch (error) {
+        console.warn("Failed to initialize blob store for attachment", { storeName, error: error.message });
+        continue;
+      }
+
+      if (!store) continue;
+
+      try {
+        const arrayBuffer = await store.get(key, { type: "arrayBuffer" });
+        if (arrayBuffer) {
+          return {
+            buffer: Buffer.from(arrayBuffer),
+            source: `blob_store:${storeName}`,
+            key,
+            attemptedSources
+          };
+        }
+      } catch (error) {
+        console.warn("Failed to retrieve attachment from blob store", { storeName, key, error: error.message });
+      }
+    }
+  }
+
+  console.warn("Unable to retrieve attachment buffer", { key, url, attemptedSources });
+  return null;
+}
+
+async function extractTextFromAttachment(buffer, fileName, contentType) {
+  const extensionFromName = fileName?.split(".").pop()?.toLowerCase() || null;
+  const extension = extensionFromName || guessExtensionFromType(contentType) || "";
+
+  if (!buffer || buffer.length === 0) {
+    return { text: "", method: "empty_buffer" };
+  }
+
+  try {
+    if (extension === "pdf") {
+      try {
+        const { extractTextFromPDF, createPDFFallbackText, createScannedPDFText } = await import("./pdf-extraction-wrapper.js");
+        const pdfResult = await extractTextFromPDF(buffer, fileName);
+        if (pdfResult.text && pdfResult.text.trim().length >= 10) {
+          return { text: pdfResult.text, method: pdfResult.method };
+        }
+        if (pdfResult.method === "pdf_extraction_failed") {
+          return { text: createPDFFallbackText(fileName, buffer.length, pdfResult.error), method: "pdf_extraction_failed" };
+        }
+        return { text: createScannedPDFText(fileName, buffer.length), method: "pdf_scanned_document" };
+      } catch (error) {
+        console.error("PDF extraction failed for attachment", { fileName, error: error.message });
+        return { text: `[PDF Content: ${fileName}] - PDF text extraction failed: ${error.message}`, method: "pdf_error_fallback" };
+      }
+    }
+
+    if (extension === "docx") {
+      try {
+        const mammoth = await import("mammoth");
+        const result = await mammoth.default.extractRawText({ buffer });
+        return { text: result.value || "", method: "mammoth" };
+      } catch (error) {
+        console.warn("Mammoth failed for DOCX attachment, trying docx-parser", { fileName, error: error.message });
+        try {
+          const { parseDocument } = await import("docx-parser");
+          const docxResult = await parseDocument(buffer);
+          return { text: docxResult.text || "", method: "docx_parser" };
+        } catch (docxError) {
+          console.error("DOCX extraction failed for attachment", { fileName, error: docxError.message });
+          return { text: `[DOCX Content: ${fileName}] - Text extraction failed`, method: "docx_extraction_failed" };
+        }
+      }
+    }
+
+    if (extension === "doc") {
+      try {
+        const mammoth = await import("mammoth");
+        const result = await mammoth.extractRawText({ buffer });
+        return { text: result.value || "", method: "mammoth_doc" };
+      } catch (error) {
+        console.error("DOC extraction failed for attachment", { fileName, error: error.message });
+        return { text: `[DOC Content: ${fileName}] - DOC text extraction failed`, method: "doc_extraction_failed" };
+      }
+    }
+
+    if (extension === "txt" || extension === "rtf" || extension === "csv") {
+      return { text: buffer.toString("utf-8"), method: extension };
+    }
+
+    return { text: buffer.toString("utf-8"), method: extension || "unknown" };
+  } catch (error) {
+    console.error("Unexpected error extracting attachment text", { fileName, error: error.message });
+    return { text: `[Error extracting text from ${fileName}: ${error.message}]`, method: "error" };
+  }
+}
+
+async function processAttachments(attachments = []) {
+  if (!Array.isArray(attachments) || attachments.length === 0) {
+    return [];
+  }
+
+  const processed = await Promise.all(
+    attachments.map(async (attachment) => {
+      const name = normalizeAttachmentName(attachment);
+      const type = attachment?.type || attachment?.contentType || null;
+      const size = attachment?.size || attachment?.bytes || null;
+
+      try {
+        const bufferResult = await fetchAttachmentBuffer(attachment);
+        if (!bufferResult?.buffer) {
+          console.warn("Skipping attachment without retrievable buffer", { name, key: attachment?.key });
+          return {
+            name,
+            type,
+            size,
+            key: attachment?.key || null,
+            extractionMethod: "unavailable",
+            text: "",
+            error: "File content could not be retrieved"
+          };
+        }
+
+        const { text, method } = await extractTextFromAttachment(bufferResult.buffer, name, type);
+        return {
+          name,
+          type,
+          size,
+          key: bufferResult.key || attachment?.key || null,
+          extractionMethod: method,
+          text,
+          bytes: bufferResult.buffer.length,
+          retrievalSource: bufferResult.source,
+          attemptedSources: bufferResult.attemptedSources || []
+        };
+      } catch (error) {
+        console.error("Error processing attachment", { name, error: error.message });
+        return {
+          name,
+          type,
+          size,
+          key: attachment?.key || null,
+          extractionMethod: "error",
+          text: "",
+          error: error.message
+        };
+      }
+    })
+  );
+
+  return processed;
+}
+
+function buildResponseDocuments(relevantDocuments, processedAttachments = []) {
+  return [
+    ...relevantDocuments.map((doc) => {
+      const isVeevaDoc = doc.source_type === "veeva";
+      const isUploadedDoc = doc.source_type === "upload";
+
+      if (isUploadedDoc) {
+        return {
+          id: doc.document_id || doc.id,
+          name: doc.document_name,
+          number: doc.original_filename || doc.document_name,
+          version: doc.version || "1.0",
+          type: doc.document_type || "uploaded_document",
+          status: "uploaded",
+          source_type: "upload",
+          isUploaded: true,
+        };
+      }
+
+      if (isVeevaDoc) {
+        const major = doc.major_version ?? doc.majorVersion ?? "0";
+        const minor = doc.minor_version ?? doc.minorVersion ?? "0";
+        return {
+          id: doc.veeva_document_id,
+          name: doc.document_name,
+          number: doc.document_number,
+          version: `${major}.${minor}`,
+          type: doc.document_type,
+          status: doc.status,
+          source_type: "veeva",
+        };
+      }
+
+      return {
+        id: doc.veeva_document_id || doc.document_id || doc.id || doc.number || doc.name,
+        name: doc.document_name || doc.name,
+        number: doc.document_number || doc.original_filename || doc.number || doc.document_name,
+        version: doc.version || "unknown",
+        type: doc.document_type || doc.type || "unknown",
+        status: doc.status || "unknown",
+        source_type: doc.source_type || "unknown",
+      };
+    }),
+    ...processedAttachments.map((attachment, index) => ({
+      id: attachment.key || `attachment_${index}`,
+      name: attachment.name,
+      number: attachment.name,
+      version: "attachment",
+      type: attachment.type || "user_attachment",
+      status: attachment.text && attachment.text.length > 0 ? "processed" : "unavailable",
+      source_type: "attachment",
+      isUploaded: true,
+      isAttachment: true,
+      extraction_method: attachment.extractionMethod,
+    })),
+  ];
+}
 
 // Function to detect comparison intent in user messages
 function detectComparisonIntent(message) {
@@ -157,11 +544,41 @@ export const handler = async (event) => {
       attachmentCount: Array.isArray(attachments) ? attachments.length : 0
     });
 
+    let processedAttachments = [];
+    if (Array.isArray(attachments) && attachments.length > 0) {
+      console.log('Processing user-provided attachments for chat context...', {
+        attachmentCount: attachments.length
+      });
+      try {
+        processedAttachments = await processAttachments(attachments);
+        console.log('Attachment processing completed', {
+          processedCount: processedAttachments.length,
+          successful: processedAttachments.filter(att => att.text && att.text.length > 0).length,
+          failed: processedAttachments.filter(att => att.error).length
+        });
+      } catch (attachmentError) {
+        console.error('Error processing attachments', {
+          message: attachmentError.message,
+          stack: attachmentError.stack
+        });
+        processedAttachments = attachments.map(attachment => ({
+          name: normalizeAttachmentName(attachment),
+          key: attachment?.key || null,
+          type: attachment?.type || attachment?.contentType || null,
+          size: attachment?.size || attachment?.bytes || null,
+          extractionMethod: 'error',
+          text: '',
+          error: attachmentError.message
+        }));
+      }
+    }
+
     // Generate embedding for the query
     console.log('Generating embedding for user query...');
     const embeddingStartTime = Date.now();
     let queryEmbedding = null;
-    
+    let vectorSearchFailed = false;
+
     try {
       const embeddingResponse = await openai.embeddings.create({
         model: "text-embedding-ada-002",
@@ -191,7 +608,6 @@ export const handler = async (event) => {
     let relevantChunks = [];
     let relevantDocuments = [];
     let relevantExternalResources = [];
-    let vectorSearchFailed = false;
     
     if (queryEmbedding) {
       // Perform vector similarity search
@@ -716,25 +1132,37 @@ export const handler = async (event) => {
       relevantExternalResources = [];
     }
 
-    if (relevantDocuments.length === 0 && relevantChunks.length === 0 && relevantExternalResources.length === 0) {
+    if (
+      relevantDocuments.length === 0 &&
+      relevantChunks.length === 0 &&
+      relevantExternalResources.length === 0 &&
+      processedAttachments.filter(att => att.text && att.text.trim().length > 0).length === 0
+    ) {
+      const attachmentIssues = processedAttachments.filter(att => !att.text || att.text.trim().length === 0);
+
       console.log('No relevant content found for query:', {
         message: message.substring(0, 100),
         vectorSearchFailed,
         documentIdsProvided: documentIds && documentIds.length > 0,
-        documentIdsCount: documentIds ? documentIds.length : 0
+        documentIdsCount: documentIds ? documentIds.length : 0,
+        attachmentIssues: attachmentIssues.length
       });
-      
+
+      const attachmentTroubleshooting = attachmentIssues.length > 0
+        ? `\n- ${attachmentIssues.length} attachment(s) could not be processed. Please confirm the files contain readable text and try re-uploading.`
+        : '';
+
       return {
         statusCode: 200,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          response: `I couldn't find any relevant documents or external resources to answer your question. 
+          response: `I couldn't find any relevant documents or external resources to answer your question.
 
 **Troubleshooting:**
 - ${vectorSearchFailed ? 'Vector search is not available (using keyword search fallback)' : 'Vector search completed but found no matches'}
 - ${documentIds && documentIds.length > 0 ? `You selected ${documentIds.length} document(s), but none contained relevant content` : 'No specific documents were selected'}
 - Please make sure documents have been indexed and contain relevant content
-- Try rephrasing your question or selecting different documents`,
+- Try rephrasing your question or selecting different documents${attachmentTroubleshooting}`,
           documents: [],
           externalResources: [],
           conversationHistory: [...conversationHistory, { role: 'user', content: message }],
@@ -745,7 +1173,8 @@ export const handler = async (event) => {
             externalResourcesUsed: 0,
             usingRAG: false,
             responseTime: 0,
-            tokensUsed: 0
+            tokensUsed: 0,
+            attachmentsProcessed: processedAttachments.length
           }
         })
       };
@@ -872,6 +1301,43 @@ Type: ${doc.document_type || 'Unknown'}`;
         }).join('\n\n');
     }
 
+    let attachmentsContext = '';
+    if (processedAttachments.length > 0) {
+      const attachmentsWithText = processedAttachments.map((attachment, index) => {
+        const truncatedText = truncateForContext(attachment.text || '');
+        const sizeLabel = typeof attachment.size === 'number'
+          ? `Size: ${(attachment.size / 1024).toFixed(1)} KB`
+          : attachment.bytes
+            ? `Size: ${(attachment.bytes / 1024).toFixed(1)} KB`
+            : null;
+        const methodLabel = attachment.extractionMethod
+          ? `Extraction: ${attachment.extractionMethod}`
+          : 'Extraction: unknown';
+        const retrievalLabel = attachment.retrievalSource
+          ? `Retrieved via: ${attachment.retrievalSource}`
+          : null;
+        const headerDetails = [sizeLabel, methodLabel, retrievalLabel]
+          .filter(Boolean)
+          .join(' | ');
+
+        return `**Attachment ${index + 1}: ${attachment.name}**${attachment.type ? ` (${attachment.type})` : ''}` +
+          (headerDetails ? `\n${headerDetails}` : '') +
+          (truncatedText
+            ? `\n\n${truncatedText}`
+            : '\n\n_No readable text was extracted from this attachment._');
+      }).join('\n\n---\n\n');
+
+      attachmentsContext = attachmentsWithText
+        ? `\n\n**User-Provided Attachments:**\n${attachmentsWithText}`
+        : '';
+    }
+
+    if (attachmentsContext) {
+      documentContext = documentContext
+        ? `${documentContext}${attachmentsContext}`
+        : attachmentsContext.replace(/^\n\n/, '');
+    }
+
     // Prepare the system prompt based on whether this is a comparison query
     const systemPrompt = isComparisonQuery && relevantChunks.length > 0
       ? `You are an AI assistant specialized in comparing pharmaceutical documents. You have access to content from multiple documents and need to perform a comprehensive comparison analysis.
@@ -945,6 +1411,70 @@ I don't have access to any specific documents or external resources for this que
 
 ${externalResourcesContext}`;
 
+    const externalResourcesPayload = relevantExternalResources.map((resource) => ({
+      id: resource.id,
+      title: resource.title,
+      url: resource.url,
+      description: resource.description,
+      category: resource.category,
+      tags: resource.tags || [],
+    }));
+
+    const elapsedBeforeLLM = Date.now() - startTime;
+    const remainingBudget = FUNCTION_TIMEOUT_MS - elapsedBeforeLLM;
+    const usableModelBudget = remainingBudget - RESPONSE_FINALIZATION_BUFFER_MS;
+
+    if (usableModelBudget <= MIN_LLM_TIME_BUDGET_MS) {
+      console.warn("Skipping LLM call due to low time budget", {
+        elapsedBeforeLLM,
+        remainingBudget,
+        usableModelBudget,
+        functionTimeoutMs: FUNCTION_TIMEOUT_MS,
+        minLlmBudgetMs: MIN_LLM_TIME_BUDGET_MS,
+        attachmentCount: processedAttachments.length,
+        relevantDocumentCount: relevantDocuments.length,
+        relevantChunkCount: relevantChunks.length,
+      });
+
+      const fallbackResponse =
+        "I gathered the requested documents and attachments, but the request is too large to analyze within the current time limit. " +
+        "Please narrow your question, remove some attachments, or try again with fewer documents.";
+
+      const responseDocuments = buildResponseDocuments(relevantDocuments, processedAttachments);
+      const responseDuration = Date.now() - startTime;
+
+      return {
+        statusCode: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          response: fallbackResponse,
+          documents: responseDocuments,
+          externalResources: externalResourcesPayload,
+          conversationHistory: [
+            ...conversationHistory.slice(-9),
+            { role: 'user', content: message },
+            { role: 'assistant', content: fallbackResponse },
+          ],
+          metadata: {
+            documentsUsed: relevantDocuments.length + processedAttachments.length,
+            chunksUsed: relevantChunks.length,
+            externalResourcesUsed: relevantExternalResources.length,
+            usingRAG: relevantChunks.length > 0,
+            responseTime: responseDuration,
+            tokensUsed: 0,
+            isComparisonQuery,
+            modelUsed: 'skipped',
+          attachmentsProcessed: processedAttachments.length,
+          timedOutBeforeModel: true,
+          remainingTimeBudgetMs: Math.max(remainingBudget, 0),
+          usableModelBudgetMs: Math.max(usableModelBudget, 0),
+          functionTimeoutMs: FUNCTION_TIMEOUT_MS,
+          minModelBudgetMs: MIN_LLM_TIME_BUDGET_MS,
+        },
+      }),
+    };
+    }
+
     // Prepare conversation messages
     const attachmentDetails = Array.isArray(attachments) && attachments.length > 0
       ? attachments
@@ -977,88 +1507,140 @@ ${externalResourcesContext}`;
       totalContextLength: systemPrompt.length + message.length,
       systemPromptLength: systemPrompt.length,
       documentContextLength: documentContext.length,
-      vectorSearchFailed
+      vectorSearchFailed,
+      attachmentContextIncluded: processedAttachments.length
     });
 
-    // Call Groq API
-    const groqStartTime = Date.now();
+    // Call language model API with Groq primary and OpenAI fallback
+    const primaryModel = "openai/gpt-oss-20b";
+    const groqTimeBudget = Math.min(usableModelBudget, GROQ_TIMEOUT_MS);
+    const llmStartTime = Date.now();
     let completion;
-    let response;
-    let groqDuration = 0;
-    let groqModelUsed = "openai/gpt-oss-20b";
-    
+    let response = "";
+    let modelDuration = 0;
+    let modelUsed = primaryModel;
+    let totalTokensUsed = 0;
+    let llmBudgetMs = groqTimeBudget;
+
     try {
-      completion = await groq.chat.completions.create({
-        model: groqModelUsed,
-        messages: messages,
+      completion = await runChatCompletionWithTimeout(groq, {
+        model: primaryModel,
+        messages,
         max_tokens: 2000,
         temperature: 0.3,
+      }, {
+        timeoutMs: groqTimeBudget,
+        label: "Groq chat completion",
       });
 
-      groqDuration = Date.now() - groqStartTime;
-      response = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
-      
+      modelDuration = Date.now() - llmStartTime;
+      totalTokensUsed = completion?.usage?.total_tokens || 0;
+      response = extractChoiceContent(completion?.choices?.[0]);
+
+      if (!response) {
+        const finishReason = completion?.choices?.[0]?.finish_reason;
+        throw new Error(
+          `Groq returned an empty response${finishReason ? ` (finish_reason: ${finishReason})` : ""}`
+        );
+      }
+
       console.log('Groq response received:', {
-        responseTime: `${groqDuration}ms`,
+        responseTime: `${modelDuration}ms`,
         responseLength: response.length,
         responsePreview: response.substring(0, 200) + (response.length > 200 ? '...' : ''),
-        tokensUsed: completion?.usage?.total_tokens || 0,
+        tokensUsed: totalTokensUsed,
         promptTokens: completion?.usage?.prompt_tokens || 0,
         completionTokens: completion?.usage?.completion_tokens || 0,
-        finishReason: completion.choices[0]?.finish_reason,
-        model: groqModelUsed
+        finishReason: completion?.choices?.[0]?.finish_reason,
+        model: modelUsed,
+        timeoutBudgetMs: groqTimeBudget,
       });
     } catch (groqError) {
-      console.error('Groq API error:', {
+      const groqDuration = Date.now() - llmStartTime;
+      console.error('Groq completion failed:', {
         message: groqError.message,
         status: groqError.status,
         code: groqError.code,
         type: groqError.type,
-        stack: groqError.stack,
-        model: "llama-3.1-70b-versatile",
+        model: primaryModel,
         messageCount: messages.length,
-        totalTokens: messages.reduce((sum, msg) => sum + (msg.content?.length || 0), 0)
+        totalPromptCharacters: messages.reduce((sum, msg) => sum + (msg.content?.length || 0), 0),
+        durationMs: groqDuration,
+        timeoutBudgetMs: groqTimeBudget,
       });
-      
-      // Try fallback to a different model
-      try {
-        const fallbackModel = "mixtral-8x7b-32768";
-        console.log(`Attempting fallback to ${fallbackModel}...`);
-        const fallbackStartTime = Date.now();
-        const fallbackCompletion = await groq.chat.completions.create({
-          model: fallbackModel,
-          messages: messages,
-          max_tokens: 2000,
-          temperature: 0.3,
+
+      const elapsedAfterGroqAttempt = Date.now() - startTime;
+      const remainingAfterGroq = FUNCTION_TIMEOUT_MS - elapsedAfterGroqAttempt;
+      const fallbackUsableBudget = remainingAfterGroq - RESPONSE_FINALIZATION_BUFFER_MS;
+
+      if (fallbackUsableBudget <= MIN_LLM_TIME_BUDGET_MS) {
+        console.warn('Skipping OpenAI fallback due to low remaining budget', {
+          fallbackUsableBudget,
+          remainingAfterGroq,
+          responseFinalizationBufferMs: RESPONSE_FINALIZATION_BUFFER_MS,
+          minLlmBudgetMs: MIN_LLM_TIME_BUDGET_MS,
+          groqErrorCode: groqError.code,
         });
 
-        completion = fallbackCompletion;
-        response = fallbackCompletion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
-        groqDuration = Date.now() - fallbackStartTime;
-        groqModelUsed = fallbackModel;
+        modelDuration = groqDuration;
+        modelUsed = groqError?.code === 'timeout' ? 'groq_timeout' : 'groq_error';
+        response = "I started analyzing the provided documents but ran out of time before completing the response. Please try again with fewer attachments or a narrower question.";
+        totalTokensUsed = 0;
+      } else {
+        const fallbackModel = "gpt-4o-mini";
+        const openaiTimeBudget = Math.min(fallbackUsableBudget, OPENAI_TIMEOUT_MS);
+        llmBudgetMs = openaiTimeBudget;
 
-        console.log('Fallback model succeeded', {
-          responseTime: `${groqDuration}ms`,
-          responseLength: response.length,
-          model: groqModelUsed
-        });
-        
-      } catch (fallbackError) {
-        console.error('Fallback model also failed:', {
-          message: fallbackError.message,
-          status: fallbackError.status,
-          code: fallbackError.code
-        });
-        
-        return {
-          statusCode: 500,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            error: "AI service temporarily unavailable",
-            details: `Primary model failed: ${groqError.message}. Fallback model failed: ${fallbackError.message}`,
-            response: "I'm sorry, I encountered an error while processing your request. Please try again in a moment."
-          })
-        };
+        try {
+          const fallbackStart = Date.now();
+          const fallbackCompletion = await runChatCompletionWithTimeout(openai, {
+            model: fallbackModel,
+            messages,
+            max_tokens: 2000,
+            temperature: 0.3,
+          }, {
+            timeoutMs: openaiTimeBudget,
+            label: "OpenAI fallback chat completion",
+          });
+
+          completion = fallbackCompletion;
+          modelUsed = fallbackModel;
+          modelDuration = Date.now() - fallbackStart;
+          totalTokensUsed = fallbackCompletion?.usage?.total_tokens || 0;
+          response = extractChoiceContent(fallbackCompletion?.choices?.[0]);
+
+          if (!response) {
+            const finishReason = fallbackCompletion?.choices?.[0]?.finish_reason;
+            throw new Error(
+              `OpenAI fallback returned an empty response${finishReason ? ` (finish_reason: ${finishReason})` : ""}`
+            );
+          }
+
+          console.log('OpenAI fallback response received:', {
+            model: fallbackModel,
+            responseTime: `${modelDuration}ms`,
+            responseLength: response.length,
+            responsePreview: response.substring(0, 200) + (response.length > 200 ? '...' : ''),
+            tokensUsed: totalTokensUsed,
+            finishReason: fallbackCompletion?.choices?.[0]?.finish_reason,
+            timeoutBudgetMs: openaiTimeBudget,
+          });
+        } catch (fallbackError) {
+          console.error('OpenAI fallback failed:', {
+            message: fallbackError.message,
+            status: fallbackError.status,
+            code: fallbackError.code,
+            type: fallbackError.type,
+            timeoutBudgetMs: openaiTimeBudget,
+          });
+
+          modelDuration = Date.now() - llmStartTime;
+          modelUsed = fallbackError?.code === 'timeout' ? 'openai_timeout' : 'unavailable';
+          response = fallbackError?.code === 'timeout'
+            ? "I started analyzing the provided documents but ran out of time before completing the response. Please try again with fewer attachments or a narrower question."
+            : "I reviewed the provided context but could not generate a response. Please try simplifying your request or removing large attachments.";
+          totalTokensUsed = 0;
+        }
       }
     }
 
@@ -1096,6 +1678,8 @@ ${externalResourcesContext}`;
     const totalDuration = Date.now() - startTime;
     console.log('Chat with documents completed:', {
       totalDuration: `${totalDuration}ms`,
+      modelDuration: `${modelDuration}ms`,
+      modelTimeoutBudgetMs: llmBudgetMs,
       documentsUsed: relevantDocuments.length,
       externalResourcesUsed: relevantExternalResources.length,
       isComparisonQuery,
@@ -1107,57 +1691,28 @@ ${externalResourcesContext}`;
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         response, // Keep for backward compatibility
-        documents: relevantDocuments.map(doc => {
-          // Handle both Veeva and uploaded documents
-          const isVeevaDoc = doc.source_type === 'veeva';
-          const isUploadedDoc = doc.source_type === 'upload';
-          
-          if (isUploadedDoc) {
-            return {
-              id: doc.document_id || doc.id,
-              name: doc.document_name,
-              number: doc.original_filename || doc.document_name, // Use filename as number for uploaded docs
-              version: doc.version || '1.0',
-              type: doc.document_type || 'uploaded_document',
-              status: 'uploaded',
-              source_type: 'upload',
-              isUploaded: true
-            };
-          } else {
-            // Veeva document
-            return {
-              id: doc.veeva_document_id,
-              name: doc.document_name,
-              number: doc.document_number,
-              version: `${doc.major_version}.${doc.minor_version}`,
-              type: doc.document_type,
-              status: doc.status,
-              source_type: 'veeva'
-            };
-          }
-        }),
-        externalResources: relevantExternalResources.map(resource => ({
-          id: resource.id,
-          title: resource.title,
-          url: resource.url,
-          description: resource.description,
-          category: resource.category,
-          tags: resource.tags || []
-        })),
+        documents: buildResponseDocuments(relevantDocuments, processedAttachments),
+        externalResources: externalResourcesPayload,
         conversationHistory: [
           ...conversationHistory.slice(-9), // Keep last 9 to make room for new messages
           { role: 'user', content: message },
           { role: 'assistant', content: response }
         ],
         metadata: {
-          documentsUsed: relevantDocuments.length,
+          documentsUsed: relevantDocuments.length + processedAttachments.length,
           chunksUsed: relevantChunks.length,
           externalResourcesUsed: relevantExternalResources.length,
           usingRAG: relevantChunks.length > 0,
-          responseTime: groqDuration,
-          tokensUsed: completion?.usage?.total_tokens || 0,
+          responseTime: modelDuration,
+          tokensUsed: totalTokensUsed,
           isComparisonQuery: isComparisonQuery,
-          modelUsed: groqModelUsed
+          modelUsed: modelUsed,
+          attachmentsProcessed: processedAttachments.length,
+          timedOutBeforeModel: false,
+          functionTimeoutMs: FUNCTION_TIMEOUT_MS,
+          minModelBudgetMs: MIN_LLM_TIME_BUDGET_MS,
+          modelTimeoutBudgetMs: llmBudgetMs,
+          responseFinalizationBufferMs: RESPONSE_FINALIZATION_BUFFER_MS
         }
       })
     };
