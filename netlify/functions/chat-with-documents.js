@@ -3,12 +3,35 @@ import OpenAI from "openai";
 import Groq from "groq-sdk";
 import { getStore } from "@netlify/blobs";
 
+function parseDuration(value, fallback) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  }
+
+  return fallback;
+}
+
+const OPENAI_TIMEOUT_MS = parseDuration(process.env.OPENAI_TIMEOUT_MS, 20000);
+const GROQ_TIMEOUT_MS = parseDuration(process.env.GROQ_TIMEOUT_MS, 20000);
+const FUNCTION_TIMEOUT_MS = parseDuration(process.env.CHAT_FUNCTION_TIMEOUT_MS, 25000);
+const MIN_LLM_TIME_BUDGET_MS = Math.min(
+  parseDuration(process.env.CHAT_MIN_LLM_BUDGET_MS, 6000),
+  FUNCTION_TIMEOUT_MS
+);
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  timeout: OPENAI_TIMEOUT_MS,
 });
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
+  timeout: GROQ_TIMEOUT_MS,
 });
 
 const CHAT_UPLOADS_STORE = "chat-uploads";
@@ -222,56 +245,113 @@ async function processAttachments(attachments = []) {
     return [];
   }
 
-  const processed = [];
+  const processed = await Promise.all(
+    attachments.map(async (attachment) => {
+      const name = normalizeAttachmentName(attachment);
+      const type = attachment?.type || attachment?.contentType || null;
+      const size = attachment?.size || attachment?.bytes || null;
 
-  for (const attachment of attachments) {
-    const name = normalizeAttachmentName(attachment);
-    const type = attachment?.type || attachment?.contentType || null;
-    const size = attachment?.size || attachment?.bytes || null;
+      try {
+        const bufferResult = await fetchAttachmentBuffer(attachment);
+        if (!bufferResult?.buffer) {
+          console.warn("Skipping attachment without retrievable buffer", { name, key: attachment?.key });
+          return {
+            name,
+            type,
+            size,
+            key: attachment?.key || null,
+            extractionMethod: "unavailable",
+            text: "",
+            error: "File content could not be retrieved"
+          };
+        }
 
-    try {
-      const bufferResult = await fetchAttachmentBuffer(attachment);
-      if (!bufferResult?.buffer) {
-        console.warn("Skipping attachment without retrievable buffer", { name, key: attachment?.key });
-        processed.push({
+        const { text, method } = await extractTextFromAttachment(bufferResult.buffer, name, type);
+        return {
+          name,
+          type,
+          size,
+          key: bufferResult.key || attachment?.key || null,
+          extractionMethod: method,
+          text,
+          bytes: bufferResult.buffer.length,
+          retrievalSource: bufferResult.source,
+          attemptedSources: bufferResult.attemptedSources || []
+        };
+      } catch (error) {
+        console.error("Error processing attachment", { name, error: error.message });
+        return {
           name,
           type,
           size,
           key: attachment?.key || null,
-          extractionMethod: "unavailable",
+          extractionMethod: "error",
           text: "",
-          error: "File content could not be retrieved"
-        });
-        continue;
+          error: error.message
+        };
       }
-
-      const { text, method } = await extractTextFromAttachment(bufferResult.buffer, name, type);
-      processed.push({
-        name,
-        type,
-        size,
-        key: bufferResult.key || attachment?.key || null,
-        extractionMethod: method,
-        text,
-        bytes: bufferResult.buffer.length,
-        retrievalSource: bufferResult.source,
-        attemptedSources: bufferResult.attemptedSources || []
-      });
-    } catch (error) {
-      console.error("Error processing attachment", { name, error: error.message });
-      processed.push({
-        name,
-        type,
-        size,
-        key: attachment?.key || null,
-        extractionMethod: "error",
-        text: "",
-        error: error.message
-      });
-    }
-  }
+    })
+  );
 
   return processed;
+}
+
+function buildResponseDocuments(relevantDocuments, processedAttachments = []) {
+  return [
+    ...relevantDocuments.map((doc) => {
+      const isVeevaDoc = doc.source_type === "veeva";
+      const isUploadedDoc = doc.source_type === "upload";
+
+      if (isUploadedDoc) {
+        return {
+          id: doc.document_id || doc.id,
+          name: doc.document_name,
+          number: doc.original_filename || doc.document_name,
+          version: doc.version || "1.0",
+          type: doc.document_type || "uploaded_document",
+          status: "uploaded",
+          source_type: "upload",
+          isUploaded: true,
+        };
+      }
+
+      if (isVeevaDoc) {
+        const major = doc.major_version ?? doc.majorVersion ?? "0";
+        const minor = doc.minor_version ?? doc.minorVersion ?? "0";
+        return {
+          id: doc.veeva_document_id,
+          name: doc.document_name,
+          number: doc.document_number,
+          version: `${major}.${minor}`,
+          type: doc.document_type,
+          status: doc.status,
+          source_type: "veeva",
+        };
+      }
+
+      return {
+        id: doc.veeva_document_id || doc.document_id || doc.id || doc.number || doc.name,
+        name: doc.document_name || doc.name,
+        number: doc.document_number || doc.original_filename || doc.number || doc.document_name,
+        version: doc.version || "unknown",
+        type: doc.document_type || doc.type || "unknown",
+        status: doc.status || "unknown",
+        source_type: doc.source_type || "unknown",
+      };
+    }),
+    ...processedAttachments.map((attachment, index) => ({
+      id: attachment.key || `attachment_${index}`,
+      name: attachment.name,
+      number: attachment.name,
+      version: "attachment",
+      type: attachment.type || "user_attachment",
+      status: attachment.text && attachment.text.length > 0 ? "processed" : "unavailable",
+      source_type: "attachment",
+      isUploaded: true,
+      isAttachment: true,
+      extraction_method: attachment.extractionMethod,
+    })),
+  ];
 }
 
 // Function to detect comparison intent in user messages
@@ -1288,6 +1368,67 @@ I don't have access to any specific documents or external resources for this que
 
 ${externalResourcesContext}`;
 
+    const externalResourcesPayload = relevantExternalResources.map((resource) => ({
+      id: resource.id,
+      title: resource.title,
+      url: resource.url,
+      description: resource.description,
+      category: resource.category,
+      tags: resource.tags || [],
+    }));
+
+    const elapsedBeforeLLM = Date.now() - startTime;
+    const remainingBudget = FUNCTION_TIMEOUT_MS - elapsedBeforeLLM;
+
+    if (remainingBudget <= MIN_LLM_TIME_BUDGET_MS) {
+      console.warn("Skipping LLM call due to low time budget", {
+        elapsedBeforeLLM,
+        remainingBudget,
+        functionTimeoutMs: FUNCTION_TIMEOUT_MS,
+        minLlmBudgetMs: MIN_LLM_TIME_BUDGET_MS,
+        attachmentCount: processedAttachments.length,
+        relevantDocumentCount: relevantDocuments.length,
+        relevantChunkCount: relevantChunks.length,
+      });
+
+      const fallbackResponse =
+        "I gathered the requested documents and attachments, but the request is too large to analyze within the current time limit. " +
+        "Please narrow your question, remove some attachments, or try again with fewer documents.";
+
+      const responseDocuments = buildResponseDocuments(relevantDocuments, processedAttachments);
+      const responseDuration = Date.now() - startTime;
+
+      return {
+        statusCode: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          response: fallbackResponse,
+          documents: responseDocuments,
+          externalResources: externalResourcesPayload,
+          conversationHistory: [
+            ...conversationHistory.slice(-9),
+            { role: 'user', content: message },
+            { role: 'assistant', content: fallbackResponse },
+          ],
+          metadata: {
+            documentsUsed: relevantDocuments.length + processedAttachments.length,
+            chunksUsed: relevantChunks.length,
+            externalResourcesUsed: relevantExternalResources.length,
+            usingRAG: relevantChunks.length > 0,
+            responseTime: responseDuration,
+            tokensUsed: 0,
+            isComparisonQuery,
+            modelUsed: 'skipped',
+            attachmentsProcessed: processedAttachments.length,
+            timedOutBeforeModel: true,
+            remainingTimeBudgetMs: Math.max(remainingBudget, 0),
+            functionTimeoutMs: FUNCTION_TIMEOUT_MS,
+            minModelBudgetMs: MIN_LLM_TIME_BUDGET_MS,
+          },
+        }),
+      };
+    }
+
     // Prepare conversation messages
     const attachmentDetails = Array.isArray(attachments) && attachments.length > 0
       ? attachments
@@ -1463,57 +1604,8 @@ ${externalResourcesContext}`;
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         response, // Keep for backward compatibility
-        documents: [
-          ...relevantDocuments.map(doc => {
-            // Handle both Veeva and uploaded documents
-            const isVeevaDoc = doc.source_type === 'veeva';
-            const isUploadedDoc = doc.source_type === 'upload';
-
-            if (isUploadedDoc) {
-              return {
-                id: doc.document_id || doc.id,
-                name: doc.document_name,
-                number: doc.original_filename || doc.document_name, // Use filename as number for uploaded docs
-                version: doc.version || '1.0',
-                type: doc.document_type || 'uploaded_document',
-                status: 'uploaded',
-                source_type: 'upload',
-                isUploaded: true
-              };
-            } else {
-              // Veeva document
-              return {
-                id: doc.veeva_document_id,
-                name: doc.document_name,
-                number: doc.document_number,
-                version: `${doc.major_version}.${doc.minor_version}`,
-                type: doc.document_type,
-                status: doc.status,
-                source_type: 'veeva'
-              };
-            }
-          }),
-          ...processedAttachments.map((attachment, index) => ({
-            id: attachment.key || `attachment_${index}`,
-            name: attachment.name,
-            number: attachment.name,
-            version: 'attachment',
-            type: attachment.type || 'user_attachment',
-            status: attachment.text && attachment.text.length > 0 ? 'processed' : 'unavailable',
-            source_type: 'attachment',
-            isUploaded: true,
-            isAttachment: true,
-            extraction_method: attachment.extractionMethod
-          }))
-        ],
-        externalResources: relevantExternalResources.map(resource => ({
-          id: resource.id,
-          title: resource.title,
-          url: resource.url,
-          description: resource.description,
-          category: resource.category,
-          tags: resource.tags || []
-        })),
+        documents: buildResponseDocuments(relevantDocuments, processedAttachments),
+        externalResources: externalResourcesPayload,
         conversationHistory: [
           ...conversationHistory.slice(-9), // Keep last 9 to make room for new messages
           { role: 'user', content: message },
@@ -1528,7 +1620,10 @@ ${externalResourcesContext}`;
           tokensUsed: totalTokensUsed,
           isComparisonQuery: isComparisonQuery,
           modelUsed: modelUsed,
-          attachmentsProcessed: processedAttachments.length
+          attachmentsProcessed: processedAttachments.length,
+          timedOutBeforeModel: false,
+          functionTimeoutMs: FUNCTION_TIMEOUT_MS,
+          minModelBudgetMs: MIN_LLM_TIME_BUDGET_MS
         }
       })
     };
