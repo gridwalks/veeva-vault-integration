@@ -44,6 +44,25 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
   const uploadedBlobKeysRef = useRef([]);
   const prevLoadingRef = useRef(false);
 
+  const getDocumentSafeName = (doc) => doc?.safeFileName || doc?.safe_file_name || null;
+  const isUploadedDocument = (doc) => doc?.source_type === 'upload';
+  const getDocumentDisplayName = (doc) => {
+    if (!doc) return 'Untitled Document';
+    const safeName = getDocumentSafeName(doc);
+    const baseName = doc?.name || doc?.document_name || doc?.original_filename || doc?.document_number || 'Untitled Document';
+    if (isUploadedDocument(doc)) {
+      return safeName || baseName;
+    }
+    return baseName;
+  };
+  const getDocumentDisplayNumber = (doc) => {
+    if (!doc) return '—';
+    if (isUploadedDocument(doc)) {
+      return getDocumentSafeName(doc) || doc?.number || doc?.original_filename || doc?.document_name || 'uploaded_document';
+    }
+    return doc?.number || doc?.document_number || doc?.name || '—';
+  };
+
   useEffect(() => {
     if (isOpen) {
       // Initialize user session
@@ -459,14 +478,17 @@ The files will upload automatically and I'll be able to perform a detailed compa
   };
 
   const handleOpenDocument = (document) => {
+    const displayName = getDocumentDisplayName(document);
+    const displayNumber = getDocumentDisplayNumber(document);
+
     if (onOpenDocumentInPane) {
       // Route document to the right pane
       const mappedDocument = {
         veeva_document_id: document.id,
-        document_name: document.name,
+        document_name: displayName,
         document_type: document.type,
         version: document.version,
-        document_number: document.number,
+        document_number: displayNumber,
         // Add uploaded document properties
         isUploaded: document.isUploaded || document.source_type === 'upload',
         source_type: document.source_type || 'veeva'
@@ -480,14 +502,14 @@ The files will upload automatically and I'll be able to perform a detailed compa
           const url = downloadUploadedDocumentUrl({ documentId: document.id });
           setSelectedDocument({
             url: url,
-            name: document.name
+            name: displayName
           });
         });
       } else {
         // For Veeva documents, use the regular download API
         setSelectedDocument({
           url: `/api/download-file?docId=${document.id}&major=${document.version.split('.')[0]}&minor=${document.version.split('.')[1]}`,
-          name: document.name
+          name: displayName
         });
       }
       setViewerOpen(true);
@@ -507,12 +529,12 @@ The files will upload automatically and I'll be able to perform a detailed compa
         documentsCount: documents.length,
         documents: documents.map(doc => ({
           id: doc.id || doc.veeva_document_id,
-          name: doc.name || doc.document_name
+          name: getDocumentDisplayName(doc)
         }))
       });
 
       const documentIds = documents.map(doc => doc.id || doc.veeva_document_id).filter(Boolean);
-      const documentNames = documents.map(doc => doc.name || doc.document_name).filter(Boolean);
+      const documentNames = documents.map(doc => getDocumentDisplayName(doc)).filter(Boolean);
       
       const result = await createQAInteraction({
         question,
@@ -893,58 +915,63 @@ The files will upload automatically and I'll be able to perform a detailed compa
               gap: '6px',
               fontFamily: 'inherit'
             }}>
-              {usedDocuments.slice(0, 5).map((doc, docIndex) => (
-                <div key={docIndex} style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '8px',
-                  backgroundColor: 'white',
-                  borderRadius: '6px',
-                  border: '1px solid #e0e0e0',
-                  fontFamily: 'inherit'
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: '#333',
-                      marginBottom: '2px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      fontFamily: 'inherit'
-                    }}>
-                      {doc.name}
+              {usedDocuments.slice(0, 5).map((doc, docIndex) => {
+                const displayName = getDocumentDisplayName(doc);
+                const displayNumber = getDocumentDisplayNumber(doc);
+
+                return (
+                  <div key={docIndex} style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '8px',
+                    backgroundColor: 'white',
+                    borderRadius: '6px',
+                    border: '1px solid #e0e0e0',
+                    fontFamily: 'inherit'
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        color: '#333',
+                        marginBottom: '2px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontFamily: 'inherit'
+                      }}>
+                        {displayName}
+                      </div>
+                      <div style={{
+                        fontSize: '11px',
+                        color: '#666',
+                        fontFamily: 'inherit'
+                      }}>
+                        {displayNumber} • v{doc.version} • {doc.type}
+                      </div>
                     </div>
-                    <div style={{
-                      fontSize: '11px',
-                      color: '#666',
-                      fontFamily: 'inherit'
-                    }}>
-                      {doc.number} • v{doc.version} • {doc.type}
-                    </div>
+                    <button
+                      onClick={() => handleOpenDocument(doc)}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#6b7280',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                        fontWeight: '500',
+                        whiteSpace: 'nowrap',
+                        marginLeft: '8px',
+                        fontFamily: 'inherit'
+                      }}
+                    >
+                      Open
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleOpenDocument(doc)}
-                    style={{
-                      padding: '6px 12px',
-                      backgroundColor: '#6b7280',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '11px',
-                      fontWeight: '500',
-                      whiteSpace: 'nowrap',
-                      marginLeft: '8px',
-                      fontFamily: 'inherit'
-                    }}
-                  >
-                    Open
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -1111,22 +1138,28 @@ The files will upload automatically and I'll be able to perform a detailed compa
                 Using {usedDocuments.length > 5 ? `5 of ${usedDocuments.length}` : usedDocuments.length} document{usedDocuments.length !== 1 ? 's' : ''}:
               </strong>
               <div style={{ marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '8px', fontFamily: 'inherit' }}>
-                {usedDocuments.slice(0, 5).map((doc, index) => (
-                  <span
-                    key={index}
-                    style={{
-                      backgroundColor: '#6b7280',
-                      color: 'white',
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      fontSize: '11px',
-                      fontFamily: 'inherit'
-                    }}
-                    title={`${doc.name} (${doc.number})`}
-                  >
-                    {doc.name.length > 30 ? doc.name.substring(0, 30) + '...' : doc.name}
-                  </span>
-                ))}
+                {usedDocuments.slice(0, 5).map((doc, index) => {
+                  const displayName = getDocumentDisplayName(doc);
+                  const displayNumber = getDocumentDisplayNumber(doc);
+                  const truncatedName = displayName.length > 30 ? displayName.substring(0, 30) + '...' : displayName;
+
+                  return (
+                    <span
+                      key={index}
+                      style={{
+                        backgroundColor: '#6b7280',
+                        color: 'white',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        fontSize: '11px',
+                        fontFamily: 'inherit'
+                      }}
+                      title={`${displayName} (${displayNumber})`}
+                    >
+                      {truncatedName}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1163,9 +1196,10 @@ The files will upload automatically and I'll be able to perform a detailed compa
                   }}>
                     <strong>Selected documents:</strong>
                     <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
-                      {selectedDocuments.map((doc, index) => (
-                        <li key={index}>{doc.document_name}</li>
-                      ))}
+                      {selectedDocuments.map((doc, index) => {
+                        const displayName = getDocumentDisplayName(doc);
+                        return <li key={index}>{displayName}</li>;
+                      })}
                     </ul>
                   </div>
                 )}

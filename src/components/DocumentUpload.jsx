@@ -8,8 +8,10 @@ import {
 
 const initialMetadataForm = {
   documentName: '',
+  safeFileName: '',
   documentType: 'uploaded_document',
   version: '',
+  manualSummary: '',
   aiSummary: ''
 };
 
@@ -183,8 +185,10 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
     setEditingDocumentId(doc.id);
     setMetadataForm({
       documentName: fallbackName,
+      safeFileName: doc.safe_file_name || '',
       documentType: doc.document_type || 'uploaded_document',
       version: doc.version || '',
+      manualSummary: doc.manual_summary || '',
       aiSummary: doc.ai_summary || ''
     });
     setMetadataError(null);
@@ -208,6 +212,8 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
     if (!editingDocumentId) return;
 
     const trimmedName = metadataForm.documentName.trim();
+    const trimmedSafeName = metadataForm.safeFileName.trim();
+    const trimmedManualSummary = metadataForm.manualSummary.trim();
     if (!trimmedName) {
       setMetadataError('Document name is required.');
       return;
@@ -226,8 +232,10 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
         documentId: editingDocumentId,
         userId,
         documentName: trimmedName,
+        safeFileName: trimmedSafeName || null,
         documentType: metadataForm.documentType,
         version: metadataForm.version,
+        manualSummary: trimmedManualSummary || null,
         aiSummary: metadataForm.aiSummary
       });
 
@@ -588,6 +596,18 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
           </button>
         </div>
 
+        <p style={{
+          margin: '0 0 20px 0',
+          fontSize: '13px',
+          color: '#4b5563',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        }}>
+          Select a document and choose <strong>Edit</strong> to update its details. A green{' '}
+          <strong>Save Changes</strong> button remains at the top of the row, and a larger{' '}
+          <strong>Save Metadata Changes</strong> button is shown beneath the summaries so you can
+          commit updates without scrolling back.
+        </p>
+
         {loadingDocuments ? (
           <div style={{
             padding: '40px',
@@ -633,7 +653,7 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
           }}>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '1.6fr 1fr 1fr 1fr 220px',
+              gridTemplateColumns: '1.6fr 1.2fr 1fr 1fr 1fr 220px',
               gap: '16px',
               padding: '12px 16px',
               backgroundColor: '#f8fafc',
@@ -644,6 +664,7 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}>
               <div>Document Name</div>
+              <div>Safe File Name</div>
               <div>Version</div>
               <div>Type</div>
               <div>Uploaded</div>
@@ -653,7 +674,8 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
               const isEditing = editingDocumentId === doc.id;
               const uploadedDate = doc.created_at ? new Date(doc.created_at).toLocaleString() : 'N/A';
               const updatedDate = doc.updated_at ? new Date(doc.updated_at).toLocaleString() : uploadedDate;
-              const summaryText = doc.ai_summary || 'No summary available.';
+              const manualSummaryText = doc.manual_summary || 'No manual summary provided.';
+              const aiSummaryText = doc.ai_summary || 'No AI summary available.';
 
               return (
                 <div
@@ -667,7 +689,7 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '1.6fr 1fr 1fr 1fr 220px',
+                      gridTemplateColumns: '1.6fr 1.2fr 1fr 1fr 1fr 220px',
                       gap: '16px',
                       padding: '12px 16px',
                       alignItems: 'center',
@@ -703,6 +725,25 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                       <span style={{ fontSize: '12px', color: '#6b7280' }}>
                         {doc.original_filename || '—'}
                       </span>
+                    </div>
+
+                    <div style={{ fontSize: '13px', color: '#374151' }}>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={metadataForm.safeFileName}
+                          onChange={(e) => handleMetadataFieldChange('safeFileName', e.target.value)}
+                          placeholder="Safe file name"
+                          style={{
+                            padding: '8px',
+                            border: '1px solid #cbd5f5',
+                            borderRadius: '4px',
+                            fontSize: '13px'
+                          }}
+                        />
+                      ) : (
+                        doc.safe_file_name || '—'
+                      )}
                     </div>
 
                     <div style={{ fontSize: '13px', color: '#374151' }}>
@@ -790,9 +831,9 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                           </button>
                         </>
                       ) : (
-                        <>
-                          <a
-                            href={downloadUploadedDocumentUrl({ documentId: doc.id })}
+                          <>
+                            <a
+                              href={downloadUploadedDocumentUrl({ documentId: doc.id })}
                             download
                             style={{
                               padding: '8px 16px',
@@ -850,38 +891,82 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                     borderTop: '1px solid #e5e7eb'
                   }}>
                     <div style={{
-                      fontSize: '12px',
-                      color: '#6b7280',
-                      marginBottom: '6px',
-                      fontWeight: '500'
+                      display: 'grid',
+                      gap: '16px',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))'
                     }}>
-                      AI Summary
+                      <div>
+                        <div style={{
+                          fontSize: '12px',
+                          color: '#6b7280',
+                          marginBottom: '6px',
+                          fontWeight: '500'
+                        }}>
+                          Manual Summary
+                        </div>
+                        {isEditing ? (
+                          <textarea
+                            value={metadataForm.manualSummary}
+                            onChange={(e) => handleMetadataFieldChange('manualSummary', e.target.value)}
+                            placeholder="Add your own description to help teammates find this document"
+                            rows={4}
+                            style={{
+                              width: '100%',
+                              padding: '10px',
+                              border: '1px solid #cbd5f5',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              resize: 'vertical'
+                            }}
+                          />
+                        ) : (
+                          <p style={{
+                            margin: 0,
+                            fontSize: '13px',
+                            color: '#374151',
+                            lineHeight: 1.5
+                          }}>
+                            {manualSummaryText}
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <div style={{
+                          fontSize: '12px',
+                          color: '#6b7280',
+                          marginBottom: '6px',
+                          fontWeight: '500'
+                        }}>
+                          AI Summary
+                        </div>
+                        {isEditing ? (
+                          <textarea
+                            value={metadataForm.aiSummary}
+                            onChange={(e) => handleMetadataFieldChange('aiSummary', e.target.value)}
+                            placeholder="Short description to help teammates find this document"
+                            rows={4}
+                            style={{
+                              width: '100%',
+                              padding: '10px',
+                              border: '1px solid #cbd5f5',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              resize: 'vertical'
+                            }}
+                          />
+                        ) : (
+                          <p style={{
+                            margin: 0,
+                            fontSize: '13px',
+                            color: '#374151',
+                            lineHeight: 1.5
+                          }}>
+                            {aiSummaryText}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    {isEditing ? (
-                      <textarea
-                        value={metadataForm.aiSummary}
-                        onChange={(e) => handleMetadataFieldChange('aiSummary', e.target.value)}
-                        placeholder="Short description to help teammates find this document"
-                        rows={4}
-                        style={{
-                          width: '100%',
-                          padding: '10px',
-                          border: '1px solid #cbd5f5',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          resize: 'vertical'
-                        }}
-                      />
-                    ) : (
-                      <p style={{
-                        margin: 0,
-                        fontSize: '13px',
-                        color: '#374151',
-                        lineHeight: 1.5
-                      }}>
-                        {summaryText}
-                      </p>
-                    )}
 
                     <div style={{
                       marginTop: '10px',
@@ -890,6 +975,51 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                     }}>
                       {formatFileSize(Number(doc.file_size) || 0)} • {doc.mime_type || 'Unknown MIME type'}
                     </div>
+                    {isEditing && (
+                      <div
+                        style={{
+                          marginTop: '16px',
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '8px',
+                          justifyContent: 'flex-end'
+                        }}
+                      >
+                        <button
+                          onClick={saveMetadataChanges}
+                          disabled={metadataSaving}
+                          style={{
+                            padding: '10px 18px',
+                            backgroundColor: metadataSaving ? '#9ca3af' : '#16a34a',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: metadataSaving ? 'not-allowed' : 'pointer',
+                            boxShadow: '0 1px 2px rgba(16, 185, 129, 0.25)'
+                          }}
+                        >
+                          {metadataSaving ? 'Saving…' : 'Save Metadata Changes'}
+                        </button>
+                        <button
+                          onClick={cancelEditingDocument}
+                          disabled={metadataSaving}
+                          style={{
+                            padding: '10px 18px',
+                            backgroundColor: '#f3f4f6',
+                            color: '#374151',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            fontWeight: '500',
+                            cursor: metadataSaving ? 'not-allowed' : 'pointer'
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
