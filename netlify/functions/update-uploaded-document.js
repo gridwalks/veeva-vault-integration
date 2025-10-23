@@ -175,6 +175,30 @@ export const handler = async (event) => {
       };
     }
 
+    const existingDocResult = await pool.query(
+      `SELECT user_id
+         FROM qms_chat_documents
+        WHERE id = $1
+          AND source_type = 'upload'`,
+      [documentId]
+    );
+
+    if (existingDocResult.rowCount === 0) {
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: 'Document not found'
+        })
+      };
+    }
+
+    const originalUserId = existingDocResult.rows[0]?.user_id || null;
+    if (originalUserId && originalUserId !== userId) {
+      warnings.push('Document updated by a different user than the original uploader');
+    }
+
     const updateFields = [...setClauses, 'updated_at = CURRENT_TIMESTAMP'];
 
     const returningFields = [
@@ -198,10 +222,9 @@ export const handler = async (event) => {
       `UPDATE qms_chat_documents
        SET ${updateFields.join(', ')}
        WHERE id = $${values.length + 1}
-         AND user_id = $${values.length + 2}
          AND source_type = 'upload'
        RETURNING ${returningFields.join(', ')}`,
-      [...values, documentId, userId]
+      [...values, documentId]
     );
 
     if (result.rowCount === 0) {
@@ -210,7 +233,7 @@ export const handler = async (event) => {
         headers,
         body: JSON.stringify({
           success: false,
-          error: 'Document not found or access denied'
+          error: 'Document not found'
         })
       };
     }
