@@ -8,6 +8,7 @@ import { createHash } from 'crypto';
 // import pdfParse from 'pdf-parse';
 // import { chunkText, validateChunks } from './chunking-utils.js';
 import { getStore } from '@netlify/blobs';
+import { ensureUploadedDocumentColumnSupport } from './uploaded-document-columns.js';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -352,54 +353,47 @@ async function storeDocument(fileName, extractedText, summary, fileSize, extract
     // Ensure table structure is up to date
     await createDocumentsTable();
 
-    // Try to insert with all columns first, fall back to basic columns if new ones don't exist
-    let result;
+    const { safeFileName: hasSafeFileName, manualSummary: hasManualSummary } =
+      await ensureUploadedDocumentColumnSupport(pool);
+
     const safeFileName = generateSafeFileName(originalFileName || fileName);
-    try {
-      result = await pool.query(`
-        INSERT INTO qms_chat_documents
-        (document_name, safe_file_name, document_type, version, content, ai_summary, manual_summary, file_size, extraction_method, source_type, blob_url, original_filename, mime_type, user_id, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
-        RETURNING id
-      `, [
-        fileName,
-        safeFileName,
-        'uploaded_document',
-        '1.0',
-        extractedText,
-        summary,
-        null,
-        fileSize,
-        extractionMethod,
-        'upload',
-        blobUrl,
-        originalFileName,
-        mimeType,
-        userId
-      ]);
-    } catch (error) {
-      if (error.message.includes('column') && error.message.includes('does not exist')) {
-        console.log('New columns not found, using basic insert...');
-        result = await pool.query(`
-          INSERT INTO qms_chat_documents 
-          (document_name, document_type, version, content, ai_summary, file_size, extraction_method, source_type, user_id, created_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
-          RETURNING id
-        `, [
-          fileName,
-          'uploaded_document',
-          '1.0',
-          extractedText,
-          summary,
-          fileSize,
-          extractionMethod,
-          'upload',
-          userId
-        ]);
-      } else {
-        throw error;
-      }
+
+    const columns = [];
+    const placeholders = [];
+    const values = [];
+
+    const pushColumn = (columnName, value) => {
+      columns.push(columnName);
+      values.push(value);
+      placeholders.push(`$${values.length}`);
+    };
+
+    pushColumn('document_name', fileName);
+    if (hasSafeFileName) {
+      pushColumn('safe_file_name', safeFileName);
     }
+    pushColumn('document_type', 'uploaded_document');
+    pushColumn('version', '1.0');
+    pushColumn('content', extractedText);
+    pushColumn('ai_summary', summary);
+    if (hasManualSummary) {
+      pushColumn('manual_summary', null);
+    }
+    pushColumn('file_size', fileSize);
+    pushColumn('extraction_method', extractionMethod);
+    pushColumn('source_type', 'upload');
+    pushColumn('blob_url', blobUrl ?? null);
+    pushColumn('original_filename', originalFileName ?? null);
+    pushColumn('mime_type', mimeType ?? null);
+    pushColumn('user_id', userId ?? null);
+    pushColumn('created_at', new Date().toISOString());
+
+    const result = await pool.query(
+      `INSERT INTO qms_chat_documents (${columns.join(', ')})
+       VALUES (${placeholders.join(', ')})
+       RETURNING id`,
+      values
+    );
 
     return result.rows[0].id;
   } catch (error) {

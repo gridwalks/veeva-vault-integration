@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { ensureUploadedDocumentColumnSupport } from './uploaded-document-columns.js';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -39,6 +40,9 @@ export const handler = async (event) => {
 
   try {
     const startTime = Date.now();
+
+    const { safeFileName: hasSafeFileName, manualSummary: hasManualSummary } =
+      await ensureUploadedDocumentColumnSupport(pool);
     
     // Parse query parameters
     const params = event.queryStringParameters || {};
@@ -59,7 +63,15 @@ export const handler = async (event) => {
     let paramIndex = 1;
 
     if (search) {
-      baseWhereClause += ` AND (d.document_name ILIKE $${paramIndex} OR d.ai_summary ILIKE $${paramIndex} OR d.manual_summary ILIKE $${paramIndex} OR d.safe_file_name ILIKE $${paramIndex})`;
+      const searchColumns = ['d.document_name', 'd.ai_summary'];
+      if (hasManualSummary) {
+        searchColumns.push('d.manual_summary');
+      }
+      if (hasSafeFileName) {
+        searchColumns.push('d.safe_file_name');
+      }
+
+      baseWhereClause += ` AND (${searchColumns.map(column => `${column} ILIKE $${paramIndex}`).join(' OR ')})`;
       queryParams.push(`%${search}%`);
       paramIndex++;
     }
@@ -83,30 +95,55 @@ export const handler = async (event) => {
     // Use the same logic as the count query
     const documentsWhereClause = baseWhereClause;
     
+    const selectColumns = [
+      'd.id',
+      'd.document_name',
+      hasSafeFileName ? 'd.safe_file_name' : 'NULL AS safe_file_name',
+      'd.document_type',
+      'd.version',
+      'd.content',
+      'd.ai_summary',
+      hasManualSummary ? 'd.manual_summary' : 'NULL AS manual_summary',
+      'd.file_size',
+      'd.extraction_method',
+      'd.blob_url',
+      'd.original_filename',
+      'd.mime_type',
+      'd.created_at',
+      'd.updated_at',
+      'COUNT(c.id) as chunk_count'
+    ];
+
+    const groupByColumns = [
+      'd.id',
+      'd.document_name',
+      'd.document_type',
+      'd.version',
+      'd.content',
+      'd.ai_summary',
+      'd.file_size',
+      'd.extraction_method',
+      'd.blob_url',
+      'd.original_filename',
+      'd.mime_type',
+      'd.created_at',
+      'd.updated_at'
+    ];
+
+    if (hasSafeFileName) {
+      groupByColumns.push('d.safe_file_name');
+    }
+
+    if (hasManualSummary) {
+      groupByColumns.push('d.manual_summary');
+    }
+
     const documentsQuery = `
-      SELECT 
-        d.id,
-        d.document_name,
-        d.safe_file_name,
-        d.document_type,
-        d.version,
-        d.content,
-        d.ai_summary,
-        d.manual_summary,
-        d.file_size,
-        d.extraction_method,
-        d.blob_url,
-        d.original_filename,
-        d.mime_type,
-        d.created_at,
-        d.updated_at,
-        COUNT(c.id) as chunk_count
+      SELECT ${selectColumns.join(', ')}
       FROM qms_chat_documents d
       LEFT JOIN qms_chat_document_chunks c ON d.id = c.document_id
       ${documentsWhereClause}
-      GROUP BY d.id, d.document_name, d.safe_file_name, d.document_type, d.version, d.content,
-               d.ai_summary, d.manual_summary, d.file_size, d.extraction_method, d.blob_url,
-               d.original_filename, d.mime_type, d.created_at, d.updated_at
+      GROUP BY ${groupByColumns.join(', ')}
       ORDER BY d.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;

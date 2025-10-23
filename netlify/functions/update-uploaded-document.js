@@ -1,4 +1,5 @@
 import { getPool } from './db.js';
+import { ensureUploadedDocumentColumnSupport } from './uploaded-document-columns.js';
 
 const ALLOWED_METHODS = ['PUT', 'PATCH'];
 
@@ -98,6 +99,7 @@ export const handler = async (event) => {
 
     const setClauses = [];
     const values = [];
+    const warnings = [];
 
     if (typeof trimmedName !== 'undefined') {
       if (!trimmedName) {
@@ -132,22 +134,34 @@ export const handler = async (event) => {
       values.push(summaryValue);
     }
 
+    const pool = getPool();
+    const { safeFileName: hasSafeFileName, manualSummary: hasManualSummary } =
+      await ensureUploadedDocumentColumnSupport(pool);
+
     if (typeof trimmedSafeName !== 'undefined') {
-      const safeBase = trimmedSafeName
-        .toLowerCase()
-        .replace(/[^a-z0-9._-]+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-+/, '')
-        .replace(/-+$/, '');
-      const sanitizedSafeName = safeBase.substring(0, 120) || null;
-      setClauses.push(`safe_file_name = $${values.length + 1}`);
-      values.push(sanitizedSafeName);
+      if (hasSafeFileName) {
+        const safeBase = trimmedSafeName
+          .toLowerCase()
+          .replace(/[^a-z0-9._-]+/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-+/, '')
+          .replace(/-+$/, '');
+        const sanitizedSafeName = safeBase.substring(0, 120) || null;
+        setClauses.push(`safe_file_name = $${values.length + 1}`);
+        values.push(sanitizedSafeName);
+      } else {
+        warnings.push('safe_file_name column unavailable');
+      }
     }
 
     if (typeof cleanedManualSummary !== 'undefined') {
-      const manualSummaryValue = cleanedManualSummary === '' ? null : cleanedManualSummary;
-      setClauses.push(`manual_summary = $${values.length + 1}`);
-      values.push(manualSummaryValue);
+      if (hasManualSummary) {
+        const manualSummaryValue = cleanedManualSummary === '' ? null : cleanedManualSummary;
+        setClauses.push(`manual_summary = $${values.length + 1}`);
+        values.push(manualSummaryValue);
+      } else {
+        warnings.push('manual_summary column unavailable');
+      }
     }
 
     if (setClauses.length === 0) {
@@ -162,7 +176,23 @@ export const handler = async (event) => {
     }
 
     const updateFields = [...setClauses, 'updated_at = CURRENT_TIMESTAMP'];
-    const pool = getPool();
+
+    const returningFields = [
+      'id',
+      'document_name',
+      hasSafeFileName ? 'safe_file_name' : 'NULL::TEXT AS safe_file_name',
+      'document_type',
+      'version',
+      'ai_summary',
+      hasManualSummary ? 'manual_summary' : 'NULL::TEXT AS manual_summary',
+      'file_size',
+      'extraction_method',
+      'blob_url',
+      'original_filename',
+      'mime_type',
+      'created_at',
+      'updated_at'
+    ];
 
     const result = await pool.query(
       `UPDATE qms_chat_documents
@@ -170,7 +200,7 @@ export const handler = async (event) => {
        WHERE id = $${values.length + 1}
          AND user_id = $${values.length + 2}
          AND source_type = 'upload'
-       RETURNING id, document_name, safe_file_name, document_type, version, ai_summary, manual_summary, file_size, extraction_method, blob_url, original_filename, mime_type, created_at, updated_at`,
+       RETURNING ${returningFields.join(', ')}`,
       [...values, documentId, userId]
     );
 
@@ -190,7 +220,8 @@ export const handler = async (event) => {
       headers,
       body: JSON.stringify({
         success: true,
-        document: result.rows[0]
+        document: result.rows[0],
+        warnings: warnings.length ? warnings : undefined
       })
     };
   } catch (error) {
