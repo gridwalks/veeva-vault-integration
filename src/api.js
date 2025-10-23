@@ -439,8 +439,10 @@ export async function updateUploadedDocumentMetadata({
   documentId,
   userId,
   documentName,
+  safeFileName,
   documentType,
   version,
+  manualSummary,
   aiSummary
 }) {
   const startTime = Date.now();
@@ -448,8 +450,10 @@ export async function updateUploadedDocumentMetadata({
     documentId,
     userId,
     hasName: typeof documentName !== 'undefined',
+    hasSafeName: typeof safeFileName !== 'undefined',
     hasType: typeof documentType !== 'undefined',
     hasVersion: typeof version !== 'undefined',
+    hasManualSummary: typeof manualSummary !== 'undefined',
     hasSummary: typeof aiSummary !== 'undefined'
   });
 
@@ -463,8 +467,10 @@ export async function updateUploadedDocumentMetadata({
         documentId,
         userId,
         documentName,
+        safeFileName,
         documentType,
         version,
+        manualSummary,
         aiSummary
       })
     });

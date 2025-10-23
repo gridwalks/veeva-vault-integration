@@ -57,10 +57,12 @@ ON Veeva_Doc_Chat_document_chunks(veeva_document_id);
 CREATE TABLE IF NOT EXISTS qms_chat_documents (
   id SERIAL PRIMARY KEY,
   document_name TEXT NOT NULL,
+  safe_file_name TEXT,
   document_type VARCHAR(255) DEFAULT 'uploaded_document',
   version VARCHAR(50) DEFAULT '1.0',
   content TEXT,
   ai_summary TEXT,
+  manual_summary TEXT,
   file_size BIGINT,
   extraction_method VARCHAR(100),
   source_type VARCHAR(50) DEFAULT 'upload', -- 'upload', 'veeva', 'external'
