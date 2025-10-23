@@ -1,4 +1,5 @@
 import { getPool, initDatabase } from "./db.js";
+import { ensureUploadedDocumentColumnSupport } from "./uploaded-document-columns.js";
 import OpenAI from "openai";
 import Groq from "groq-sdk";
 import { getStore } from "@netlify/blobs";
@@ -346,15 +347,35 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = []) {
       const isUploadedDoc = doc.source_type === "upload";
 
       if (isUploadedDoc) {
+        const safeName =
+          doc.safe_file_name ||
+          doc.safeFileName ||
+          doc.safe_filename ||
+          null;
+        const baseName =
+          doc.document_name ||
+          doc.name ||
+          doc.original_filename ||
+          "Uploaded Document";
+        const displayName = safeName || baseName;
+        const displayNumber =
+          safeName ||
+          doc.number ||
+          doc.original_filename ||
+          baseName;
+
         return {
           id: doc.document_id || doc.id,
-          name: doc.document_name,
-          number: doc.original_filename || doc.document_name,
+          name: displayName,
+          number: displayNumber,
           version: doc.version || "1.0",
           type: doc.document_type || "uploaded_document",
           status: "uploaded",
           source_type: "upload",
           isUploaded: true,
+          safe_file_name: safeName,
+          safeFileName: safeName,
+          original_filename: doc.original_filename || null,
         };
       }
 
@@ -505,6 +526,14 @@ export const handler = async (event) => {
     // Initialize database
     await initDatabase();
     const pool = getPool();
+
+    const uploadedColumnSupport = await ensureUploadedDocumentColumnSupport(pool);
+    const safeFileNameSelect = uploadedColumnSupport.safeFileName
+      ? "safe_file_name"
+      : "NULL::TEXT AS safe_file_name";
+    const safeFileNameSelectWithAlias = uploadedColumnSupport.safeFileName
+      ? "d.safe_file_name"
+      : "NULL::TEXT AS safe_file_name";
 
     // Detect if user is asking specifically about uploaded documents
     const isUploadedDocQuery = message.toLowerCase().includes('uploaded') || 
@@ -662,6 +691,7 @@ export const handler = async (event) => {
                 d.ai_summary,
                 d.file_size,
                 d.original_filename,
+                ${safeFileNameSelectWithAlias},
                 1 - (c.embedding <=> $1::vector) as similarity,
                 'upload' as source_type
               FROM qms_chat_document_chunks c
@@ -708,6 +738,7 @@ export const handler = async (event) => {
                 d.ai_summary,
                 d.file_size,
                 d.original_filename,
+                ${safeFileNameSelectWithAlias},
                 1 - (c.embedding <=> $1::vector) as similarity,
                 'upload' as source_type
               FROM qms_chat_document_chunks c
@@ -737,6 +768,7 @@ export const handler = async (event) => {
               d.ai_summary,
               d.file_size,
               d.original_filename,
+              ${safeFileNameSelectWithAlias},
               1 - (c.embedding <=> $1::vector) as similarity,
               'upload' as source_type
             FROM qms_chat_document_chunks c
@@ -842,8 +874,8 @@ export const handler = async (event) => {
       if (uniqueUploadedDocIds.length > 0) {
         const uploadedDocPlaceholders = uniqueUploadedDocIds.map((_, index) => `$${index + 1}`).join(',');
         const uploadedDocQuery = `
-          SELECT id as document_id, document_name, document_type, 
-                 ai_summary, file_size, original_filename, created_at,
+          SELECT id as document_id, document_name, document_type,
+                 ai_summary, file_size, original_filename, ${safeFileNameSelect}, created_at,
                  'upload' as source_type
           FROM qms_chat_documents
           WHERE id IN (${uploadedDocPlaceholders})
@@ -894,13 +926,13 @@ export const handler = async (event) => {
           
           const uploadedSearchParams = searchTerms.map(term => `%${term}%`);
           const uploadedQuery = `
-            SELECT id as document_id, document_name, 
-                   document_type, ai_summary, file_size, original_filename,
+            SELECT id as document_id, document_name,
+                   document_type, ai_summary, file_size, original_filename, ${safeFileNameSelect},
                    'upload' as source_type
-            FROM qms_chat_documents 
+            FROM qms_chat_documents
             WHERE (${uploadedSearchConditions}) AND user_id = $${uploadedSearchParams.length + 1}
-            ORDER BY 
-              CASE 
+            ORDER BY
+              CASE
                 WHEN document_name ILIKE ANY($${uploadedSearchParams.length + 2}) THEN 1
                 WHEN ai_summary ILIKE ANY($${uploadedSearchParams.length + 3}) THEN 2
                 WHEN original_filename ILIKE ANY($${uploadedSearchParams.length + 4}) THEN 3
@@ -982,13 +1014,13 @@ export const handler = async (event) => {
         ).join(' OR ');
         
         const uploadedQuery = `
-          SELECT id as document_id, document_name, 
-                 document_type, ai_summary, file_size, original_filename,
+          SELECT id as document_id, document_name,
+                 document_type, ai_summary, file_size, original_filename, ${safeFileNameSelect},
                  'upload' as source_type
-          FROM qms_chat_documents 
+          FROM qms_chat_documents
           WHERE (${uploadedSearchConditions}) AND user_id = $${searchParams.length + 1}
-          ORDER BY 
-            CASE 
+          ORDER BY
+            CASE
               WHEN document_name ILIKE ANY($${searchParams.length + 2}) THEN 1
               WHEN ai_summary ILIKE ANY($${searchParams.length + 3}) THEN 2
               WHEN original_filename ILIKE ANY($${searchParams.length + 4}) THEN 3

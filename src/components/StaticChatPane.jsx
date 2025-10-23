@@ -61,7 +61,26 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
   const chatPromptBoxRef = useRef(null);
   const uploadedBlobKeysRef = useRef([]);
   const prevLoadingRef = useRef(false);
-  
+
+  const getDocumentSafeName = (doc) => doc?.safeFileName || doc?.safe_file_name || null;
+  const isUploadedDocument = (doc) => doc?.source_type === 'upload';
+  const getDocumentDisplayName = (doc) => {
+    if (!doc) return 'Untitled Document';
+    const safeName = getDocumentSafeName(doc);
+    const baseName = doc?.name || doc?.document_name || doc?.original_filename || doc?.document_number || 'Untitled Document';
+    if (isUploadedDocument(doc)) {
+      return safeName || baseName;
+    }
+    return baseName;
+  };
+  const getDocumentDisplayNumber = (doc) => {
+    if (!doc) return '—';
+    if (isUploadedDocument(doc)) {
+      return getDocumentSafeName(doc) || doc?.number || doc?.original_filename || doc?.document_name || 'uploaded_document';
+    }
+    return doc?.number || doc?.document_number || doc?.name || '—';
+  };
+
   // Workflow state
   const [workflowState, setWorkflowState] = useState({
     isActive: false,
@@ -593,15 +612,17 @@ The documents will be automatically included in the comparison analysis.
 
   const handleOpenDocument = (document) => {
     console.log('StaticChatPane handleOpenDocument called with:', document);
-    
+    const displayName = getDocumentDisplayName(document);
+    const displayNumber = getDocumentDisplayNumber(document);
+
     if (onOpenDocumentInPane) {
       // Route document to the right pane (both Veeva and uploaded documents)
       const mappedDocument = {
         veeva_document_id: document.id,
-        document_name: document.name,
+        document_name: displayName,
         document_type: document.type,
         version: document.version,
-        document_number: document.number,
+        document_number: displayNumber,
         // Add uploaded document properties
         isUploaded: document.isUploaded || document.source_type === 'upload',
         source_type: document.source_type || 'veeva'
@@ -617,7 +638,7 @@ The documents will be automatically included in the comparison analysis.
         a.href = url;
         a.target = '_blank';
         a.rel = 'noopener noreferrer';
-        a.download = document.original_filename || document.document_name || 'document';
+        a.download = getDocumentSafeName(document) || document.original_filename || document.document_name || 'document';
         window.document.body.appendChild(a);
         a.click();
         a.remove();
@@ -629,7 +650,7 @@ The documents will be automatically included in the comparison analysis.
         a.href = url;
         a.target = '_blank';
         a.rel = 'noopener noreferrer';
-        a.download = document.name;
+        a.download = displayName;
         window.document.body.appendChild(a);
         a.click();
         a.remove();
@@ -650,12 +671,12 @@ The documents will be automatically included in the comparison analysis.
         documentsCount: documents.length,
         documents: documents.map(doc => ({
           id: doc.id || doc.veeva_document_id,
-          name: doc.name || doc.document_name
+          name: getDocumentDisplayName(doc)
         }))
       });
 
       const documentIds = documents.map(doc => doc.id || doc.veeva_document_id).filter(Boolean);
-      const documentNames = documents.map(doc => doc.name || doc.document_name).filter(Boolean);
+      const documentNames = documents.map(doc => getDocumentDisplayName(doc)).filter(Boolean);
       
       const result = await createQAInteraction({
         question,
@@ -1467,58 +1488,63 @@ The documents will be automatically included in the comparison analysis.
               gap: '6px',
               fontFamily: 'inherit'
             }}>
-              {usedDocuments.slice(0, 5).map((doc, docIndex) => (
-                <div key={docIndex} style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '8px',
-                  backgroundColor: 'white',
-                  borderRadius: '6px',
-                  border: '1px solid #e0e0e0',
-                  fontFamily: 'inherit'
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: '#333',
-                      marginBottom: '2px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      fontFamily: 'inherit'
-                    }}>
-                      {doc.name}
+              {usedDocuments.slice(0, 5).map((doc, docIndex) => {
+                const displayName = getDocumentDisplayName(doc);
+                const displayNumber = getDocumentDisplayNumber(doc);
+
+                return (
+                  <div key={docIndex} style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '8px',
+                    backgroundColor: 'white',
+                    borderRadius: '6px',
+                    border: '1px solid #e0e0e0',
+                    fontFamily: 'inherit'
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        color: '#333',
+                        marginBottom: '2px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontFamily: 'inherit'
+                      }}>
+                        {displayName}
+                      </div>
+                      <div style={{
+                        fontSize: '11px',
+                        color: '#666',
+                        fontFamily: 'inherit'
+                      }}>
+                        {displayNumber} • v{doc.version} • {doc.type}
+                      </div>
                     </div>
-                    <div style={{
-                      fontSize: '11px',
-                      color: '#666',
-                      fontFamily: 'inherit'
-                    }}>
-                      {doc.number} • v{doc.version} • {doc.type}
-                    </div>
+                    <button
+                      onClick={() => handleOpenDocument(doc)}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#6b7280',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                        fontWeight: '500',
+                        whiteSpace: 'nowrap',
+                        marginLeft: '8px',
+                        fontFamily: 'inherit'
+                      }}
+                    >
+                      Open
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleOpenDocument(doc)}
-                    style={{
-                      padding: '6px 12px',
-                      backgroundColor: '#6b7280',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '11px',
-                      fontWeight: '500',
-                      whiteSpace: 'nowrap',
-                      marginLeft: '8px',
-                      fontFamily: 'inherit'
-                    }}
-                  >
-                    Open
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -1794,9 +1820,10 @@ The documents will be automatically included in the comparison analysis.
                     Selected documents:
                   </div>
                   <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', color: '#b0b0b0' }}>
-                    {selectedDocuments.map((doc, index) => (
-                      <li key={index}>{doc.document_name}</li>
-                    ))}
+                    {selectedDocuments.map((doc, index) => {
+                      const displayName = getDocumentDisplayName(doc);
+                      return <li key={index}>{displayName}</li>;
+                    })}
                   </ul>
                 </div>
               )}
