@@ -60,8 +60,10 @@ export const handler = async (event) => {
       documentId,
       userId,
       documentName,
+      safeFileName,
       documentType,
       version,
+      manualSummary,
       aiSummary
     } = payload;
 
@@ -88,9 +90,11 @@ export const handler = async (event) => {
     }
 
     const trimmedName = typeof documentName === 'string' ? documentName.trim() : undefined;
+    const trimmedSafeName = typeof safeFileName === 'string' ? safeFileName.trim() : undefined;
     const trimmedType = typeof documentType === 'string' ? documentType.trim() : undefined;
     const trimmedVersion = typeof version === 'string' ? version.trim() : undefined;
     const cleanedSummary = typeof aiSummary === 'string' ? aiSummary.trim() : typeof aiSummary === 'undefined' ? undefined : aiSummary;
+    const cleanedManualSummary = typeof manualSummary === 'string' ? manualSummary.trim() : typeof manualSummary === 'undefined' ? undefined : manualSummary;
 
     const setClauses = [];
     const values = [];
@@ -128,6 +132,24 @@ export const handler = async (event) => {
       values.push(summaryValue);
     }
 
+    if (typeof trimmedSafeName !== 'undefined') {
+      const safeBase = trimmedSafeName
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+/, '')
+        .replace(/-+$/, '');
+      const sanitizedSafeName = safeBase.substring(0, 120) || null;
+      setClauses.push(`safe_file_name = $${values.length + 1}`);
+      values.push(sanitizedSafeName);
+    }
+
+    if (typeof cleanedManualSummary !== 'undefined') {
+      const manualSummaryValue = cleanedManualSummary === '' ? null : cleanedManualSummary;
+      setClauses.push(`manual_summary = $${values.length + 1}`);
+      values.push(manualSummaryValue);
+    }
+
     if (setClauses.length === 0) {
       return {
         statusCode: 400,
@@ -148,7 +170,7 @@ export const handler = async (event) => {
        WHERE id = $${values.length + 1}
          AND user_id = $${values.length + 2}
          AND source_type = 'upload'
-       RETURNING id, document_name, document_type, version, ai_summary, file_size, extraction_method, blob_url, original_filename, mime_type, created_at, updated_at`,
+       RETURNING id, document_name, safe_file_name, document_type, version, ai_summary, manual_summary, file_size, extraction_method, blob_url, original_filename, mime_type, created_at, updated_at`,
       [...values, documentId, userId]
     );
 

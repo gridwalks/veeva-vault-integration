@@ -9,6 +9,36 @@ import { chunkText } from './chunking-utils.js';
 
 const STORE_NAME = 'chat-uploads';
 
+function generateSafeFileName(fileName) {
+  if (!fileName) {
+    return '';
+  }
+
+  const trimmed = fileName.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  const lower = trimmed.toLowerCase();
+  const lastDotIndex = lower.lastIndexOf('.');
+  let base = lower;
+  let extension = '';
+
+  if (lastDotIndex > 0 && lastDotIndex < lower.length - 1) {
+    base = lower.substring(0, lastDotIndex);
+    extension = lower.substring(lastDotIndex + 1);
+  }
+
+  const safeBase = base
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '')
+    .substring(0, 96) || 'document';
+
+  const safeExtension = extension.replace(/[^a-z0-9]+/g, '').substring(0, 16);
+  return safeExtension ? `${safeBase}.${safeExtension}` : safeBase;
+}
+
 // Function to log indexing activities
 async function logIndexingActivity(pool, logData) {
   try {
@@ -214,17 +244,21 @@ async function processAndIndexDocument(fileBuffer, fileName, blobKey, userId = n
     // Create document record
     const now = new Date().toISOString();
     
+    const safeFileName = generateSafeFileName(fileName);
+
     const documentResult = await pool.query(`
-      INSERT INTO qms_chat_documents 
-      (document_name, document_type, version, content, ai_summary, file_size, extraction_method, source_type, blob_url, original_filename, mime_type, user_id, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      INSERT INTO qms_chat_documents
+      (document_name, safe_file_name, document_type, version, content, ai_summary, manual_summary, file_size, extraction_method, source_type, blob_url, original_filename, mime_type, user_id, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING id
     `, [
       fileName,
+      safeFileName,
       'uploaded_document',
       '1.0',
       extractedText,
       null, // ai_summary will be generated later
+      null,
       buffer.length,
       extractionMethod,
       'upload',
