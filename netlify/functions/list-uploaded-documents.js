@@ -59,7 +59,7 @@ export const handler = async (event) => {
     let paramIndex = 1;
 
     if (search) {
-      baseWhereClause += ` AND (d.document_name ILIKE $${paramIndex} OR d.ai_summary ILIKE $${paramIndex})`;
+      baseWhereClause += ` AND (d.document_name ILIKE $${paramIndex} OR d.ai_summary ILIKE $${paramIndex} OR d.manual_summary ILIKE $${paramIndex} OR d.safe_file_name ILIKE $${paramIndex})`;
       queryParams.push(`%${search}%`);
       paramIndex++;
     }
@@ -81,20 +81,18 @@ export const handler = async (event) => {
     
     // Build WHERE clause for documents query with table aliases
     // Use the same logic as the count query
-    let documentsWhereClause = baseWhereClause;
-    if (search) {
-      const searchParamIndex = queryParams.length;
-      documentsWhereClause += ` AND (d.document_name ILIKE $${searchParamIndex} OR d.ai_summary ILIKE $${searchParamIndex})`;
-    }
+    const documentsWhereClause = baseWhereClause;
     
     const documentsQuery = `
       SELECT 
         d.id,
         d.document_name,
+        d.safe_file_name,
         d.document_type,
         d.version,
         d.content,
         d.ai_summary,
+        d.manual_summary,
         d.file_size,
         d.extraction_method,
         d.blob_url,
@@ -106,8 +104,8 @@ export const handler = async (event) => {
       FROM qms_chat_documents d
       LEFT JOIN qms_chat_document_chunks c ON d.id = c.document_id
       ${documentsWhereClause}
-      GROUP BY d.id, d.document_name, d.document_type, d.version, d.content, 
-               d.ai_summary, d.file_size, d.extraction_method, d.blob_url, 
+      GROUP BY d.id, d.document_name, d.safe_file_name, d.document_type, d.version, d.content,
+               d.ai_summary, d.manual_summary, d.file_size, d.extraction_method, d.blob_url,
                d.original_filename, d.mime_type, d.created_at, d.updated_at
       ORDER BY d.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -120,9 +118,11 @@ export const handler = async (event) => {
       id: doc.id,
       document_id: doc.id,
       document_name: doc.document_name,
+      safe_file_name: doc.safe_file_name,
       document_type: doc.document_type,
       version: doc.version,
       ai_summary: doc.ai_summary,
+      manual_summary: doc.manual_summary,
       file_size: doc.file_size,
       extraction_method: doc.extraction_method,
       blob_url: doc.blob_url,
