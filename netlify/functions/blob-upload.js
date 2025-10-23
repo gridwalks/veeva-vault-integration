@@ -2,12 +2,43 @@ import { randomUUID } from 'crypto';
 import { getStore } from '@netlify/blobs';
 import { writeBlobAudit } from './blob-audit.js';
 import { getPool } from './db.js';
+import { ensureUploadedDocumentColumnSupport } from './uploaded-document-columns.js';
 import { OpenAI } from 'openai';
 import mammoth from 'mammoth';
 import { parseDocument } from 'docx-parser';
 import { chunkText } from './chunking-utils.js';
 
 const STORE_NAME = 'chat-uploads';
+
+function generateSafeFileName(fileName) {
+  if (!fileName) {
+    return '';
+  }
+
+  const trimmed = fileName.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  const lower = trimmed.toLowerCase();
+  const lastDotIndex = lower.lastIndexOf('.');
+  let base = lower;
+  let extension = '';
+
+  if (lastDotIndex > 0 && lastDotIndex < lower.length - 1) {
+    base = lower.substring(0, lastDotIndex);
+    extension = lower.substring(lastDotIndex + 1);
+  }
+
+  const safeBase = base
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '')
+    .substring(0, 96) || 'document';
+
+  const safeExtension = extension.replace(/[^a-z0-9]+/g, '').substring(0, 16);
+  return safeExtension ? `${safeBase}.${safeExtension}` : safeBase;
+}
 
 // Function to log indexing activities
 async function logIndexingActivity(pool, logData) {
@@ -210,31 +241,52 @@ async function processAndIndexDocument(fileBuffer, fileName, blobKey, userId = n
     if (!pool) {
       throw new Error('Database connection not available');
     }
-    
+
+    const { safeFileName: hasSafeFileName, manualSummary: hasManualSummary } =
+      await ensureUploadedDocumentColumnSupport(pool);
+
     // Create document record
     const now = new Date().toISOString();
-    
-    const documentResult = await pool.query(`
-      INSERT INTO qms_chat_documents 
-      (document_name, document_type, version, content, ai_summary, file_size, extraction_method, source_type, blob_url, original_filename, mime_type, user_id, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-      RETURNING id
-    `, [
-      fileName,
-      'uploaded_document',
-      '1.0',
-      extractedText,
-      null, // ai_summary will be generated later
-      buffer.length,
-      extractionMethod,
-      'upload',
-      blobKey,
-      fileName,
-      contentType,
-      userId,
-      now,
-      now
-    ]);
+
+    const safeFileName = generateSafeFileName(fileName);
+
+    const columns = [];
+    const placeholders = [];
+    const values = [];
+
+    const pushColumn = (columnName, value) => {
+      columns.push(columnName);
+      values.push(value);
+      placeholders.push(`$${values.length}`);
+    };
+
+    pushColumn('document_name', fileName);
+    if (hasSafeFileName) {
+      pushColumn('safe_file_name', safeFileName);
+    }
+    pushColumn('document_type', 'uploaded_document');
+    pushColumn('version', '1.0');
+    pushColumn('content', extractedText);
+    pushColumn('ai_summary', null);
+    if (hasManualSummary) {
+      pushColumn('manual_summary', null);
+    }
+    pushColumn('file_size', buffer.length);
+    pushColumn('extraction_method', extractionMethod);
+    pushColumn('source_type', 'upload');
+    pushColumn('blob_url', blobKey ?? null);
+    pushColumn('original_filename', fileName ?? null);
+    pushColumn('mime_type', contentType ?? null);
+    pushColumn('user_id', userId ?? null);
+    pushColumn('created_at', now);
+    pushColumn('updated_at', now);
+
+    const documentResult = await pool.query(
+      `INSERT INTO qms_chat_documents (${columns.join(', ')})
+       VALUES (${placeholders.join(', ')})
+       RETURNING id`,
+      values
+    );
     
     const documentId = documentResult.rows[0].id;
     
