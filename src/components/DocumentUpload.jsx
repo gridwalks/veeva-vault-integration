@@ -596,6 +596,18 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
           </button>
         </div>
 
+        <p style={{
+          margin: '0 0 20px 0',
+          fontSize: '13px',
+          color: '#4b5563',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        }}>
+          Select a document and choose <strong>Edit</strong> to update its details. A green{' '}
+          <strong>Save Changes</strong> button remains at the top of the row, and a larger{' '}
+          <strong>Save Metadata Changes</strong> button is shown beneath the summaries so you can
+          commit updates without scrolling back.
+        </p>
+
         {loadingDocuments ? (
           <div style={{
             padding: '40px',
@@ -819,9 +831,9 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                           </button>
                         </>
                       ) : (
-                        <>
-                          <a
-                            href={downloadUploadedDocumentUrl({ documentId: doc.id })}
+                          <>
+                            <a
+                              href={downloadUploadedDocumentUrl({ documentId: doc.id })}
                             download
                             style={{
                               padding: '8px 16px',
@@ -963,6 +975,51 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                     }}>
                       {formatFileSize(Number(doc.file_size) || 0)} • {doc.mime_type || 'Unknown MIME type'}
                     </div>
+                    {isEditing && (
+                      <div
+                        style={{
+                          marginTop: '16px',
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '8px',
+                          justifyContent: 'flex-end'
+                        }}
+                      >
+                        <button
+                          onClick={saveMetadataChanges}
+                          disabled={metadataSaving}
+                          style={{
+                            padding: '10px 18px',
+                            backgroundColor: metadataSaving ? '#9ca3af' : '#16a34a',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: metadataSaving ? 'not-allowed' : 'pointer',
+                            boxShadow: '0 1px 2px rgba(16, 185, 129, 0.25)'
+                          }}
+                        >
+                          {metadataSaving ? 'Saving…' : 'Save Metadata Changes'}
+                        </button>
+                        <button
+                          onClick={cancelEditingDocument}
+                          disabled={metadataSaving}
+                          style={{
+                            padding: '10px 18px',
+                            backgroundColor: '#f3f4f6',
+                            color: '#374151',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            fontWeight: '500',
+                            cursor: metadataSaving ? 'not-allowed' : 'pointer'
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
