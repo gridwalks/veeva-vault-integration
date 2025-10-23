@@ -1186,13 +1186,28 @@ export const handler = async (event) => {
     if (relevantChunks.length > 0) {
       // Use RAG approach with semantic chunks
       console.log('Building context from relevant chunks (RAG)');
+      const documentMetadataMap = new Map(
+        relevantDocuments.map(doc => [doc.veeva_document_id || doc.document_id, doc])
+      );
+      const manualSummariesIncluded = new Set();
+
       const chunkContext = relevantChunks.map((chunk, index) => {
-        return `**Relevant Section ${index + 1}** from "${chunk.document_name}" (${chunk.document_number} v${chunk.major_version}.${chunk.minor_version})
-Similarity: ${(chunk.similarity * 100).toFixed(1)}%
+        const docId = chunk.veeva_document_id || chunk.upload_document_id;
+        const docMetadata = documentMetadataMap.get(docId);
+        const manualSummary = docMetadata?.manual_summary;
 
-${chunk.chunk_text}
+        let context = `**Relevant Section ${index + 1}** from "${chunk.document_name}" (${chunk.document_number} v${chunk.major_version}.${chunk.minor_version})
+Similarity: ${(chunk.similarity * 100).toFixed(1)}%`;
 
----`;
+        if (manualSummary && !manualSummariesIncluded.has(docId)) {
+          context += `\nManual Summary Guidance: ${manualSummary}`;
+          manualSummariesIncluded.add(docId);
+        }
+
+        context += `\n\n${chunk.chunk_text}`;
+        context += `\n\n---`;
+
+        return context;
       }).join('\n\n');
       
       // Also include document summaries for any documents that weren't found by semantic search
