@@ -76,25 +76,49 @@ export const handler = async (event) => {
     const clientId = process.env.AUTH0_MGMT_CLIENT_ID;
     const clientSecret = process.env.AUTH0_MGMT_CLIENT_SECRET;
 
+    console.log('Auth0 Management API credentials check:', {
+      domain: domain ? 'present' : 'missing',
+      clientId: clientId ? 'present' : 'missing',
+      clientSecret: clientSecret ? 'present' : 'missing'
+    });
+
     if (!domain || !clientId || !clientSecret) {
-      console.error('Missing Auth0 Management API credentials');
+      console.error('Missing Auth0 Management API credentials:', {
+        domain: !!domain,
+        clientId: !!clientId,
+        clientSecret: !!clientSecret
+      });
       return {
         statusCode: 500,
         headers,
         body: JSON.stringify({
           success: false,
-          error: 'Server configuration error'
+          error: 'Server configuration error: Missing Auth0 Management API credentials'
         })
       };
     }
 
     // Initialize Auth0 Management Client
-    const management = new ManagementClient({
-      domain: domain,
-      clientId: clientId,
-      clientSecret: clientSecret,
-      scope: 'update:users'
-    });
+    let management;
+    try {
+      management = new ManagementClient({
+        domain: domain,
+        clientId: clientId,
+        clientSecret: clientSecret,
+        scope: 'update:users'
+      });
+      console.log('Auth0 Management Client initialized successfully');
+    } catch (initError) {
+      console.error('Failed to initialize Auth0 Management Client:', initError);
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: 'Failed to initialize Auth0 client'
+        })
+      };
+    }
 
     // Prepare update data
     const updateData = {};
