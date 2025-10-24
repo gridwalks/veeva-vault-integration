@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 import StaticChatPane from "./components/StaticChatPane.jsx";
 import Header from "./components/Header.jsx";
