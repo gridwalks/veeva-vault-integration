@@ -791,6 +791,52 @@ export async function deleteExternalResource({ id }) {
   }
 }
 
+export async function updateUserProfile({ userId, name, picture }) {
+  const startTime = Date.now();
+  console.log('Updating user profile...', { userId, name, picture });
+  
+  try {
+    const res = await fetch('/api/update-user-profile', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId,
+        name,
+        picture
+      })
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to update user profile:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error,
+        details: errorData.details
+      });
+      throw new Error(errorData.error || `Failed to update user profile: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`User profile updated in ${duration}ms:`, {
+      userId: data.user?.sub,
+      name: data.user?.name
+    });
+    
+    return data.user;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error updating user profile after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
 // Q&A Interactions API functions
 export async function getQAInteractions({ page = 1, limit = 50, search = '', user_id, session_id } = {}) {
   const startTime = Date.now();

@@ -186,6 +186,39 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout, 
                   <span>Main App</span>
                 </button>
 
+                {/* Profile */}
+                <button
+                  onClick={() => {
+                    onScreenChange('profile');
+                    setMenuOpen(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px 16px',
+                    border: 'none',
+                    backgroundColor: currentScreen === 'profile' ? '#f3f4f6' : 'transparent',
+                    color: currentScreen === 'profile' ? '#4338ca' : '#374151',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    textAlign: 'left',
+                    transition: 'background-color 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (currentScreen !== 'profile') e.target.style.backgroundColor = '#f9fafb';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (currentScreen !== 'profile') e.target.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <User style={{ width: '16px', height: '16px' }} />
+                  <span>Profile</span>
+                </button>
+
                 {/* Admin Panel - Only show for admin users */}
                 {isAdmin && (
                   <button

@@ -5,6 +5,7 @@ import Header from "./components/Header.jsx";
 import AdminScreen from "./components/AdminScreen.jsx";
 import SelectedDocumentViewer from "./components/SelectedDocumentViewer.jsx";
 import AuthScreen from "./components/AuthScreen.jsx";
+import UserProfile from "./components/UserProfile.jsx";
 import { useInactivityLogout } from "./hooks/useInactivityLogout.js";
 import { useAdminRole } from "./hooks/useAdminRole.js";
 // import StatusPanel from "./components/StatusPanel.jsx";
@@ -19,6 +20,13 @@ export default function App() {
   // Set up inactivity logout for authenticated users
   const handleLogout = () => logout({ logoutParams: { returnTo: window.location.origin } });
   useInactivityLogout(handleLogout);
+
+  // Handle user profile updates
+  const handleUserUpdate = (updatedUser) => {
+    // This would typically update the user state, but since we're using Auth0's useAuth0 hook,
+    // the user object is managed by Auth0. The updated information will be available on next login.
+    console.log('User profile updated:', updatedUser);
+  };
 
   const handleOpenDocumentInPane = (document) => {
     console.log('App: handleOpenDocumentInPane called with:', document);
@@ -175,12 +183,15 @@ useEffect(() => {
                   />
                 </div>
         </div>
-      ) : (
+      ) : currentScreen === "admin" ? (
         /* Admin Screen */
         <div style={{ margin: '0 16px' }}>
           <AdminScreen userId={user?.sub} />
         </div>
-      )}
+      ) : currentScreen === "profile" ? (
+        /* Profile Screen */
+        <UserProfile user={user} onUpdateUser={handleUserUpdate} />
+      ) : null}
     </div>
   );
 }
