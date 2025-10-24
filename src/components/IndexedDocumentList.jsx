@@ -381,53 +381,53 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected, o
             </div>
           
           {/* AI Summary */}
-          {doc.summary && (
+          <div style={{
+            backgroundColor: 'white',
+            padding: '8px',
+            borderRadius: '4px',
+            border: '1px solid #e0e0e0',
+            marginBottom: '8px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <h4 style={{margin: '0', fontSize: '12px', fontWeight: '600', color: '#333'}}>
+                AI Summary:
+              </h4>
+              <button
+                onClick={() => handleRegenerateSummary(doc)}
+                disabled={regeneratingDoc === doc.id}
+                style={{
+                  padding: '4px 8px',
+                  backgroundColor: regeneratingDoc === doc.id ? '#ccc' : '#17a2b8',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '3px',
+                  cursor: regeneratingDoc === doc.id ? 'not-allowed' : 'pointer',
+                  fontSize: '11px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                {regeneratingDoc === doc.id ? (
+                  <>
+                    <span>🔄</span>
+                    <span>Regenerating...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🔄</span>
+                    <span>Regenerate</span>
+                  </>
+                )}
+              </button>
+            </div>
             <div style={{
-              backgroundColor: 'white',
-              padding: '8px',
-              borderRadius: '4px',
-              border: '1px solid #e0e0e0',
-              marginBottom: '8px'
+              fontSize: '12px',
+              lineHeight: '1.4',
+              color: '#555',
+              textAlign: 'left'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <h4 style={{margin: '0', fontSize: '12px', fontWeight: '600', color: '#333'}}>
-                  AI Summary:
-                </h4>
-                <button
-                  onClick={() => handleRegenerateSummary(doc)}
-                  disabled={regeneratingDoc === doc.id}
-                  style={{
-                    padding: '4px 8px',
-                    backgroundColor: regeneratingDoc === doc.id ? '#ccc' : '#17a2b8',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '3px',
-                    cursor: regeneratingDoc === doc.id ? 'not-allowed' : 'pointer',
-                    fontSize: '11px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  {regeneratingDoc === doc.id ? (
-                    <>
-                      <span>🔄</span>
-                      <span>Regenerating...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>🔄</span>
-                      <span>Regenerate</span>
-                    </>
-                  )}
-                </button>
-              </div>
-              <div style={{
-                fontSize: '12px',
-                lineHeight: '1.4',
-                color: '#555',
-                textAlign: 'left'
-              }}>
+              {doc.summary ? (
                 <ReactMarkdown
                   components={{
                     h1: ({children}) => <h1 style={{fontSize: '16px', fontWeight: 'bold', margin: '8px 0 4px 0', color: '#333'}}>{children}</h1>,
@@ -446,9 +446,18 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected, o
                 >
                   {doc.summary}
                 </ReactMarkdown>
-              </div>
+              ) : (
+                <div style={{
+                  color: '#999',
+                  fontStyle: 'italic',
+                  textAlign: 'center',
+                  padding: '20px'
+                }}>
+                  No AI summary available. Click "Regenerate" to generate one.
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Summary Comparison View */}
           {summaryComparison && summaryComparison.documentId === doc.id && (
