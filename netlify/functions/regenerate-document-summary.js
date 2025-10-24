@@ -362,11 +362,11 @@ export const handler = async (event) => {
     if (actualSourceType === 'veeva') {
       // For Veeva documents, download from Veeva API
       const sessionId = await getSessionId();
-      const domain = process.env.VEEVA_DOMAIN;
+      const domain = process.env.VAULT_DOMAIN;
       const v = process.env.VEEVA_VERSION || 'v20.3';
       
       if (!domain) {
-        throw new Error('VEEVA_DOMAIN environment variable is not set');
+        throw new Error('VAULT_DOMAIN environment variable is not set');
       }
       
       const downloadUrl = `https://${domain}/api/${v}/objects/documents/${doc.veeva_document_id}/file`;
