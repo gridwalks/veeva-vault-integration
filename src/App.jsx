@@ -39,6 +39,14 @@ export default function App() {
     }
   };
 
+  //temp// Add this in your App component, before the return statement
+useEffect(() => {
+  console.log('Current Auth0 Config:');
+  console.log('Domain:', import.meta.env.VITE_AUTH0_DOMAIN);
+  console.log('Client ID:', import.meta.env.VITE_AUTH0_CLIENT_ID);
+  console.log('User object:', user);
+}, [user]);
+
   if (!isAuthenticated) {
     return <AuthScreen onLogin={() => loginWithRedirect()} />;
   }
