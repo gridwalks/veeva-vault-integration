@@ -18,6 +18,12 @@
 [functions."upload-documents"]
   timeout = 26
 
+[functions."regenerate-document-summary"]
+  timeout = 60
+
+[functions."accept-regenerated-summary"]
+  timeout = 10
+
 [build.environment]
   NODE_VERSION = "18"
 
