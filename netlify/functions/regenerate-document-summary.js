@@ -278,11 +278,20 @@ async function extractTextFromBuffer(fileBuffer, fileName = '', contentType = ''
 
 export const handler = async (event) => {
   const startTime = Date.now();
+  console.log('=== REGENERATE DOCUMENT SUMMARY STARTED ===');
   
   try {
+    console.log('Event received:', {
+      method: event.httpMethod,
+      body: event.body,
+      headers: event.headers
+    });
+    
     // Parse request body
     const body = JSON.parse(event.body || '{}');
     const { documentId, sourceType } = body;
+    
+    console.log('Parsed request:', { documentId, sourceType });
     
     if (!documentId) {
       return {
@@ -527,7 +536,12 @@ ${documentText.substring(0, 4000)}`
     };
 
   } catch (error) {
-    console.error('Error regenerating document summary:', error);
+    console.error('Error regenerating document summary:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      duration: Date.now() - startTime
+    });
     
     return {
       statusCode: 500,
@@ -535,7 +549,8 @@ ${documentText.substring(0, 4000)}`
       body: JSON.stringify({
         success: false,
         error: error.message,
-        duration: Date.now() - startTime
+        duration: Date.now() - startTime,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       })
     };
   }
