@@ -307,14 +307,19 @@ export const handler = async (event) => {
     console.log(`Regenerating summary for document: ${documentId} (source: ${sourceType})`);
 
     // Initialize database
+    console.log('Initializing database...');
     await initDatabase();
+    console.log('Database initialized successfully');
     const pool = getPool();
+    console.log('Database pool obtained');
 
     // Get document from database
+    console.log('Querying database for document...');
     const docQuery = await pool.query(`
       SELECT * FROM Veeva_Doc_Chat_document_index 
       WHERE id = $1
     `, [documentId]);
+    console.log('Database query completed, rows found:', docQuery.rows.length);
 
     if (docQuery.rows.length === 0) {
       return {
