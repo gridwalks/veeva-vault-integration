@@ -319,13 +319,33 @@ export const handler = async (event) => {
     }
 
     const doc = docQuery.rows[0];
-    console.log(`Found document: ${doc.document_name} (${doc.source_type})`);
+    console.log(`Found document: ${doc.document_name}`, {
+      id: doc.id,
+      source_type: doc.source_type,
+      veeva_document_id: doc.veeva_document_id,
+      blob_url: doc.blob_url,
+      document_name: doc.document_name
+    });
 
     let documentText = '';
     let documentBuffer = null;
 
+    // Determine source type if not set
+    let actualSourceType = doc.source_type;
+    if (!actualSourceType) {
+      if (doc.veeva_document_id) {
+        actualSourceType = 'veeva';
+        console.log('Inferred source type as veeva based on veeva_document_id');
+      } else if (doc.blob_url) {
+        actualSourceType = 'upload';
+        console.log('Inferred source type as upload based on blob_url');
+      } else {
+        throw new Error(`Cannot determine document source type for document ${doc.id}. No source_type, veeva_document_id, or blob_url found.`);
+      }
+    }
+
     // Download document content based on source type
-    if (doc.source_type === 'veeva') {
+    if (actualSourceType === 'veeva') {
       // For Veeva documents, download from Veeva API
       const sessionId = await getSessionId();
       const domain = process.env.VEEVA_DOMAIN;
@@ -355,7 +375,7 @@ export const handler = async (event) => {
       documentText = extractionResult.extractedText;
       console.log(`Extracted ${extractionResult.textLength} characters from Veeva document`);
       
-    } else if (doc.source_type === 'upload') {
+    } else if (actualSourceType === 'upload') {
       // For uploaded documents, we need to get the blob URL and download from there
       if (!doc.blob_url) {
         throw new Error('Uploaded document has no blob URL');
@@ -382,7 +402,7 @@ export const handler = async (event) => {
       console.log(`Extracted ${extractionResult.textLength} characters from uploaded document`);
       
     } else {
-      throw new Error(`Unsupported source type: ${doc.source_type}`);
+      throw new Error(`Unsupported source type: ${actualSourceType}`);
     }
 
     if (!documentText || documentText.trim().length === 0) {

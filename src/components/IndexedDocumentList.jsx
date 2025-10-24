@@ -164,10 +164,28 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected, o
     setSummaryComparison(null);
     
     try {
-      console.log(`Regenerating summary for document: ${doc.document_name}`);
+      console.log(`Regenerating summary for document: ${doc.document_name}`, {
+        documentId: doc.id,
+        sourceType: doc.source_type,
+        hasVeevaId: !!doc.veeva_document_id,
+        hasBlobUrl: !!doc.blob_url
+      });
+      
+      // Determine source type - if source_type is undefined, infer from available fields
+      let sourceType = doc.source_type;
+      if (!sourceType) {
+        if (doc.veeva_document_id) {
+          sourceType = 'veeva';
+        } else if (doc.blob_url) {
+          sourceType = 'upload';
+        } else {
+          throw new Error('Cannot determine document source type - no veeva_document_id or blob_url found');
+        }
+      }
+      
       const result = await regenerateDocumentSummary({
         documentId: doc.id,
-        sourceType: doc.source_type
+        sourceType: sourceType
       });
       
       console.log('Summary regeneration completed:', result);
