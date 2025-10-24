@@ -1103,3 +1103,94 @@ export async function refineWorkflowDocument({ instanceId, currentDocument, inst
     throw error;
   }
 }
+
+export async function regenerateDocumentSummary({ documentId, sourceType }) {
+  const startTime = Date.now();
+  console.log('Regenerating document summary...', { documentId, sourceType });
+  
+  try {
+    const res = await fetch('/api/regenerate-document-summary', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        documentId,
+        sourceType
+      })
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to regenerate document summary:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error
+      });
+      throw new Error(errorData.error || `Failed to regenerate summary: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Document summary regenerated in ${duration}ms:`, {
+      documentId: data.documentId,
+      documentName: data.documentName,
+      summaryLength: data.summaryLength,
+      chunksRegenerated: data.chunksRegenerated,
+      chunkCount: data.chunkCount
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error regenerating document summary after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
+export async function acceptRegeneratedSummary({ documentId, newSummary }) {
+  const startTime = Date.now();
+  console.log('Accepting regenerated summary...', { documentId, summaryLength: newSummary?.length });
+  
+  try {
+    const res = await fetch('/api/accept-regenerated-summary', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        documentId,
+        newSummary
+      })
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to accept regenerated summary:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error
+      });
+      throw new Error(errorData.error || `Failed to accept summary: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Regenerated summary accepted in ${duration}ms:`, {
+      documentId: data.documentId,
+      summaryLength: data.summary?.length
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error accepting regenerated summary after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}

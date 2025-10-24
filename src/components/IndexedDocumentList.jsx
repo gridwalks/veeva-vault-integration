@@ -1,9 +1,9 @@
-import { downloadUrl, updateManualSummary, downloadUploadedDocumentUrl, deleteDocument } from "../api";
+import { downloadUrl, updateManualSummary, downloadUploadedDocumentUrl, deleteDocument, regenerateDocumentSummary, acceptRegeneratedSummary } from "../api";
 import { useState } from "react";
 import DocumentViewer from "./DocumentViewer.jsx";
 import ReactMarkdown from "react-markdown";
 
-export default function IndexedDocumentList({ items = [], onDocumentsSelected, onDocumentDeleted }) {
+export default function IndexedDocumentList({ items = [], onDocumentsSelected, onDocumentDeleted, onSummaryUpdated }) {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [selectedDocs, setSelectedDocs] = useState(new Set());
@@ -14,6 +14,10 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected, o
   const [deletingDoc, setDeletingDoc] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
+  const [regeneratingDoc, setRegeneratingDoc] = useState(null);
+  const [regenerationError, setRegenerationError] = useState(null);
+  const [summaryComparison, setSummaryComparison] = useState(null);
+  const [acceptingSummary, setAcceptingSummary] = useState(null);
 
   const handleViewDocument = (doc) => {
     let url;
@@ -152,6 +156,73 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected, o
   const handleCancelDelete = () => {
     setDeleteConfirm(null);
     setDeleteError(null);
+  };
+
+  const handleRegenerateSummary = async (doc) => {
+    setRegeneratingDoc(doc.id);
+    setRegenerationError(null);
+    setSummaryComparison(null);
+    
+    try {
+      console.log(`Regenerating summary for document: ${doc.document_name}`);
+      const result = await regenerateDocumentSummary({
+        documentId: doc.id,
+        sourceType: doc.source_type
+      });
+      
+      console.log('Summary regeneration completed:', result);
+      
+      // Set up comparison view
+      setSummaryComparison({
+        documentId: doc.id,
+        documentName: doc.document_name,
+        oldSummary: result.oldSummary,
+        newSummary: result.newSummary,
+        chunksRegenerated: result.chunksRegenerated,
+        chunkCount: result.chunkCount
+      });
+      
+    } catch (error) {
+      console.error('Failed to regenerate summary:', error);
+      setRegenerationError(error.message);
+    } finally {
+      setRegeneratingDoc(null);
+    }
+  };
+
+  const handleAcceptNewSummary = async () => {
+    if (!summaryComparison) return;
+    
+    setAcceptingSummary(summaryComparison.documentId);
+    
+    try {
+      console.log(`Accepting new summary for document: ${summaryComparison.documentName}`);
+      await acceptRegeneratedSummary({
+        documentId: summaryComparison.documentId,
+        newSummary: summaryComparison.newSummary
+      });
+      
+      console.log('Summary accepted successfully');
+      
+      // Clear comparison state
+      setSummaryComparison(null);
+      
+      // Notify parent component to refresh the document list
+      if (onSummaryUpdated) {
+        onSummaryUpdated(summaryComparison.documentId);
+      }
+      
+    } catch (error) {
+      console.error('Failed to accept new summary:', error);
+      setRegenerationError(error.message);
+    } finally {
+      setAcceptingSummary(null);
+    }
+  };
+
+  const handleKeepOldSummary = () => {
+    setSummaryComparison(null);
+    setRegenerationError(null);
   };
 
   if (!items?.length) {
@@ -318,9 +389,39 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected, o
               border: '1px solid #e0e0e0',
               marginBottom: '8px'
             }}>
-              <h4 style={{margin: '0 0 6px 0', fontSize: '12px', fontWeight: '600', color: '#333'}}>
-                AI Summary:
-              </h4>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <h4 style={{margin: '0', fontSize: '12px', fontWeight: '600', color: '#333'}}>
+                  AI Summary:
+                </h4>
+                <button
+                  onClick={() => handleRegenerateSummary(doc)}
+                  disabled={regeneratingDoc === doc.id}
+                  style={{
+                    padding: '4px 8px',
+                    backgroundColor: regeneratingDoc === doc.id ? '#ccc' : '#17a2b8',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '3px',
+                    cursor: regeneratingDoc === doc.id ? 'not-allowed' : 'pointer',
+                    fontSize: '11px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  {regeneratingDoc === doc.id ? (
+                    <>
+                      <span>🔄</span>
+                      <span>Regenerating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🔄</span>
+                      <span>Regenerate</span>
+                    </>
+                  )}
+                </button>
+              </div>
               <div style={{
                 fontSize: '12px',
                 lineHeight: '1.4',
@@ -346,6 +447,151 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected, o
                   {doc.summary}
                 </ReactMarkdown>
               </div>
+            </div>
+          )}
+
+          {/* Summary Comparison View */}
+          {summaryComparison && summaryComparison.documentId === doc.id && (
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              padding: '12px',
+              borderRadius: '6px',
+              border: '2px solid #17a2b8',
+              marginBottom: '8px'
+            }}>
+              <h4 style={{margin: '0 0 12px 0', fontSize: '13px', fontWeight: '600', color: '#17a2b8'}}>
+                📊 Summary Comparison - {summaryComparison.documentName}
+              </h4>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                {/* Old Summary */}
+                <div style={{
+                  backgroundColor: 'white',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #dee2e6'
+                }}>
+                  <h5 style={{margin: '0 0 6px 0', fontSize: '11px', fontWeight: '600', color: '#6c757d'}}>
+                    Current Summary:
+                  </h5>
+                  <div style={{
+                    fontSize: '11px',
+                    lineHeight: '1.4',
+                    color: '#555',
+                    maxHeight: '200px',
+                    overflowY: 'auto'
+                  }}>
+                    <ReactMarkdown
+                      components={{
+                        p: ({children}) => <p style={{margin: '2px 0', fontSize: '11px'}}>{children}</p>,
+                        strong: ({children}) => <strong style={{fontWeight: 'bold'}}>{children}</strong>,
+                        em: ({children}) => <em style={{fontStyle: 'italic'}}>{children}</em>,
+                        ul: ({children}) => <ul style={{margin: '2px 0', paddingLeft: '16px', fontSize: '11px'}}>{children}</ul>,
+                        ol: ({children}) => <ol style={{margin: '2px 0', paddingLeft: '16px', fontSize: '11px'}}>{children}</ol>,
+                        li: ({children}) => <li style={{margin: '1px 0', fontSize: '11px'}}>{children}</li>
+                      }}
+                    >
+                      {summaryComparison.oldSummary || 'No current summary'}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+
+                {/* New Summary */}
+                <div style={{
+                  backgroundColor: 'white',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #28a745'
+                }}>
+                  <h5 style={{margin: '0 0 6px 0', fontSize: '11px', fontWeight: '600', color: '#28a745'}}>
+                    New Summary:
+                  </h5>
+                  <div style={{
+                    fontSize: '11px',
+                    lineHeight: '1.4',
+                    color: '#555',
+                    maxHeight: '200px',
+                    overflowY: 'auto'
+                  }}>
+                    <ReactMarkdown
+                      components={{
+                        p: ({children}) => <p style={{margin: '2px 0', fontSize: '11px'}}>{children}</p>,
+                        strong: ({children}) => <strong style={{fontWeight: 'bold'}}>{children}</strong>,
+                        em: ({children}) => <em style={{fontStyle: 'italic'}}>{children}</em>,
+                        ul: ({children}) => <ul style={{margin: '2px 0', paddingLeft: '16px', fontSize: '11px'}}>{children}</ul>,
+                        ol: ({children}) => <ol style={{margin: '2px 0', paddingLeft: '16px', fontSize: '11px'}}>{children}</ol>,
+                        li: ({children}) => <li style={{margin: '1px 0', fontSize: '11px'}}>{children}</li>
+                      }}
+                    >
+                      {summaryComparison.newSummary}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                <button
+                  onClick={handleAcceptNewSummary}
+                  disabled={acceptingSummary === summaryComparison.documentId}
+                  style={{
+                    padding: '6px 12px',
+                    backgroundColor: acceptingSummary === summaryComparison.documentId ? '#ccc' : '#28a745',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: acceptingSummary === summaryComparison.documentId ? 'not-allowed' : 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}
+                >
+                  {acceptingSummary === summaryComparison.documentId ? 'Accepting...' : '✅ Accept New Summary'}
+                </button>
+                <button
+                  onClick={handleKeepOldSummary}
+                  style={{
+                    padding: '6px 12px',
+                    backgroundColor: '#6c757d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}
+                >
+                  ❌ Keep Current Summary
+                </button>
+              </div>
+
+              {/* Additional Info */}
+              {summaryComparison.chunksRegenerated && (
+                <div style={{
+                  marginTop: '8px',
+                  padding: '6px',
+                  backgroundColor: '#d1ecf1',
+                  borderRadius: '4px',
+                  fontSize: '10px',
+                  color: '#0c5460',
+                  textAlign: 'center'
+                }}>
+                  ℹ️ Document chunks were also regenerated ({summaryComparison.chunkCount} chunks)
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Regeneration Error */}
+          {regenerationError && regeneratingDoc === doc.id && (
+            <div style={{
+              backgroundColor: '#f8d7da',
+              color: '#721c24',
+              padding: '8px',
+              borderRadius: '4px',
+              marginBottom: '8px',
+              fontSize: '12px'
+            }}>
+              ❌ Error regenerating summary: {regenerationError}
             </div>
           )}
 

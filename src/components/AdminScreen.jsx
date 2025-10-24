@@ -452,6 +452,10 @@ export default function AdminScreen({ userId }) {
               console.log('Document deleted, refreshing list...', deletedId);
               loadIndexed(indexedData.pageOffset);
             }}
+            onSummaryUpdated={(documentId) => {
+              console.log('Summary updated, refreshing list...', documentId);
+              loadIndexed(indexedData.pageOffset);
+            }}
           />
           <div className="pager" style={{display:'flex', gap:8, alignItems:'center', marginTop:10}}>
             <button 
