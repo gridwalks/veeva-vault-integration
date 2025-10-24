@@ -365,6 +365,10 @@ export const handler = async (event) => {
       const domain = process.env.VEEVA_DOMAIN;
       const v = process.env.VEEVA_VERSION || 'v20.3';
       
+      if (!domain) {
+        throw new Error('VEEVA_DOMAIN environment variable is not set');
+      }
+      
       const downloadUrl = `https://${domain}/api/${v}/objects/documents/${doc.veeva_document_id}/file`;
       console.log(`Downloading from Veeva: ${downloadUrl}`);
       
