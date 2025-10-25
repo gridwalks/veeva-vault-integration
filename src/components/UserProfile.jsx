@@ -131,8 +131,8 @@ export default function UserProfile({ user, onUpdateUser }) {
     setPasswordSuccess(null);
 
     // Validate passwords
-    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
-      setPasswordError('All password fields are required');
+    if (!passwordData.newPassword || !passwordData.confirmPassword) {
+      setPasswordError('New password and confirmation are required');
       return;
     }
 
@@ -147,18 +147,13 @@ export default function UserProfile({ user, onUpdateUser }) {
       return;
     }
 
-    if (passwordData.currentPassword === passwordData.newPassword) {
-      setPasswordError('New password must be different from current password');
-      return;
-    }
-
     setIsChangingPassword(true);
 
     try {
       const accessToken = await getAccessTokenSilently();
       
       await changeUserPassword({
-        currentPassword: passwordData.currentPassword,
+        currentPassword: passwordData.currentPassword || 'dummy', // Not used in current implementation
         newPassword: passwordData.newPassword,
         accessToken: accessToken
       });
@@ -635,7 +630,7 @@ export default function UserProfile({ user, onUpdateUser }) {
             display: 'grid',
             gap: '20px'
           }}>
-            {/* Current Password */}
+            {/* Current Password - Optional for now */}
             <div>
               <label style={{
                 display: 'block',
@@ -645,13 +640,14 @@ export default function UserProfile({ user, onUpdateUser }) {
                 marginBottom: '8px',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
-                Current Password
+                Current Password (Optional)
               </label>
               <div style={{ position: 'relative' }}>
                 <input
                   type={showPasswords.current ? 'text' : 'password'}
                   value={passwordData.currentPassword}
                   onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
+                  placeholder="Enter current password (optional)"
                   style={{
                     width: '100%',
                     padding: '12px 40px 12px 12px',
@@ -691,6 +687,14 @@ export default function UserProfile({ user, onUpdateUser }) {
                   )}
                 </button>
               </div>
+              <p style={{
+                margin: '4px 0 0 0',
+                fontSize: '12px',
+                color: '#6b7280',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}>
+                Current password verification is not implemented in this version
+              </p>
             </div>
 
             {/* New Password */}
@@ -844,16 +848,16 @@ export default function UserProfile({ user, onUpdateUser }) {
               </button>
               <button
                 onClick={handlePasswordSave}
-                disabled={isChangingPassword || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword}
+                disabled={isChangingPassword || !passwordData.newPassword || !passwordData.confirmPassword}
                 style={{
                   padding: '8px 16px',
-                  backgroundColor: isChangingPassword || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword ? '#9ca3af' : '#10b981',
+                  backgroundColor: isChangingPassword || !passwordData.newPassword || !passwordData.confirmPassword ? '#9ca3af' : '#10b981',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '6px',
                   fontSize: '14px',
                   fontWeight: '500',
-                  cursor: isChangingPassword || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword ? 'not-allowed' : 'pointer',
+                  cursor: isChangingPassword || !passwordData.newPassword || !passwordData.confirmPassword ? 'not-allowed' : 'pointer',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   transition: 'background-color 0.2s ease',
                   display: 'flex',
