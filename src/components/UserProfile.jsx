@@ -153,8 +153,9 @@ export default function UserProfile({ user, onUpdateUser }) {
       const accessToken = await getAccessTokenSilently();
       
       await changeUserPassword({
-        currentPassword: passwordData.currentPassword || 'dummy', // Not used in current implementation
+        currentPassword: passwordData.currentPassword || 'dummy',
         newPassword: passwordData.newPassword,
+        userId: user.sub,  // ADD THIS LINE
         accessToken: accessToken
       });
 
