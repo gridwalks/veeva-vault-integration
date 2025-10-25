@@ -144,7 +144,7 @@ export const handler = async (event) => {
     try {
       // First, let's try to list users to see what's available
       console.log('Attempting to list users to debug...');
-      const users = await management.users.list({ per_page: 5 });
+      const users = await management.users.getAll({ per_page: 5 });
       console.log('Found users:', users.map(u => ({ id: u.user_id, name: u.name, email: u.email })));
       
       const candidateIds = new Set();
@@ -172,7 +172,8 @@ export const handler = async (event) => {
       for (const candidateId of lookupIds) {
         console.log('Attempting to get user with ID:', candidateId);
         try {
-          existingUser = await management.users.get({ id: candidateId });
+          // FIX: Pass ID as first parameter directly, not as an object
+          existingUser = await management.users.get(candidateId);
           resolvedId = existingUser.user_id;
           console.log('User found:', {
             requestedId: candidateId,
@@ -195,6 +196,7 @@ export const handler = async (event) => {
 
       console.log('Updating user with data:', updateData, 'using resolved ID:', resolvedId);
 
+      // FIX: Pass ID as first parameter and update data as second parameter
       updatedUser = await management.users.update({ id: resolvedId }, updateData);
     } catch (auth0Error) {
       console.error('Auth0 Management API error:', {
