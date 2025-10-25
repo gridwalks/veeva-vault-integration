@@ -99,8 +99,23 @@ export const handler = async (event) => {
     // Initialize Auth0 Management Client
     let management;
     try {
-      // Dynamic import to avoid module loading issues
-      const { ManagementClient } = await import('auth0');
+      // Try different import methods for Auth0 v5
+      const auth0Module = await import('auth0');
+      console.log('Auth0 module imported successfully:', Object.keys(auth0Module));
+      
+      // Try different ways to get ManagementClient
+      let ManagementClient;
+      if (auth0Module.ManagementClient) {
+        ManagementClient = auth0Module.ManagementClient;
+      } else if (auth0Module.default && auth0Module.default.ManagementClient) {
+        ManagementClient = auth0Module.default.ManagementClient;
+      } else if (auth0Module.default) {
+        ManagementClient = auth0Module.default;
+      } else {
+        throw new Error('Could not find ManagementClient in auth0 module');
+      }
+      
+      console.log('ManagementClient constructor:', typeof ManagementClient);
       
       management = new ManagementClient({
         domain: domain,
@@ -109,8 +124,15 @@ export const handler = async (event) => {
         scope: 'read:users update:users'
       });
       console.log('Auth0 Management Client initialized successfully');
+      console.log('Management client type:', typeof management);
+      console.log('Management client constructor name:', management.constructor.name);
     } catch (initError) {
       console.error('Failed to initialize Auth0 Management Client:', initError);
+      console.error('Init error details:', {
+        message: initError.message,
+        stack: initError.stack,
+        name: initError.name
+      });
       return {
         statusCode: 500,
         headers,
@@ -150,7 +172,20 @@ export const handler = async (event) => {
     let currentUser;
     try {
       console.log('Getting current user info for:', userId);
-      currentUser = await management.users.get({ id: userId });
+      console.log('Management client methods available:', Object.keys(management));
+      console.log('Users methods available:', management.users ? Object.keys(management.users) : 'users not available');
+      
+      // Try different method names for Auth0 v5
+      if (management.users && management.users.get) {
+        currentUser = await management.users.get({ id: userId });
+      } else if (management.getUser) {
+        currentUser = await management.getUser({ id: userId });
+      } else if (management.users && management.users.getUser) {
+        currentUser = await management.users.getUser({ id: userId });
+      } else {
+        throw new Error('No suitable method found to get user');
+      }
+      
       console.log('Current user retrieved successfully:', currentUser.user_id);
     } catch (getError) {
       console.error('Failed to get user from Auth0:', getError);
@@ -158,19 +193,37 @@ export const handler = async (event) => {
         message: getError.message,
         statusCode: getError.statusCode,
         status: getError.status,
-        response: getError.response
+        response: getError.response,
+        stack: getError.stack
       });
-      throw getError;
+      
+      // If we can't get the user, we can't update them either
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: 'Failed to access user: ' + getError.message
+        })
+      };
     }
 
     // Update user in Auth0
     let updatedUser;
     try {
-      console.log('Calling management.users.update with:', { id: userId, updateData });
-      updatedUser = await management.users.update(
-        { id: userId },
-        updateData
-      );
+      console.log('Calling update method with:', { id: userId, updateData });
+      
+      // Try different method names for Auth0 v5
+      if (management.users && management.users.update) {
+        updatedUser = await management.users.update({ id: userId }, updateData);
+      } else if (management.updateUser) {
+        updatedUser = await management.updateUser({ id: userId }, updateData);
+      } else if (management.users && management.users.updateUser) {
+        updatedUser = await management.users.updateUser({ id: userId }, updateData);
+      } else {
+        throw new Error('No suitable method found to update user');
+      }
+      
       console.log('User profile updated successfully:', updatedUser.user_id);
     } catch (updateError) {
       console.error('Failed to update user in Auth0:', updateError);
@@ -178,7 +231,8 @@ export const handler = async (event) => {
         message: updateError.message,
         statusCode: updateError.statusCode,
         status: updateError.status,
-        response: updateError.response
+        response: updateError.response,
+        stack: updateError.stack
       });
       throw updateError;
     }
