@@ -11,21 +11,36 @@ import { useAdminRole } from "./hooks/useAdminRole.js";
 // import StatusPanel from "./components/StatusPanel.jsx";
 
 export default function App() {
-  const { isAuthenticated, loginWithRedirect, logout, user } = useAuth0();
+  const { isAuthenticated, loginWithRedirect, logout, user, getAccessTokenSilently } = useAuth0();
   const { isAdmin, isLoading: isRoleLoading } = useAdminRole();
   const [currentScreen, setCurrentScreen] = useState("main");
   const [selectedDocuments, setSelectedDocuments] = useState([]);
+  const [localUser, setLocalUser] = useState(null);
   const documentViewerRef = useRef(null);
 
   // Set up inactivity logout for authenticated users
   const handleLogout = () => logout({ logoutParams: { returnTo: window.location.origin } });
   useInactivityLogout(handleLogout);
 
+  // Update local user state when Auth0 user changes
+  useEffect(() => {
+    if (user) {
+      setLocalUser(user);
+    }
+  }, [user]);
+
   // Handle user profile updates
   const handleUserUpdate = (updatedUser) => {
-    // This would typically update the user state, but since we're using Auth0's useAuth0 hook,
-    // the user object is managed by Auth0. The updated information will be available on next login.
     console.log('User profile updated:', updatedUser);
+    // Update the local user state with the new data
+    if (updatedUser && localUser) {
+      setLocalUser(prevUser => ({
+        ...prevUser,
+        name: updatedUser.name,
+        picture: updatedUser.picture,
+        updated_at: updatedUser.updated_at
+      }));
+    }
   };
 
   const handleOpenDocumentInPane = (document) => {
@@ -140,7 +155,7 @@ useEffect(() => {
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh' }}>
       <Header 
-        user={user}
+        user={localUser || user}
         currentScreen={currentScreen}
         onScreenChange={setCurrentScreen}
         onLogout={handleLogout}
@@ -168,7 +183,7 @@ useEffect(() => {
             <StaticChatPane 
               selectedDocuments={selectedDocuments} 
               onOpenDocumentInPane={handleOpenDocumentInPane}
-              userId={user?.sub}
+              userId={(localUser || user)?.sub}
             />
           </div>
 
@@ -186,11 +201,11 @@ useEffect(() => {
       ) : currentScreen === "admin" ? (
         /* Admin Screen */
         <div style={{ margin: '0 16px' }}>
-          <AdminScreen userId={user?.sub} />
+          <AdminScreen userId={(localUser || user)?.sub} />
         </div>
       ) : currentScreen === "profile" ? (
         /* Profile Screen */
-        <UserProfile user={user} onUpdateUser={handleUserUpdate} />
+        <UserProfile user={localUser || user} onUpdateUser={handleUserUpdate} />
       ) : null}
     </div>
   );

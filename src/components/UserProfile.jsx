@@ -24,6 +24,16 @@ export default function UserProfile({ user, onUpdateUser }) {
     }
   }, [user]);
 
+  // Update form data when user data changes (for real-time updates)
+  useEffect(() => {
+    if (user && !isEditing) {
+      setFormData({
+        name: user.name || '',
+        picture: user.picture || ''
+      });
+    }
+  }, [user, isEditing]);
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
