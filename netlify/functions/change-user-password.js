@@ -49,10 +49,24 @@ export const handler = async (event) => {
       console.log('Token claims extracted:', {
         sub: tokenClaims.sub,
         iss: tokenClaims.iss,
-        aud: tokenClaims.aud
+        aud: tokenClaims.aud,
+        exp: tokenClaims.exp,
+        iat: tokenClaims.iat,
+        allClaims: Object.keys(tokenClaims)
       });
     } catch (decodeError) {
-      console.warn('Unable to decode JWT payload for diagnostics:', decodeError.message);
+      console.error('Unable to decode JWT payload:', decodeError.message);
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: 'Invalid authentication token. Please log out and log back in.',
+          details: {
+            decodeError: decodeError.message
+          }
+        })
+      };
     }
 
     // Validate request body
@@ -200,12 +214,25 @@ export const handler = async (event) => {
       };
     }
 
-    // Use the token's sub claim as the authoritative user ID
-    const userIdToUpdate = tokenClaims.sub;
-    console.log('Using user ID from token sub claim:', userIdToUpdate);
+    // Try to extract user ID from various possible claims
+    let userIdToUpdate = tokenClaims.sub || tokenClaims.user_id || tokenClaims.oid;
+    const userEmail = tokenClaims.email || tokenClaims['https://acceleraqa.com/email'];
     
-    if (!userIdToUpdate) {
-      console.error('No user ID found in token sub claim');
+    console.log('Using user ID from token claims:', userIdToUpdate);
+    console.log('User email from token claims:', userEmail);
+    console.log('Available claims for user ID extraction:', {
+      sub: tokenClaims.sub,
+      user_id: tokenClaims.user_id,
+      oid: tokenClaims.oid,
+      email: userEmail,
+      allClaims: Object.keys(tokenClaims)
+    });
+    
+    // If we don't have a user ID but we have an email, we'll try to find the user by email
+    if (!userIdToUpdate && userEmail) {
+      console.log('No user ID found, will attempt to find user by email:', userEmail);
+    } else if (!userIdToUpdate) {
+      console.error('No user ID or email found in any token claims');
       return {
         statusCode: 400,
         headers,
@@ -213,6 +240,7 @@ export const handler = async (event) => {
           success: false,
           error: 'Unable to identify user from authentication token. Please log out and log back in.',
           details: {
+            availableClaims: Object.keys(tokenClaims),
             tokenClaims: tokenClaims
           }
         })
@@ -224,30 +252,62 @@ export const handler = async (event) => {
     let currentUser;
     
     try {
-      // Try the management.users.get method (most common)
-      if (management.users && typeof management.users.get === 'function') {
-        console.log('Using management.users.get()');
-        try {
-          // Try passing as object first (newer SDK versions)
-          currentUser = await management.users.get({ id: userIdToUpdate });
-        } catch (e) {
-          if (e.message && e.message.includes("didn't pass validation")) {
-            console.log('Retrying with ID as direct parameter...');
-            // Try passing ID directly (older SDK versions)
-            currentUser = await management.users.get(userIdToUpdate);
-          } else {
-            throw e;
+      // If we have a user ID, try to get the user directly
+      if (userIdToUpdate) {
+        console.log('Looking up user by ID:', userIdToUpdate);
+        
+        // Try the management.users.get method (most common)
+        if (management.users && typeof management.users.get === 'function') {
+          console.log('Using management.users.get()');
+          try {
+            // Try passing as object first (newer SDK versions)
+            currentUser = await management.users.get({ id: userIdToUpdate });
+          } catch (e) {
+            if (e.message && e.message.includes("didn't pass validation")) {
+              console.log('Retrying with ID as direct parameter...');
+              // Try passing ID directly (older SDK versions)
+              currentUser = await management.users.get(userIdToUpdate);
+            } else {
+              throw e;
+            }
           }
+        } 
+        // Try alternative method
+        else if (typeof management.getUser === 'function') {
+          console.log('Using management.getUser()');
+          const result = await management.getUser({ id: userIdToUpdate });
+          currentUser = result.data || result;
+        }
+        else {
+          throw new Error('Unable to find getUser method on management client');
         }
       } 
-      // Try alternative method
-      else if (typeof management.getUser === 'function') {
-        console.log('Using management.getUser()');
-        const result = await management.getUser({ id: userIdToUpdate });
-        currentUser = result.data || result;
-      }
-      else {
-        throw new Error('Unable to find getUser method on management client');
+      // If we don't have a user ID but we have an email, try to find by email
+      else if (userEmail) {
+        console.log('Looking up user by email:', userEmail);
+        
+        // Search for user by email
+        if (management.users && typeof management.users.getAll === 'function') {
+          console.log('Using management.users.getAll() to search by email');
+          const users = await management.users.getAll({
+            q: `email:"${userEmail}"`,
+            per_page: 1
+          });
+          
+          if (users && users.length > 0) {
+            currentUser = users[0];
+            console.log('User found by email search:', {
+              user_id: currentUser.user_id,
+              email: currentUser.email
+            });
+          } else {
+            throw new Error(`No user found with email: ${userEmail}`);
+          }
+        } else {
+          throw new Error('Unable to search users by email - getUserAll method not available');
+        }
+      } else {
+        throw new Error('No user ID or email available for lookup');
       }
 
       console.log('Current user found:', {
