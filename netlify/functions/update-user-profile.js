@@ -27,7 +27,7 @@ export const handler = async (event) => {
       };
     }
 
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    const token = authHeader.substring(7);
     console.log('Received token for validation');
 
     const decodeJwt = (jwt) => {
@@ -136,17 +136,34 @@ export const handler = async (event) => {
     console.log('Updating Auth0 user with data:', updateData);
     console.log('User ID supplied by request body:', userId);
     if (tokenClaims.sub && tokenClaims.sub !== userId) {
-      console.log('User ID mismatch detected between token sub and request payload. Using both values for lookup.');
+      console.log('User ID mismatch detected between token sub and request payload.');
     }
+
+    // Helper function to handle different SDK versions
+    const callManagementApi = async (methodPath, ...args) => {
+      // Try modern SDK format (direct methods)
+      const methodName = methodPath.split('.').pop();
+      if (typeof management[methodName] === 'function') {
+        const result = await management[methodName](...args);
+        return result.data || result;
+      }
+      
+      // Try legacy SDK format (nested under resource)
+      const parts = methodPath.split('.');
+      if (parts.length === 2) {
+        const [resource, method] = parts;
+        if (management[resource] && typeof management[resource][method] === 'function') {
+          const result = await management[resource][method](...args);
+          return result.data || result;
+        }
+      }
+      
+      throw new Error(`Method ${methodPath} not found on management client`);
+    };
 
     // Update the user in Auth0
     let updatedUser;
     try {
-      // First, let's try to list users to see what's available
-      console.log('Attempting to list users to debug...');
-      const users = await management.users.getAll({ per_page: 5 });
-      console.log('Found users:', users.map(u => ({ id: u.user_id, name: u.name, email: u.email })));
-      
       const candidateIds = new Set();
       if (userId) {
         candidateIds.add(userId);
@@ -169,11 +186,26 @@ export const handler = async (event) => {
       let existingUser;
       let resolvedId;
 
+      // Try to find the user with different ID formats
       for (const candidateId of lookupIds) {
         console.log('Attempting to get user with ID:', candidateId);
         try {
-          // FIX: Pass ID as first parameter directly, not as an object
-          existingUser = await management.users.get(candidateId);
+          // Try different API call formats
+          try {
+            existingUser = await callManagementApi('users.get', { id: candidateId });
+          } catch (e1) {
+            try {
+              existingUser = await callManagementApi('getUser', { id: candidateId });
+            } catch (e2) {
+              // Last resort: direct call
+              if (management.users && typeof management.users.get === 'function') {
+                existingUser = await management.users.get({ id: candidateId });
+              } else {
+                throw e2;
+              }
+            }
+          }
+          
           resolvedId = existingUser.user_id;
           console.log('User found:', {
             requestedId: candidateId,
@@ -182,10 +214,11 @@ export const handler = async (event) => {
           });
           break;
         } catch (getError) {
-          if (getError.statusCode === 404 || getError.status === 404) {
+          if (getError.statusCode === 404 || getError.status === 404 || getError.message?.includes('404')) {
             console.log('User not found with ID, trying next candidate...');
             continue;
           }
+          console.error('Error getting user:', getError.message);
           throw getError;
         }
       }
@@ -194,10 +227,23 @@ export const handler = async (event) => {
         throw Object.assign(new Error('User not found in Auth0'), { statusCode: 404 });
       }
 
-      console.log('Updating user with data:', updateData, 'using resolved ID:', resolvedId);
+      console.log('Updating user with resolved ID:', resolvedId);
 
-      // FIX: Pass ID as first parameter and update data as second parameter
-      updatedUser = await management.users.update({ id: resolvedId }, updateData);
+      // Try different update methods
+      try {
+        updatedUser = await callManagementApi('users.update', { id: resolvedId }, updateData);
+      } catch (e1) {
+        try {
+          updatedUser = await callManagementApi('updateUser', { id: resolvedId }, updateData);
+        } catch (e2) {
+          // Last resort
+          if (management.users && typeof management.users.update === 'function') {
+            updatedUser = await management.users.update({ id: resolvedId }, updateData);
+          } else {
+            throw e2;
+          }
+        }
+      }
     } catch (auth0Error) {
       console.error('Auth0 Management API error:', {
         message: auth0Error.message,
@@ -205,8 +251,7 @@ export const handler = async (event) => {
         statusCode: auth0Error.statusCode,
         error: auth0Error.error,
         error_description: auth0Error.error_description,
-        stack: auth0Error.stack,
-        fullError: auth0Error
+        stack: auth0Error.stack
       });
       const responseStatus = auth0Error.statusCode || auth0Error.status;
       return {
