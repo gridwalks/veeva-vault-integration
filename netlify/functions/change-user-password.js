@@ -17,7 +17,7 @@ export const handler = async (event) => {
   }
 
   try {
-    // Extract JWT token
+    // Extract JWT token for authentication
     const authHeader = event.headers.authorization || event.headers.Authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return {
@@ -28,17 +28,7 @@ export const handler = async (event) => {
     }
 
     const token = authHeader.substring(7);
-    console.log('Received token for password change validation');
-    console.log('Token info:', {
-      length: token.length,
-      parts: token.split('.').length,
-      firstChars: token.substring(0, 20),
-      lastChars: token.substring(token.length - 20)
-    });
-
-    // For password changes, we'll get the user ID from the request body
-    // The token is just for authentication verification
-    // We won't decode it since Auth0 access tokens may have non-standard formats
+    console.log('Received authenticated request for password change');
 
     // Validate request body
     if (!event.body) {
@@ -60,13 +50,21 @@ export const handler = async (event) => {
       };
     }
 
-    const { currentPassword, newPassword } = payload;
+    const { currentPassword, newPassword, userId } = payload;
 
-    if (!currentPassword || !newPassword) {
+    if (!newPassword) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ success: false, error: 'Current password and new password are required' })
+        body: JSON.stringify({ success: false, error: 'New password is required' })
+      };
+    }
+    
+    if (!userId) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ success: false, error: 'User ID is required' })
       };
     }
 
@@ -79,7 +77,7 @@ export const handler = async (event) => {
       };
     }
 
-    console.log('Password change request for user:', tokenClaims.sub);
+    console.log('Password change request for user:', userId);
 
     // Get Auth0 Management API credentials
     let domain = process.env.AUTH0_MGMT_DOMAIN;
@@ -142,20 +140,9 @@ export const handler = async (event) => {
     
     const management = new ManagementClient(managementConfig);
 
-    // Use the token's sub claim as the user ID
-    const userIdToUpdate = tokenClaims.sub;
-    console.log('Using user ID from token sub claim:', userIdToUpdate);
-
-    if (!userIdToUpdate) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          success: false,
-          error: 'Unable to identify user from authentication token'
-        })
-      };
-    }
+    // Use the userId from the request body
+    const userIdToUpdate = userId;
+    console.log('Using user ID from request body:', userIdToUpdate);
 
     // First verify the user exists and get current data
     console.log('Fetching current user data...');
