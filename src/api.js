@@ -844,7 +844,7 @@ export async function updateUserProfile({ userId, name, picture, accessToken }) 
   }
 }
 
-export async function changeUserPassword({ currentPassword, newPassword, accessToken }) {
+export async function changeUserPassword({ currentPassword, newPassword, userId, accessToken }) {
   const startTime = Date.now();
   console.log('Changing user password...');
   
@@ -863,7 +863,8 @@ export async function changeUserPassword({ currentPassword, newPassword, accessT
       headers,
       body: JSON.stringify({
         currentPassword,
-        newPassword
+        newPassword,
+        userId  // Add userId to the request body
       })
     });
     
