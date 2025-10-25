@@ -124,24 +124,39 @@ export const handler = async (event) => {
       console.log('Original user ID:', userId);
       console.log('Encoded user ID:', encodedUserId);
       
-      // Try to get the user with the original ID first
-      console.log('Attempting to get user with original ID:', userId);
-      let existingUser;
-      let updateId = userId;
-      try {
-        existingUser = await management.users.get({ id: userId });
-        updateId = existingUser.user_id || userId;
-        console.log('User found with original ID:', { userId: existingUser.user_id, name: existingUser.name });
-      } catch (getError) {
-        console.log('Failed to get user with original ID, trying encoded ID...');
-        existingUser = await management.users.get({ id: encodedUserId });
-        updateId = existingUser.user_id || encodedUserId;
-        console.log('User found with encoded ID:', { userId: existingUser.user_id, name: existingUser.name });
+      // Try to get the user with either the raw or encoded ID and reuse the same identifier for the update call
+      const lookupIds = [userId];
+      if (encodedUserId !== userId) {
+        lookupIds.push(encodedUserId);
       }
 
-      // Now update the user using the ID returned from Auth0 (preferred). The Auth0 SDK handles URL
-      // encoding internally, so pass the raw identifier to avoid double-encoding issues.
-      const updateRequestId = existingUser?.user_id || updateId;
+      let existingUser;
+      let updateRequestId;
+
+      for (const candidateId of lookupIds) {
+        console.log('Attempting to get user with ID:', candidateId);
+        try {
+          existingUser = await management.users.get({ id: candidateId });
+          updateRequestId = candidateId;
+          console.log('User found:', {
+            requestedId: candidateId,
+            userId: existingUser.user_id,
+            name: existingUser.name
+          });
+          break;
+        } catch (getError) {
+          if (getError.statusCode === 404 || getError.status === 404) {
+            console.log('User not found with ID, trying next candidate...');
+            continue;
+          }
+          throw getError;
+        }
+      }
+
+      if (!existingUser || !updateRequestId) {
+        throw Object.assign(new Error('User not found in Auth0'), { statusCode: 404 });
+      }
+
       console.log('Updating user with data:', updateData, 'using ID:', updateRequestId);
       updatedUser = await management.users.update({ id: updateRequestId }, updateData);
     } catch (auth0Error) {
