@@ -114,6 +114,13 @@ export const handler = async (event) => {
     // Update the user in Auth0
     let updatedUser;
     try {
+      // First, let's try to get the user to verify they exist
+      console.log('Attempting to get user first:', userId);
+      const existingUser = await management.users.get({ id: userId });
+      console.log('User found:', { userId: existingUser.user_id, name: existingUser.name });
+      
+      // Now update the user
+      console.log('Updating user with data:', updateData);
       updatedUser = await management.users.update({ id: userId }, updateData);
     } catch (auth0Error) {
       console.error('Auth0 Management API error:', {
@@ -122,7 +129,8 @@ export const handler = async (event) => {
         statusCode: auth0Error.statusCode,
         error: auth0Error.error,
         error_description: auth0Error.error_description,
-        stack: auth0Error.stack
+        stack: auth0Error.stack,
+        fullError: auth0Error
       });
       return {
         statusCode: 500,
