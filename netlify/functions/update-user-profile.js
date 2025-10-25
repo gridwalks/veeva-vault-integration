@@ -150,7 +150,7 @@ export const handler = async (event) => {
     let currentUser;
     try {
       console.log('Getting current user info for:', userId);
-      currentUser = await management.getUser({ id: userId });
+      currentUser = await management.users.get({ id: userId });
       console.log('Current user retrieved successfully:', currentUser.user_id);
     } catch (getError) {
       console.error('Failed to get user from Auth0:', getError);
@@ -166,8 +166,8 @@ export const handler = async (event) => {
     // Update user in Auth0
     let updatedUser;
     try {
-      console.log('Calling management.updateUser with:', { id: userId, updateData });
-      updatedUser = await management.updateUser(
+      console.log('Calling management.users.update with:', { id: userId, updateData });
+      updatedUser = await management.users.update(
         { id: userId },
         updateData
       );
