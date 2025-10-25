@@ -31,16 +31,29 @@ export const handler = async (event) => {
     console.log('Received token for password change validation');
 
     const decodeJwt = (jwt) => {
-      const parts = jwt.split('.');
-      if (parts.length < 2) {
-        throw new Error('Invalid JWT');
-      }
+      try {
+        const parts = jwt.split('.');
+        if (parts.length !== 3) {
+          throw new Error('Invalid JWT format - expected 3 parts');
+        }
 
-      const base64Url = parts[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
-      const json = Buffer.from(padded, 'base64').toString('utf8');
-      return JSON.parse(json);
+        const base64Url = parts[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        
+        // Calculate proper padding
+        const padLength = 4 - (base64.length % 4);
+        const padded = padLength === 4 ? base64 : base64 + '='.repeat(padLength);
+        
+        const json = Buffer.from(padded, 'base64').toString('utf8');
+        return JSON.parse(json);
+      } catch (error) {
+        console.error('JWT decode error details:', {
+          error: error.message,
+          tokenLength: jwt ? jwt.length : 0,
+          tokenParts: jwt ? jwt.split('.').length : 0
+        });
+        throw error;
+      }
     };
 
     let tokenClaims = {};
@@ -50,9 +63,7 @@ export const handler = async (event) => {
         sub: tokenClaims.sub,
         iss: tokenClaims.iss,
         aud: tokenClaims.aud,
-        exp: tokenClaims.exp,
-        iat: tokenClaims.iat,
-        allClaims: Object.keys(tokenClaims)
+        exp: tokenClaims.exp
       });
     } catch (decodeError) {
       console.error('Unable to decode JWT payload:', decodeError.message);
@@ -109,27 +120,11 @@ export const handler = async (event) => {
     }
 
     console.log('Password change request for user:', tokenClaims.sub);
-    console.log('Token claims details:', {
-      sub: tokenClaims.sub,
-      iss: tokenClaims.iss,
-      aud: tokenClaims.aud,
-      exp: tokenClaims.exp,
-      iat: tokenClaims.iat
-    });
 
     // Get Auth0 Management API credentials
-    let domain = process.env.AUTH0_MGMT_DOMAIN || process.env.VITE_AUTH0_DOMAIN;
+    let domain = process.env.AUTH0_MGMT_DOMAIN;
     const clientId = process.env.AUTH0_MGMT_CLIENT_ID;
     const clientSecret = process.env.AUTH0_MGMT_CLIENT_SECRET;
-
-    // Debug: Log all environment variables that start with AUTH0
-    console.log('All AUTH0 environment variables:', {
-      AUTH0_MGMT_DOMAIN: process.env.AUTH0_MGMT_DOMAIN,
-      AUTH0_MGMT_CLIENT_ID: process.env.AUTH0_MGMT_CLIENT_ID,
-      AUTH0_MGMT_CLIENT_SECRET: process.env.AUTH0_MGMT_CLIENT_SECRET ? 'present' : 'missing',
-      VITE_AUTH0_DOMAIN: process.env.VITE_AUTH0_DOMAIN,
-      VITE_AUTH0_CLIENT_ID: process.env.VITE_AUTH0_CLIENT_ID
-    });
 
     // Clean domain - remove https:// prefix and /api/v2/ suffix if present
     if (domain && domain.startsWith('https://')) {
@@ -140,11 +135,6 @@ export const handler = async (event) => {
     }
     if (domain && domain.endsWith('/api/v2')) {
       domain = domain.replace('/api/v2', '');
-    }
-    
-    // Ensure domain ends with .auth0.com or .auth0.com/ if it doesn't already
-    if (domain && !domain.includes('.auth0.com')) {
-      domain = domain + '.auth0.com';
     }
 
     console.log('Auth0 Management API credentials check:', {
@@ -160,7 +150,7 @@ export const handler = async (event) => {
         headers,
         body: JSON.stringify({ 
           success: false, 
-          error: 'Password change feature requires Auth0 Management API configuration. Please contact your administrator to set up AUTH0_MGMT_DOMAIN, AUTH0_MGMT_CLIENT_ID, and AUTH0_MGMT_CLIENT_SECRET environment variables.' 
+          error: 'Server configuration error: Missing Auth0 credentials' 
         })
       };
     }
@@ -168,81 +158,41 @@ export const handler = async (event) => {
     // Initialize Auth0 Management Client
     console.log('Initializing Auth0 Management Client with domain:', domain);
     
-    let management;
-    try {
-      // Use the exact same configuration as the working update-user-profile function
-      const managementConfig = {
-        domain: domain,
-        clientId: clientId,
-        clientSecret: clientSecret,
-        scope: 'read:users update:users'
-      };
-      
-      // Add token configuration to help the SDK authenticate properly
-      if (!managementConfig.domain.startsWith('https://')) {
-        // Ensure we're using HTTPS for the token endpoint
-        managementConfig.audience = `https://${domain}/api/v2/`;
-        managementConfig.tokenProvider = {
-          enableCache: true,
-          cacheTTLInSeconds: 3600
-        };
-      } else {
-        // If domain already has https://, use it directly for audience
-        managementConfig.audience = `${domain}/api/v2/`;
-      }
-      
-      console.log('Management config:', {
-        domain: managementConfig.domain,
-        audience: managementConfig.audience,
-        clientId: managementConfig.clientId ? 'present' : 'missing'
-      });
-      
-      management = new ManagementClient(managementConfig);
-      console.log('Management client initialized successfully');
-    } catch (initError) {
-      console.error('Failed to initialize Auth0 Management Client:', initError);
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({
-          success: false,
-          error: 'Failed to initialize Auth0 Management API client. Please check your Auth0 Management API configuration.',
-          details: {
-            message: initError.message
-          }
-        })
+    const managementConfig = {
+      domain: domain,
+      clientId: clientId,
+      clientSecret: clientSecret,
+      scope: 'read:users update:users'
+    };
+    
+    // Add token configuration to help the SDK authenticate properly
+    if (!managementConfig.domain.startsWith('https://')) {
+      managementConfig.audience = `https://${domain}/api/v2/`;
+      managementConfig.tokenProvider = {
+        enableCache: true,
+        cacheTTLInSeconds: 3600
       };
     }
-
-    // Try to extract user ID from various possible claims
-    let userIdToUpdate = tokenClaims.sub || tokenClaims.user_id || tokenClaims.oid;
-    const userEmail = tokenClaims.email || tokenClaims['https://acceleraqa.com/email'];
     
-    console.log('Using user ID from token claims:', userIdToUpdate);
-    console.log('User email from token claims:', userEmail);
-    console.log('Available claims for user ID extraction:', {
-      sub: tokenClaims.sub,
-      user_id: tokenClaims.user_id,
-      oid: tokenClaims.oid,
-      email: userEmail,
-      allClaims: Object.keys(tokenClaims)
+    console.log('Management config:', {
+      domain: managementConfig.domain,
+      audience: managementConfig.audience,
+      clientId: managementConfig.clientId ? 'present' : 'missing'
     });
     
-    // If we don't have a user ID but we have an email, we'll try to find the user by email
-    if (!userIdToUpdate && userEmail) {
-      console.log('No user ID found, will attempt to find user by email:', userEmail);
-    } else if (!userIdToUpdate) {
-      console.error('No user ID or email found in any token claims');
+    const management = new ManagementClient(managementConfig);
+
+    // Use the token's sub claim as the user ID
+    const userIdToUpdate = tokenClaims.sub;
+    console.log('Using user ID from token sub claim:', userIdToUpdate);
+
+    if (!userIdToUpdate) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({
           success: false,
-          error: 'Unable to identify user from authentication token. Please log out and log back in.',
-          details: {
-            availableClaims: Object.keys(tokenClaims),
-            tokenClaims: tokenClaims
-          }
+          error: 'Unable to identify user from authentication token'
         })
       };
     }
@@ -252,62 +202,27 @@ export const handler = async (event) => {
     let currentUser;
     
     try {
-      // If we have a user ID, try to get the user directly
-      if (userIdToUpdate) {
-        console.log('Looking up user by ID:', userIdToUpdate);
-        
-        // Try the management.users.get method (most common)
-        if (management.users && typeof management.users.get === 'function') {
-          console.log('Using management.users.get()');
-          try {
-            // Try passing as object first (newer SDK versions)
-            currentUser = await management.users.get({ id: userIdToUpdate });
-          } catch (e) {
-            if (e.message && e.message.includes("didn't pass validation")) {
-              console.log('Retrying with ID as direct parameter...');
-              // Try passing ID directly (older SDK versions)
-              currentUser = await management.users.get(userIdToUpdate);
-            } else {
-              throw e;
-            }
+      // Try the management.users.get method
+      if (management.users && typeof management.users.get === 'function') {
+        console.log('Using management.users.get()');
+        try {
+          currentUser = await management.users.get({ id: userIdToUpdate });
+        } catch (e) {
+          if (e.message && e.message.includes("didn't pass validation")) {
+            console.log('Retrying with ID as direct parameter...');
+            currentUser = await management.users.get(userIdToUpdate);
+          } else {
+            throw e;
           }
-        } 
-        // Try alternative method
-        else if (typeof management.getUser === 'function') {
-          console.log('Using management.getUser()');
-          const result = await management.getUser({ id: userIdToUpdate });
-          currentUser = result.data || result;
-        }
-        else {
-          throw new Error('Unable to find getUser method on management client');
         }
       } 
-      // If we don't have a user ID but we have an email, try to find by email
-      else if (userEmail) {
-        console.log('Looking up user by email:', userEmail);
-        
-        // Search for user by email
-        if (management.users && typeof management.users.getAll === 'function') {
-          console.log('Using management.users.getAll() to search by email');
-          const users = await management.users.getAll({
-            q: `email:"${userEmail}"`,
-            per_page: 1
-          });
-          
-          if (users && users.length > 0) {
-            currentUser = users[0];
-            console.log('User found by email search:', {
-              user_id: currentUser.user_id,
-              email: currentUser.email
-            });
-          } else {
-            throw new Error(`No user found with email: ${userEmail}`);
-          }
-        } else {
-          throw new Error('Unable to search users by email - getUserAll method not available');
-        }
-      } else {
-        throw new Error('No user ID or email available for lookup');
+      else if (typeof management.getUser === 'function') {
+        console.log('Using management.getUser()');
+        const result = await management.getUser({ id: userIdToUpdate });
+        currentUser = result.data || result;
+      }
+      else {
+        throw new Error('Unable to find getUser method on management client');
       }
 
       console.log('Current user found:', {
@@ -315,27 +230,28 @@ export const handler = async (event) => {
         email: currentUser.email
       });
 
-      // Note: Current password verification is skipped for this implementation
-      // In a production environment, you would want to implement proper verification
-      console.log('Skipping current password verification - proceeding with password update');
+      // Note: We cannot verify the current password via Management API
+      // Auth0 doesn't expose password verification through the Management API
+      console.log('Note: Current password verification not available via Management API');
 
-      // Now update the password
+      // Update the password
       console.log('Updating user password...');
       
       let updatedUser;
       if (management.users && typeof management.users.update === 'function') {
         console.log('Using management.users.update()');
         try {
-          // Try object format first
           updatedUser = await management.users.update(
             { id: currentUser.user_id }, 
-            { password: newPassword }
+            { password: newPassword, connection: 'Username-Password-Authentication' }
           );
         } catch (e) {
           if (e.message && e.message.includes("didn't pass validation")) {
             console.log('Retrying update with direct parameters...');
-            // Try direct parameters (ID as string, data as second param)
-            updatedUser = await management.users.update(currentUser.user_id, { password: newPassword });
+            updatedUser = await management.users.update(
+              currentUser.user_id, 
+              { password: newPassword, connection: 'Username-Password-Authentication' }
+            );
           } else {
             throw e;
           }
@@ -345,7 +261,7 @@ export const handler = async (event) => {
         console.log('Using management.updateUser()');
         const result = await management.updateUser(
           { id: currentUser.user_id }, 
-          { password: newPassword }
+          { password: newPassword, connection: 'Username-Password-Authentication' }
         );
         updatedUser = result.data || result;
       }
@@ -361,19 +277,19 @@ export const handler = async (event) => {
         status: auth0Error.status,
         statusCode: auth0Error.statusCode,
         error: auth0Error.error,
-        error_description: auth0Error.error_description,
-        originalError: auth0Error.originalError
+        error_description: auth0Error.error_description
       });
       
-      // Handle specific Auth0 errors
-      let errorMessage = 'Failed to update password: ' + (auth0Error.message || 'Unknown error');
+      let errorMessage = 'Failed to update password';
       
-      if (auth0Error.error === 'invalid_uri' || auth0Error.message?.includes('invalid_uri')) {
-        errorMessage = 'Invalid Auth0 configuration. Please check that AUTH0_MGMT_DOMAIN is set correctly (should be your Auth0 domain without https://, e.g., "your-domain.auth0.com").';
+      if (auth0Error.message?.includes('PasswordStrengthError')) {
+        errorMessage = 'Password does not meet strength requirements. Please use a stronger password.';
       } else if (auth0Error.status === 401 || auth0Error.statusCode === 401) {
-        errorMessage = 'Authentication failed. Please check your Auth0 Management API credentials (AUTH0_MGMT_CLIENT_ID and AUTH0_MGMT_CLIENT_SECRET).';
+        errorMessage = 'Authentication failed with Auth0 Management API';
       } else if (auth0Error.status === 403 || auth0Error.statusCode === 403) {
-        errorMessage = 'Insufficient permissions. Please ensure your Auth0 Management API application has the required scopes (read:users, update:users).';
+        errorMessage = 'Insufficient permissions to update password';
+      } else if (auth0Error.message) {
+        errorMessage = auth0Error.message;
       }
       
       const responseStatus = auth0Error.statusCode || auth0Error.status || 500;
@@ -386,14 +302,13 @@ export const handler = async (event) => {
           details: {
             status: responseStatus,
             error: auth0Error.error,
-            error_description: auth0Error.error_description,
-            user_id: tokenClaims.sub || 'undefined'
+            error_description: auth0Error.error_description
           }
         })
       };
     }
 
-    console.log('Password change completed successfully for user:', currentUser.user_id);
+    console.log('Password change completed successfully');
 
     return {
       statusCode: 200,
