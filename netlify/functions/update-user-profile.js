@@ -136,9 +136,9 @@ export const handler = async (event) => {
         console.log('User found with encoded ID:', { userId: existingUser.user_id, name: existingUser.name });
       }
       
-      // Now update the user
+      // Now update the user using the same ID format that worked for the lookup
       console.log('Updating user with data:', updateData);
-      updatedUser = await management.users.update({ id: userId }, updateData);
+      updatedUser = await management.users.update({ id: encodedUserId }, updateData);
     } catch (auth0Error) {
       console.error('Auth0 Management API error:', {
         message: auth0Error.message,
