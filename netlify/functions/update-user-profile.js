@@ -8,7 +8,10 @@ function makeHttpsRequest(url, options = {}) {
     console.log('Making HTTPS request to:', url);
     
     // Parse URL manually since URL constructor might not be available
+    console.log('Parsing URL:', url);
     const urlMatch = url.match(/^https:\/\/([^\/]+)(.*)$/);
+    console.log('URL match result:', urlMatch);
+    
     if (!urlMatch) {
       console.error('Invalid HTTPS URL:', url);
       reject(new Error(`Invalid HTTPS URL: ${url}`));
@@ -17,6 +20,7 @@ function makeHttpsRequest(url, options = {}) {
     
     const hostname = urlMatch[1];
     const path = urlMatch[2] || '/';
+    console.log('Parsed hostname:', hostname, 'path:', path);
     
     const requestOptions = {
       hostname: hostname,
@@ -167,14 +171,16 @@ export const handler = async (event) => {
     let accessToken;
     try {
       console.log('Getting Auth0 Management API access token...');
+      const tokenUrl = `https://${domain}/oauth/token`;
       console.log('Token request details:', {
-        url: `https://${domain}/oauth/token`,
+        domain: domain,
+        tokenUrl: tokenUrl,
         clientId: clientId ? 'present' : 'missing',
         clientSecret: clientSecret ? 'present' : 'missing',
         audience: `https://${domain}/api/v2/`
       });
       
-      const tokenResponse = await makeHttpsRequest(`https://${domain}/oauth/token`, {
+      const tokenResponse = await makeHttpsRequest(tokenUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
