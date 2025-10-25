@@ -92,9 +92,15 @@ export const handler = async (event) => {
     const clientId = process.env.AUTH0_MGMT_CLIENT_ID;
     const clientSecret = process.env.AUTH0_MGMT_CLIENT_SECRET;
 
-    // Clean domain - remove https:// prefix if present
+    // Clean domain - remove https:// prefix and /api/v2/ suffix if present
     if (domain && domain.startsWith('https://')) {
       domain = domain.replace('https://', '');
+    }
+    if (domain && domain.endsWith('/api/v2/')) {
+      domain = domain.replace('/api/v2/', '');
+    }
+    if (domain && domain.endsWith('/api/v2')) {
+      domain = domain.replace('/api/v2', '');
     }
 
     console.log('Auth0 Management API credentials check:', {
