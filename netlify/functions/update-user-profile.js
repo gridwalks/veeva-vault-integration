@@ -114,19 +114,31 @@ export const handler = async (event) => {
     // Update the user in Auth0
     let updatedUser;
     try {
+      // First, let's try to list users to see what's available
+      console.log('Attempting to list users to debug...');
+      const users = await management.users.getAll({ per_page: 5 });
+      console.log('Found users:', users.map(u => ({ id: u.user_id, name: u.name, email: u.email })));
+      
       // URL encode the user ID in case it contains special characters
       const encodedUserId = encodeURIComponent(userId);
       console.log('Original user ID:', userId);
       console.log('Encoded user ID:', encodedUserId);
       
-      // First, let's try to get the user to verify they exist
-      console.log('Attempting to get user first with encoded ID:', encodedUserId);
-      const existingUser = await management.users.get({ id: encodedUserId });
-      console.log('User found:', { userId: existingUser.user_id, name: existingUser.name });
+      // Try to get the user with the original ID first
+      console.log('Attempting to get user with original ID:', userId);
+      let existingUser;
+      try {
+        existingUser = await management.users.get({ id: userId });
+        console.log('User found with original ID:', { userId: existingUser.user_id, name: existingUser.name });
+      } catch (getError) {
+        console.log('Failed to get user with original ID, trying encoded ID...');
+        existingUser = await management.users.get({ id: encodedUserId });
+        console.log('User found with encoded ID:', { userId: existingUser.user_id, name: existingUser.name });
+      }
       
       // Now update the user
       console.log('Updating user with data:', updateData);
-      updatedUser = await management.users.update({ id: encodedUserId }, updateData);
+      updatedUser = await management.users.update({ id: userId }, updateData);
     } catch (auth0Error) {
       console.error('Auth0 Management API error:', {
         message: auth0Error.message,
