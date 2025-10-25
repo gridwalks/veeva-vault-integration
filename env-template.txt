@@ -14,6 +14,9 @@ DATABASE_URL=postgresql://username:password@hostname:5432/database
 # OpenAI Configuration (for document summarization)
 OPENAI_API_KEY=<your_openai_api_key>
 
+# OpenAI Fallback Control (set to 'true' to disable gpt-4o-mini fallback)
+DISABLE_OPENAI_FALLBACK=false
+
 # GovInfo CFR API
 GPO_API_KEY=<your_govinfo_api_key>
 

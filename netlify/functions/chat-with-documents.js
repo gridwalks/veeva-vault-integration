@@ -28,6 +28,7 @@ const MIN_LLM_TIME_BUDGET_MS = Math.min(
   parseDuration(process.env.CHAT_MIN_LLM_BUDGET_MS, 6000),
   FUNCTION_TIMEOUT_MS
 );
+const DISABLE_OPENAI_FALLBACK = process.env.DISABLE_OPENAI_FALLBACK === 'true';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -1626,6 +1627,17 @@ ${externalResourcesContext}`;
           remainingAfterGroq,
           responseFinalizationBufferMs: RESPONSE_FINALIZATION_BUFFER_MS,
           minLlmBudgetMs: MIN_LLM_TIME_BUDGET_MS,
+          groqErrorCode: groqError.code,
+        });
+
+        modelDuration = groqDuration;
+        modelUsed = groqError?.code === 'timeout' ? 'groq_timeout' : 'groq_error';
+        response = "I started analyzing the provided documents but ran out of time before completing the response. Please try again with fewer attachments or a narrower question.";
+        totalTokensUsed = 0;
+      } else if (DISABLE_OPENAI_FALLBACK) {
+        console.warn('Skipping OpenAI fallback due to DISABLE_OPENAI_FALLBACK environment variable', {
+          fallbackUsableBudget,
+          remainingAfterGroq,
           groqErrorCode: groqError.code,
         });
 

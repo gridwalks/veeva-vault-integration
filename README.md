@@ -30,6 +30,9 @@ DATABASE_URL=postgresql://username:password@hostname:5432/database
 # OpenAI Configuration (for document summarization)
 OPENAI_API_KEY=<your_openai_api_key>
 
+# OpenAI Fallback Control (set to 'true' to disable gpt-4o-mini fallback)
+DISABLE_OPENAI_FALLBACK=false
+
 # Auth0 Configuration
 VITE_AUTH0_DOMAIN=<your_auth0_domain>
 VITE_AUTH0_CLIENT_ID=<your_auth0_client_id>
