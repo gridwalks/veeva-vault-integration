@@ -844,6 +844,55 @@ export async function updateUserProfile({ userId, name, picture, accessToken }) 
   }
 }
 
+export async function changeUserPassword({ currentPassword, newPassword, accessToken }) {
+  const startTime = Date.now();
+  console.log('Changing user password...');
+  
+  try {
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Add Authorization header if access token is provided
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+    
+    const res = await fetch('/api/change-user-password', {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        currentPassword,
+        newPassword
+      })
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to change password:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error,
+        details: errorData.details
+      });
+      throw new Error(errorData.error || `Failed to change password: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Password changed successfully in ${duration}ms`);
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error changing password after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
 // Q&A Interactions API functions
 export async function getQAInteractions({ page = 1, limit = 50, search = '', user_id, session_id } = {}) {
   const startTime = Date.now();

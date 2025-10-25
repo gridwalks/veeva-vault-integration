@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Shield, Calendar, CheckCircle, XCircle, Save, X, Edit3 } from 'lucide-react';
+import { User, Mail, Shield, Calendar, CheckCircle, XCircle, Save, X, Edit3, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth0 } from '@auth0/auth0-react';
-import { updateUserProfile } from '../api.js';
+import { updateUserProfile, changeUserPassword } from '../api.js';
 
 export default function UserProfile({ user, onUpdateUser }) {
   const { getAccessTokenSilently } = useAuth0();
@@ -13,6 +13,19 @@ export default function UserProfile({ user, onUpdateUser }) {
     name: '',
     picture: ''
   });
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState(null);
+  const [passwordSuccess, setPasswordSuccess] = useState(null);
 
   // Initialize form data when user changes
   useEffect(() => {
@@ -39,6 +52,38 @@ export default function UserProfile({ user, onUpdateUser }) {
       ...prev,
       [field]: value
     }));
+  };
+
+  const handlePasswordChange = (field, value) => {
+    setPasswordData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    // Clear errors when user starts typing
+    if (passwordError) setPasswordError(null);
+  };
+
+  const togglePasswordVisibility = (field) => {
+    setShowPasswords(prev => ({
+      ...prev,
+      [field]: !prev[field]
+    }));
+  };
+
+  const validatePassword = (password) => {
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters long';
+    }
+    if (!/(?=.*[a-z])/.test(password)) {
+      return 'Password must contain at least one lowercase letter';
+    }
+    if (!/(?=.*[A-Z])/.test(password)) {
+      return 'Password must contain at least one uppercase letter';
+    }
+    if (!/(?=.*\d)/.test(password)) {
+      return 'Password must contain at least one number';
+    }
+    return null;
   };
 
   const handleSave = async () => {
@@ -79,6 +124,66 @@ export default function UserProfile({ user, onUpdateUser }) {
     setIsEditing(false);
     setError(null);
     setSuccess(null);
+  };
+
+  const handlePasswordSave = async () => {
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    // Validate passwords
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      setPasswordError('All password fields are required');
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordError('New passwords do not match');
+      return;
+    }
+
+    const passwordValidation = validatePassword(passwordData.newPassword);
+    if (passwordValidation) {
+      setPasswordError(passwordValidation);
+      return;
+    }
+
+    if (passwordData.currentPassword === passwordData.newPassword) {
+      setPasswordError('New password must be different from current password');
+      return;
+    }
+
+    setIsChangingPassword(true);
+
+    try {
+      const accessToken = await getAccessTokenSilently();
+      
+      await changeUserPassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+        accessToken: accessToken
+      });
+
+      setPasswordSuccess('Password changed successfully!');
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+    } catch (err) {
+      setPasswordError(err.message || 'Failed to change password');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handlePasswordCancel = () => {
+    setPasswordData({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+    setPasswordError(null);
+    setPasswordSuccess(null);
   };
 
   // Get user roles from various possible locations
@@ -293,6 +398,45 @@ export default function UserProfile({ user, onUpdateUser }) {
           </div>
         )}
 
+        {/* Password Success/Error Messages */}
+        {passwordSuccess && (
+          <div style={{
+            backgroundColor: '#d1fae5',
+            border: '1px solid #10b981',
+            borderRadius: '6px',
+            padding: '12px 16px',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: '#065f46',
+            fontSize: '14px',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          }}>
+            <CheckCircle style={{ width: '16px', height: '16px' }} />
+            {passwordSuccess}
+          </div>
+        )}
+
+        {passwordError && (
+          <div style={{
+            backgroundColor: '#fee2e2',
+            border: '1px solid #ef4444',
+            borderRadius: '6px',
+            padding: '12px 16px',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: '#991b1b',
+            fontSize: '14px',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          }}>
+            <XCircle style={{ width: '16px', height: '16px' }} />
+            {passwordError}
+          </div>
+        )}
+
         {/* Profile Information */}
         <div style={{
           backgroundColor: '#ffffff',
@@ -436,6 +580,291 @@ export default function UserProfile({ user, onUpdateUser }) {
                 />
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Password Change Section */}
+        <div style={{
+          backgroundColor: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px',
+          padding: '24px',
+          marginTop: '24px',
+          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '20px'
+          }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              backgroundColor: '#f3f4f6',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#6b7280'
+            }}>
+              <Lock style={{ width: '20px', height: '20px' }} />
+            </div>
+            <div>
+              <h3 style={{
+                margin: '0 0 4px 0',
+                fontSize: '18px',
+                fontWeight: '600',
+                color: '#374151',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}>
+                Change Password
+              </h3>
+              <p style={{
+                margin: '0',
+                fontSize: '14px',
+                color: '#6b7280',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}>
+                Update your account password
+              </p>
+            </div>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gap: '20px'
+          }}>
+            {/* Current Password */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#374151',
+                marginBottom: '8px',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}>
+                Current Password
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPasswords.current ? 'text' : 'password'}
+                  value={passwordData.currentPassword}
+                  onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 40px 12px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    outline: 'none',
+                    transition: 'border-color 0.2s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#4338ca';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#d1d5db';
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => togglePasswordVisibility('current')}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#6b7280',
+                    padding: '4px'
+                  }}
+                >
+                  {showPasswords.current ? (
+                    <EyeOff style={{ width: '16px', height: '16px' }} />
+                  ) : (
+                    <Eye style={{ width: '16px', height: '16px' }} />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* New Password */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#374151',
+                marginBottom: '8px',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}>
+                New Password
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPasswords.new ? 'text' : 'password'}
+                  value={passwordData.newPassword}
+                  onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 40px 12px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    outline: 'none',
+                    transition: 'border-color 0.2s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#4338ca';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#d1d5db';
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => togglePasswordVisibility('new')}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#6b7280',
+                    padding: '4px'
+                  }}
+                >
+                  {showPasswords.new ? (
+                    <EyeOff style={{ width: '16px', height: '16px' }} />
+                  ) : (
+                    <Eye style={{ width: '16px', height: '16px' }} />
+                  )}
+                </button>
+              </div>
+              <p style={{
+                margin: '4px 0 0 0',
+                fontSize: '12px',
+                color: '#6b7280',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}>
+                Must be at least 8 characters with uppercase, lowercase, and number
+              </p>
+            </div>
+
+            {/* Confirm New Password */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#374151',
+                marginBottom: '8px',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}>
+                Confirm New Password
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPasswords.confirm ? 'text' : 'password'}
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 40px 12px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    outline: 'none',
+                    transition: 'border-color 0.2s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#4338ca';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#d1d5db';
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => togglePasswordVisibility('confirm')}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#6b7280',
+                    padding: '4px'
+                  }}
+                >
+                  {showPasswords.confirm ? (
+                    <EyeOff style={{ width: '16px', height: '16px' }} />
+                  ) : (
+                    <Eye style={{ width: '16px', height: '16px' }} />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Password Change Buttons */}
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={handlePasswordCancel}
+                disabled={isChangingPassword}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#6b7280',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: isChangingPassword ? 'not-allowed' : 'pointer',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  transition: 'background-color 0.2s ease',
+                  opacity: isChangingPassword ? 0.6 : 1
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePasswordSave}
+                disabled={isChangingPassword || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: isChangingPassword || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword ? '#9ca3af' : '#10b981',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: isChangingPassword || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword ? 'not-allowed' : 'pointer',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  transition: 'background-color 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Lock style={{ width: '16px', height: '16px' }} />
+                {isChangingPassword ? 'Changing...' : 'Change Password'}
+              </button>
+            </div>
           </div>
         </div>
 
