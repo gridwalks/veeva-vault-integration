@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Shield, Calendar, CheckCircle, XCircle, Save, X, Edit3 } from 'lucide-react';
+import { useAuth0 } from '@auth0/auth0-react';
 import { updateUserProfile } from '../api.js';
 
 export default function UserProfile({ user, onUpdateUser }) {
+  const { getAccessTokenSilently } = useAuth0();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -35,10 +37,14 @@ export default function UserProfile({ user, onUpdateUser }) {
     setSuccess(null);
 
     try {
+      // Get the access token
+      const accessToken = await getAccessTokenSilently();
+      
       const updatedUser = await updateUserProfile({
         userId: user.sub,
         name: formData.name,
-        picture: formData.picture
+        picture: formData.picture,
+        accessToken: accessToken
       });
 
       // Call parent callback to update user in app state

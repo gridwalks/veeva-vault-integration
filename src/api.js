@@ -791,16 +791,23 @@ export async function deleteExternalResource({ id }) {
   }
 }
 
-export async function updateUserProfile({ userId, name, picture }) {
+export async function updateUserProfile({ userId, name, picture, accessToken }) {
   const startTime = Date.now();
   console.log('Updating user profile...', { userId, name, picture });
   
   try {
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Add Authorization header if access token is provided
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+    
     const res = await fetch('/api/update-user-profile', {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         userId,
         name,
