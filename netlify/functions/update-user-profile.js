@@ -127,18 +127,21 @@ export const handler = async (event) => {
       // Try to get the user with the original ID first
       console.log('Attempting to get user with original ID:', userId);
       let existingUser;
+      let updateId = userId;
       try {
         existingUser = await management.users.get({ id: userId });
+        updateId = existingUser.user_id || userId;
         console.log('User found with original ID:', { userId: existingUser.user_id, name: existingUser.name });
       } catch (getError) {
         console.log('Failed to get user with original ID, trying encoded ID...');
         existingUser = await management.users.get({ id: encodedUserId });
+        updateId = existingUser.user_id || encodedUserId;
         console.log('User found with encoded ID:', { userId: existingUser.user_id, name: existingUser.name });
       }
-      
-      // Now update the user using the same ID format that worked for the lookup
-      console.log('Updating user with data:', updateData);
-      updatedUser = await management.users.update({ id: encodedUserId }, updateData);
+
+      // Now update the user using the ID returned from Auth0 (preferred) or the format that succeeded
+      console.log('Updating user with data:', updateData, 'using ID:', updateId);
+      updatedUser = await management.users.update({ id: updateId }, updateData);
     } catch (auth0Error) {
       console.error('Auth0 Management API error:', {
         message: auth0Error.message,
