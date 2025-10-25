@@ -106,7 +106,7 @@ export const handler = async (event) => {
         domain: domain,
         clientId: clientId,
         clientSecret: clientSecret,
-        scope: 'update:users'
+        scope: 'read:users update:users'
       });
       console.log('Auth0 Management Client initialized successfully');
     } catch (initError) {
@@ -146,13 +146,42 @@ export const handler = async (event) => {
 
     console.log('Updating user profile:', { userId, updateData });
 
-    // Update user in Auth0
-    const updatedUser = await management.updateUser(
-      { id: userId },
-      updateData
-    );
+    // First, try to get the user to verify we can access them
+    let currentUser;
+    try {
+      console.log('Getting current user info for:', userId);
+      currentUser = await management.getUser({ id: userId });
+      console.log('Current user retrieved successfully:', currentUser.user_id);
+    } catch (getError) {
+      console.error('Failed to get user from Auth0:', getError);
+      console.error('Get error details:', {
+        message: getError.message,
+        statusCode: getError.statusCode,
+        status: getError.status,
+        response: getError.response
+      });
+      throw getError;
+    }
 
-    console.log('User profile updated successfully:', updatedUser.user_id);
+    // Update user in Auth0
+    let updatedUser;
+    try {
+      console.log('Calling management.updateUser with:', { id: userId, updateData });
+      updatedUser = await management.updateUser(
+        { id: userId },
+        updateData
+      );
+      console.log('User profile updated successfully:', updatedUser.user_id);
+    } catch (updateError) {
+      console.error('Failed to update user in Auth0:', updateError);
+      console.error('Update error details:', {
+        message: updateError.message,
+        statusCode: updateError.statusCode,
+        status: updateError.status,
+        response: updateError.response
+      });
+      throw updateError;
+    }
 
     return {
       statusCode: 200,
