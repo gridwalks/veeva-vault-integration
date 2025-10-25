@@ -1,4 +1,57 @@
+import https from 'https';
+
 const ALLOWED_METHODS = ['PUT', 'PATCH'];
+
+// Helper function to make HTTPS requests
+function makeHttpsRequest(url, options = {}) {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const requestOptions = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || 443,
+      path: urlObj.pathname + urlObj.search,
+      method: options.method || 'GET',
+      headers: options.headers || {}
+    };
+
+    const req = https.request(requestOptions, (res) => {
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => {
+        try {
+          const jsonData = JSON.parse(data);
+          resolve({
+            status: res.statusCode,
+            statusText: res.statusMessage,
+            ok: res.statusCode >= 200 && res.statusCode < 300,
+            json: () => Promise.resolve(jsonData),
+            text: () => Promise.resolve(data)
+          });
+        } catch (error) {
+          resolve({
+            status: res.statusCode,
+            statusText: res.statusMessage,
+            ok: res.statusCode >= 200 && res.statusCode < 300,
+            json: () => Promise.reject(error),
+            text: () => Promise.resolve(data)
+          });
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      reject(error);
+    });
+
+    if (options.body) {
+      req.write(options.body);
+    }
+
+    req.end();
+  });
+}
 
 export const handler = async (event) => {
   const headers = {
@@ -100,7 +153,14 @@ export const handler = async (event) => {
     let accessToken;
     try {
       console.log('Getting Auth0 Management API access token...');
-      const tokenResponse = await fetch(`https://${domain}/oauth/token`, {
+      console.log('Token request details:', {
+        url: `https://${domain}/oauth/token`,
+        clientId: clientId ? 'present' : 'missing',
+        clientSecret: clientSecret ? 'present' : 'missing',
+        audience: `https://${domain}/api/v2/`
+      });
+      
+      const tokenResponse = await makeHttpsRequest(`https://${domain}/oauth/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -113,6 +173,12 @@ export const handler = async (event) => {
         })
       });
 
+      console.log('Token response received:', {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        ok: tokenResponse.ok
+      });
+
       if (!tokenResponse.ok) {
         const errorText = await tokenResponse.text();
         console.error('Failed to get access token:', {
@@ -120,7 +186,7 @@ export const handler = async (event) => {
           statusText: tokenResponse.statusText,
           error: errorText
         });
-        throw new Error(`Failed to get access token: ${tokenResponse.status} ${tokenResponse.statusText}`);
+        throw new Error(`Failed to get access token: ${tokenResponse.status} ${tokenResponse.statusText} - ${errorText}`);
       }
 
       const tokenData = await tokenResponse.json();
@@ -128,6 +194,12 @@ export const handler = async (event) => {
       console.log('Access token obtained successfully');
     } catch (tokenError) {
       console.error('Failed to get Auth0 access token:', tokenError);
+      console.error('Token error details:', {
+        message: tokenError.message,
+        name: tokenError.name,
+        stack: tokenError.stack,
+        cause: tokenError.cause
+      });
       return {
         statusCode: 500,
         headers,
@@ -168,7 +240,7 @@ export const handler = async (event) => {
     try {
       console.log('Getting current user info for:', userId);
       
-      const getUserResponse = await fetch(`https://${domain}/api/v2/users/${encodeURIComponent(userId)}`, {
+      const getUserResponse = await makeHttpsRequest(`https://${domain}/api/v2/users/${encodeURIComponent(userId)}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -211,7 +283,7 @@ export const handler = async (event) => {
     try {
       console.log('Updating user with data:', { id: userId, updateData });
       
-      const updateUserResponse = await fetch(`https://${domain}/api/v2/users/${encodeURIComponent(userId)}`, {
+      const updateUserResponse = await makeHttpsRequest(`https://${domain}/api/v2/users/${encodeURIComponent(userId)}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
