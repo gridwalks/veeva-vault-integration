@@ -73,8 +73,8 @@ export const handler = async (event) => {
     }
 
     console.log('Auth0 Management API credentials check:', {
-      domain: domain ? 'present' : 'missing',
-      clientId: clientId ? 'present' : 'missing',
+      domain: domain ? `present (${domain})` : 'missing',
+      clientId: clientId ? `present (${clientId.substring(0, 8)}...)` : 'missing',
       clientSecret: clientSecret ? 'present' : 'missing'
     });
 
@@ -114,14 +114,19 @@ export const handler = async (event) => {
     // Update the user in Auth0
     let updatedUser;
     try {
+      // URL encode the user ID in case it contains special characters
+      const encodedUserId = encodeURIComponent(userId);
+      console.log('Original user ID:', userId);
+      console.log('Encoded user ID:', encodedUserId);
+      
       // First, let's try to get the user to verify they exist
-      console.log('Attempting to get user first:', userId);
-      const existingUser = await management.users.get({ id: userId });
+      console.log('Attempting to get user first with encoded ID:', encodedUserId);
+      const existingUser = await management.users.get({ id: encodedUserId });
       console.log('User found:', { userId: existingUser.user_id, name: existingUser.name });
       
       // Now update the user
       console.log('Updating user with data:', updateData);
-      updatedUser = await management.users.update({ id: userId }, updateData);
+      updatedUser = await management.users.update({ id: encodedUserId }, updateData);
     } catch (auth0Error) {
       console.error('Auth0 Management API error:', {
         message: auth0Error.message,
