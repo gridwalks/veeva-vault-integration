@@ -1,5 +1,3 @@
-import { ManagementClient } from 'auth0';
-
 const ALLOWED_METHODS = ['PUT', 'PATCH'];
 
 export const handler = async (event) => {
@@ -101,6 +99,9 @@ export const handler = async (event) => {
     // Initialize Auth0 Management Client
     let management;
     try {
+      // Dynamic import to avoid module loading issues
+      const { ManagementClient } = await import('auth0');
+      
       management = new ManagementClient({
         domain: domain,
         clientId: clientId,
@@ -115,7 +116,7 @@ export const handler = async (event) => {
         headers,
         body: JSON.stringify({
           success: false,
-          error: 'Failed to initialize Auth0 client'
+          error: 'Failed to initialize Auth0 client: ' + initError.message
         })
       };
     }
@@ -172,6 +173,12 @@ export const handler = async (event) => {
 
   } catch (error) {
     console.error('Error updating user profile:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      statusCode: error.statusCode,
+      name: error.name
+    });
     
     // Handle specific Auth0 errors
     if (error.statusCode === 404) {
@@ -201,7 +208,7 @@ export const handler = async (event) => {
       headers,
       body: JSON.stringify({
         success: false,
-        error: 'Internal server error'
+        error: 'Internal server error: ' + (error.message || 'Unknown error')
       })
     };
   }
