@@ -1,11 +1,4 @@
-import { auth } from 'express-oauth2-jwt-bearer';
-
-// JWT validation configuration
-const jwtCheck = auth({
-  audience: 'https://yprime.acceleraqa.io',
-  issuerBaseURL: 'https://dev-aedhk47a2vv8iis3.us.auth0.com/',
-  tokenSigningAlg: 'RS256'
-});
+import { ManagementClient } from 'auth0';
 
 export const handler = async (event) => {
   const headers = {
@@ -37,10 +30,6 @@ export const handler = async (event) => {
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
     console.log('Received token for validation');
 
-    // For Netlify Functions, we'll do basic token validation
-    // In a production environment, you'd use the jwtCheck middleware
-    // For now, we'll assume the token is valid if it exists
-
     // Validate request body
     if (!event.body) {
       return {
@@ -71,8 +60,61 @@ export const handler = async (event) => {
       };
     }
 
-    // Simulate profile update - in a real app, you'd update your database
     console.log('Profile update request:', { userId, name, picture });
+
+    // Get Auth0 Management API credentials
+    const domain = process.env.AUTH0_MGMT_DOMAIN;
+    const clientId = process.env.AUTH0_MGMT_CLIENT_ID;
+    const clientSecret = process.env.AUTH0_MGMT_CLIENT_SECRET;
+
+    if (!domain || !clientId || !clientSecret) {
+      console.error('Missing Auth0 Management API credentials');
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ 
+          success: false, 
+          error: 'Server configuration error: Missing Auth0 credentials' 
+        })
+      };
+    }
+
+    // Initialize Auth0 Management Client
+    const management = new ManagementClient({
+      domain: domain,
+      clientId: clientId,
+      clientSecret: clientSecret,
+      scope: 'read:users update:users'
+    });
+
+    // Prepare update data
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (picture !== undefined) updateData.picture = picture;
+
+    console.log('Updating Auth0 user with data:', updateData);
+
+    // Update the user in Auth0
+    let updatedUser;
+    try {
+      updatedUser = await management.users.update({ id: userId }, updateData);
+    } catch (auth0Error) {
+      console.error('Auth0 Management API error:', auth0Error);
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: 'Failed to update user profile in Auth0: ' + (auth0Error.message || 'Unknown error')
+        })
+      };
+    }
+
+    console.log('Auth0 user updated successfully:', {
+      userId: updatedUser.user_id,
+      name: updatedUser.name,
+      picture: updatedUser.picture
+    });
 
     return {
       statusCode: 200,
@@ -80,10 +122,10 @@ export const handler = async (event) => {
       body: JSON.stringify({
         success: true,
         user: {
-          sub: userId,
-          name: name || 'Updated Name',
-          picture: picture || 'https://example.com/avatar.jpg',
-          updated_at: new Date().toISOString()
+          sub: updatedUser.user_id,
+          name: updatedUser.name,
+          picture: updatedUser.picture,
+          updated_at: updatedUser.updated_at
         }
       })
     };
