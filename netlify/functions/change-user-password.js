@@ -97,9 +97,18 @@ export const handler = async (event) => {
     console.log('Password change request for user:', tokenClaims.sub);
 
     // Get Auth0 Management API credentials
-    let domain = process.env.AUTH0_MGMT_DOMAIN;
+    let domain = process.env.AUTH0_MGMT_DOMAIN || process.env.VITE_AUTH0_DOMAIN;
     const clientId = process.env.AUTH0_MGMT_CLIENT_ID;
     const clientSecret = process.env.AUTH0_MGMT_CLIENT_SECRET;
+
+    // Debug: Log all environment variables that start with AUTH0
+    console.log('All AUTH0 environment variables:', {
+      AUTH0_MGMT_DOMAIN: process.env.AUTH0_MGMT_DOMAIN,
+      AUTH0_MGMT_CLIENT_ID: process.env.AUTH0_MGMT_CLIENT_ID,
+      AUTH0_MGMT_CLIENT_SECRET: process.env.AUTH0_MGMT_CLIENT_SECRET ? 'present' : 'missing',
+      VITE_AUTH0_DOMAIN: process.env.VITE_AUTH0_DOMAIN,
+      VITE_AUTH0_CLIENT_ID: process.env.VITE_AUTH0_CLIENT_ID
+    });
 
     // Clean domain - remove https:// prefix and /api/v2/ suffix if present
     if (domain && domain.startsWith('https://')) {
