@@ -63,12 +63,27 @@ export const handler = async (event) => {
     console.log('Profile update request:', { userId, name, picture });
 
     // Get Auth0 Management API credentials
-    const domain = process.env.AUTH0_MGMT_DOMAIN;
+    let domain = process.env.AUTH0_MGMT_DOMAIN;
     const clientId = process.env.AUTH0_MGMT_CLIENT_ID;
     const clientSecret = process.env.AUTH0_MGMT_CLIENT_SECRET;
 
+    // Clean domain - remove https:// prefix if present
+    if (domain && domain.startsWith('https://')) {
+      domain = domain.replace('https://', '');
+    }
+
+    console.log('Auth0 Management API credentials check:', {
+      domain: domain ? 'present' : 'missing',
+      clientId: clientId ? 'present' : 'missing',
+      clientSecret: clientSecret ? 'present' : 'missing'
+    });
+
     if (!domain || !clientId || !clientSecret) {
-      console.error('Missing Auth0 Management API credentials');
+      console.error('Missing Auth0 Management API credentials:', {
+        domain: !!domain,
+        clientId: !!clientId,
+        clientSecret: !!clientSecret
+      });
       return {
         statusCode: 500,
         headers,
@@ -80,6 +95,7 @@ export const handler = async (event) => {
     }
 
     // Initialize Auth0 Management Client
+    console.log('Initializing Auth0 Management Client with domain:', domain);
     const management = new ManagementClient({
       domain: domain,
       clientId: clientId,
@@ -93,19 +109,32 @@ export const handler = async (event) => {
     if (picture !== undefined) updateData.picture = picture;
 
     console.log('Updating Auth0 user with data:', updateData);
+    console.log('User ID for update:', userId);
 
     // Update the user in Auth0
     let updatedUser;
     try {
       updatedUser = await management.users.update({ id: userId }, updateData);
     } catch (auth0Error) {
-      console.error('Auth0 Management API error:', auth0Error);
+      console.error('Auth0 Management API error:', {
+        message: auth0Error.message,
+        status: auth0Error.status,
+        statusCode: auth0Error.statusCode,
+        error: auth0Error.error,
+        error_description: auth0Error.error_description,
+        stack: auth0Error.stack
+      });
       return {
         statusCode: 500,
         headers,
         body: JSON.stringify({
           success: false,
-          error: 'Failed to update user profile in Auth0: ' + (auth0Error.message || 'Unknown error')
+          error: 'Failed to update user profile in Auth0: ' + (auth0Error.message || 'Unknown error'),
+          details: {
+            status: auth0Error.status || auth0Error.statusCode,
+            error: auth0Error.error,
+            error_description: auth0Error.error_description
+          }
         })
       };
     }
