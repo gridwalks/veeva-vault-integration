@@ -30,6 +30,31 @@ export const handler = async (event) => {
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
     console.log('Received token for validation');
 
+    const decodeJwt = (jwt) => {
+      const parts = jwt.split('.');
+      if (parts.length < 2) {
+        throw new Error('Invalid JWT');
+      }
+
+      const base64Url = parts[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+      const json = Buffer.from(padded, 'base64').toString('utf8');
+      return JSON.parse(json);
+    };
+
+    let tokenClaims = {};
+    try {
+      tokenClaims = decodeJwt(token);
+      console.log('Token claims extracted:', {
+        sub: tokenClaims.sub,
+        iss: tokenClaims.iss,
+        aud: tokenClaims.aud
+      });
+    } catch (decodeError) {
+      console.warn('Unable to decode JWT payload for diagnostics:', decodeError.message);
+    }
+
     // Validate request body
     if (!event.body) {
       return {
@@ -109,7 +134,10 @@ export const handler = async (event) => {
     if (picture !== undefined) updateData.picture = picture;
 
     console.log('Updating Auth0 user with data:', updateData);
-    console.log('User ID for update:', userId);
+    console.log('User ID supplied by request body:', userId);
+    if (tokenClaims.sub && tokenClaims.sub !== userId) {
+      console.log('User ID mismatch detected between token sub and request payload. Using both values for lookup.');
+    }
 
     // Update the user in Auth0
     let updatedUser;
@@ -119,26 +147,55 @@ export const handler = async (event) => {
       const users = await management.users.list({ per_page: 5 });
       console.log('Found users:', users.map(u => ({ id: u.user_id, name: u.name, email: u.email })));
       
-      // URL encode the user ID in case it contains special characters
-      const encodedUserId = encodeURIComponent(userId);
-      console.log('Original user ID:', userId);
-      console.log('Encoded user ID:', encodedUserId);
-      
-      // Try to get the user with the original ID first
-      console.log('Attempting to get user with original ID:', userId);
-      let existingUser;
-      try {
-        existingUser = await management.users.get({ id: userId });
-        console.log('User found with original ID:', { userId: existingUser.user_id, name: existingUser.name });
-      } catch (getError) {
-        console.log('Failed to get user with original ID, trying encoded ID...');
-        existingUser = await management.users.get({ id: encodedUserId });
-        console.log('User found with encoded ID:', { userId: existingUser.user_id, name: existingUser.name });
+      const candidateIds = new Set();
+      if (userId) {
+        candidateIds.add(userId);
       }
-      
-      // Now update the user using the same ID format that worked for the lookup
-      console.log('Updating user with data:', updateData);
-      updatedUser = await management.users.update({ id: encodedUserId }, updateData);
+      if (tokenClaims.sub) {
+        candidateIds.add(tokenClaims.sub);
+      }
+
+      const lookupIds = [];
+      for (const candidateId of candidateIds) {
+        lookupIds.push(candidateId);
+        const encodedCandidate = encodeURIComponent(candidateId);
+        if (encodedCandidate !== candidateId) {
+          lookupIds.push(encodedCandidate);
+        }
+      }
+
+      console.log('Candidate Auth0 user IDs for lookup:', lookupIds);
+
+      let existingUser;
+      let resolvedId;
+
+      for (const candidateId of lookupIds) {
+        console.log('Attempting to get user with ID:', candidateId);
+        try {
+          existingUser = await management.users.get({ id: candidateId });
+          resolvedId = existingUser.user_id;
+          console.log('User found:', {
+            requestedId: candidateId,
+            userId: existingUser.user_id,
+            name: existingUser.name
+          });
+          break;
+        } catch (getError) {
+          if (getError.statusCode === 404 || getError.status === 404) {
+            console.log('User not found with ID, trying next candidate...');
+            continue;
+          }
+          throw getError;
+        }
+      }
+
+      if (!existingUser || !resolvedId) {
+        throw Object.assign(new Error('User not found in Auth0'), { statusCode: 404 });
+      }
+
+      console.log('Updating user with data:', updateData, 'using resolved ID:', resolvedId);
+
+      updatedUser = await management.users.update({ id: resolvedId }, updateData);
     } catch (auth0Error) {
       console.error('Auth0 Management API error:', {
         message: auth0Error.message,
@@ -149,8 +206,9 @@ export const handler = async (event) => {
         stack: auth0Error.stack,
         fullError: auth0Error
       });
+      const responseStatus = auth0Error.statusCode || auth0Error.status;
       return {
-        statusCode: 500,
+        statusCode: responseStatus === 404 ? 404 : 500,
         headers,
         body: JSON.stringify({
           success: false,
