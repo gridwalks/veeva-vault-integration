@@ -96,49 +96,44 @@ export const handler = async (event) => {
       };
     }
 
-    // Initialize Auth0 Management Client
-    let management;
+    // Get Auth0 Management API access token
+    let accessToken;
     try {
-      // Try different import methods for Auth0 v5
-      const auth0Module = await import('auth0');
-      console.log('Auth0 module imported successfully:', Object.keys(auth0Module));
-      
-      // Try different ways to get ManagementClient
-      let ManagementClient;
-      if (auth0Module.ManagementClient) {
-        ManagementClient = auth0Module.ManagementClient;
-      } else if (auth0Module.default && auth0Module.default.ManagementClient) {
-        ManagementClient = auth0Module.default.ManagementClient;
-      } else if (auth0Module.default) {
-        ManagementClient = auth0Module.default;
-      } else {
-        throw new Error('Could not find ManagementClient in auth0 module');
+      console.log('Getting Auth0 Management API access token...');
+      const tokenResponse = await fetch(`https://${domain}/oauth/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          audience: `https://${domain}/api/v2/`,
+          grant_type: 'client_credentials'
+        })
+      });
+
+      if (!tokenResponse.ok) {
+        const errorText = await tokenResponse.text();
+        console.error('Failed to get access token:', {
+          status: tokenResponse.status,
+          statusText: tokenResponse.statusText,
+          error: errorText
+        });
+        throw new Error(`Failed to get access token: ${tokenResponse.status} ${tokenResponse.statusText}`);
       }
-      
-      console.log('ManagementClient constructor:', typeof ManagementClient);
-      
-      management = new ManagementClient({
-        domain: domain,
-        clientId: clientId,
-        clientSecret: clientSecret,
-        scope: 'read:users update:users'
-      });
-      console.log('Auth0 Management Client initialized successfully');
-      console.log('Management client type:', typeof management);
-      console.log('Management client constructor name:', management.constructor.name);
-    } catch (initError) {
-      console.error('Failed to initialize Auth0 Management Client:', initError);
-      console.error('Init error details:', {
-        message: initError.message,
-        stack: initError.stack,
-        name: initError.name
-      });
+
+      const tokenData = await tokenResponse.json();
+      accessToken = tokenData.access_token;
+      console.log('Access token obtained successfully');
+    } catch (tokenError) {
+      console.error('Failed to get Auth0 access token:', tokenError);
       return {
         statusCode: 500,
         headers,
         body: JSON.stringify({
           success: false,
-          error: 'Failed to initialize Auth0 client: ' + initError.message
+          error: 'Failed to get Auth0 access token: ' + tokenError.message
         })
       };
     }
@@ -172,28 +167,31 @@ export const handler = async (event) => {
     let currentUser;
     try {
       console.log('Getting current user info for:', userId);
-      console.log('Management client methods available:', Object.keys(management));
-      console.log('Users methods available:', management.users ? Object.keys(management.users) : 'users not available');
       
-      // Try different method names for Auth0 v5
-      if (management.users && management.users.get) {
-        currentUser = await management.users.get({ id: userId });
-      } else if (management.getUser) {
-        currentUser = await management.getUser({ id: userId });
-      } else if (management.users && management.users.getUser) {
-        currentUser = await management.users.getUser({ id: userId });
-      } else {
-        throw new Error('No suitable method found to get user');
+      const getUserResponse = await fetch(`https://${domain}/api/v2/users/${encodeURIComponent(userId)}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!getUserResponse.ok) {
+        const errorText = await getUserResponse.text();
+        console.error('Failed to get user:', {
+          status: getUserResponse.status,
+          statusText: getUserResponse.statusText,
+          error: errorText
+        });
+        throw new Error(`Failed to get user: ${getUserResponse.status} ${getUserResponse.statusText}`);
       }
-      
+
+      currentUser = await getUserResponse.json();
       console.log('Current user retrieved successfully:', currentUser.user_id);
     } catch (getError) {
       console.error('Failed to get user from Auth0:', getError);
       console.error('Get error details:', {
         message: getError.message,
-        statusCode: getError.statusCode,
-        status: getError.status,
-        response: getError.response,
         stack: getError.stack
       });
       
@@ -211,27 +209,33 @@ export const handler = async (event) => {
     // Update user in Auth0
     let updatedUser;
     try {
-      console.log('Calling update method with:', { id: userId, updateData });
+      console.log('Updating user with data:', { id: userId, updateData });
       
-      // Try different method names for Auth0 v5
-      if (management.users && management.users.update) {
-        updatedUser = await management.users.update({ id: userId }, updateData);
-      } else if (management.updateUser) {
-        updatedUser = await management.updateUser({ id: userId }, updateData);
-      } else if (management.users && management.users.updateUser) {
-        updatedUser = await management.users.updateUser({ id: userId }, updateData);
-      } else {
-        throw new Error('No suitable method found to update user');
+      const updateUserResponse = await fetch(`https://${domain}/api/v2/users/${encodeURIComponent(userId)}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      if (!updateUserResponse.ok) {
+        const errorText = await updateUserResponse.text();
+        console.error('Failed to update user:', {
+          status: updateUserResponse.status,
+          statusText: updateUserResponse.statusText,
+          error: errorText
+        });
+        throw new Error(`Failed to update user: ${updateUserResponse.status} ${updateUserResponse.statusText}`);
       }
-      
+
+      updatedUser = await updateUserResponse.json();
       console.log('User profile updated successfully:', updatedUser.user_id);
     } catch (updateError) {
       console.error('Failed to update user in Auth0:', updateError);
       console.error('Update error details:', {
         message: updateError.message,
-        statusCode: updateError.statusCode,
-        status: updateError.status,
-        response: updateError.response,
         stack: updateError.stack
       });
       throw updateError;
