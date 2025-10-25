@@ -14,12 +14,10 @@ export default function UserProfile({ user, onUpdateUser }) {
     picture: ''
   });
   const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
   const [showPasswords, setShowPasswords] = useState({
-    current: false,
     new: false,
     confirm: false
   });
@@ -153,15 +151,13 @@ export default function UserProfile({ user, onUpdateUser }) {
       const accessToken = await getAccessTokenSilently();
       
       await changeUserPassword({
-        currentPassword: passwordData.currentPassword || 'dummy',
         newPassword: passwordData.newPassword,
-        userId: user.sub,  // ADD THIS LINE
+        userId: user.sub,
         accessToken: accessToken
       });
 
       setPasswordSuccess('Password changed successfully!');
       setPasswordData({
-        currentPassword: '',
         newPassword: '',
         confirmPassword: ''
       });
@@ -174,7 +170,6 @@ export default function UserProfile({ user, onUpdateUser }) {
 
   const handlePasswordCancel = () => {
     setPasswordData({
-      currentPassword: '',
       newPassword: '',
       confirmPassword: ''
     });
@@ -631,72 +626,6 @@ export default function UserProfile({ user, onUpdateUser }) {
             display: 'grid',
             gap: '20px'
           }}>
-            {/* Current Password - Optional for now */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '8px',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
-                Current Password (Optional)
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showPasswords.current ? 'text' : 'password'}
-                  value={passwordData.currentPassword}
-                  onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
-                  placeholder="Enter current password (optional)"
-                  style={{
-                    width: '100%',
-                    padding: '12px 40px 12px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    outline: 'none',
-                    transition: 'border-color 0.2s ease'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#4338ca';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#d1d5db';
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => togglePasswordVisibility('current')}
-                  style={{
-                    position: 'absolute',
-                    right: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#6b7280',
-                    padding: '4px'
-                  }}
-                >
-                  {showPasswords.current ? (
-                    <EyeOff style={{ width: '16px', height: '16px' }} />
-                  ) : (
-                    <Eye style={{ width: '16px', height: '16px' }} />
-                  )}
-                </button>
-              </div>
-              <p style={{
-                margin: '4px 0 0 0',
-                fontSize: '12px',
-                color: '#6b7280',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
-                Current password verification is not implemented in this version
-              </p>
-            </div>
 
             {/* New Password */}
             <div>
