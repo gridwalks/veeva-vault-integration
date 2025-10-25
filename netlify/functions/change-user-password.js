@@ -125,7 +125,7 @@ export const handler = async (event) => {
         headers,
         body: JSON.stringify({ 
           success: false, 
-          error: 'Server configuration error: Missing Auth0 credentials' 
+          error: 'Password change feature requires Auth0 Management API configuration. Please contact your administrator to set up AUTH0_MGMT_DOMAIN, AUTH0_MGMT_CLIENT_ID, and AUTH0_MGMT_CLIENT_SECRET environment variables.' 
         })
       };
     }
@@ -133,30 +133,48 @@ export const handler = async (event) => {
     // Initialize Auth0 Management Client
     console.log('Initializing Auth0 Management Client with domain:', domain);
     
-    const managementConfig = {
-      domain: domain,
-      clientId: clientId,
-      clientSecret: clientSecret,
-      scope: 'read:users update:users'
-    };
-    
-    // Add token configuration to help the SDK authenticate properly
-    if (!managementConfig.domain.startsWith('https://')) {
-      // Ensure we're using HTTPS for the token endpoint
-      managementConfig.audience = `https://${domain}/api/v2/`;
-      managementConfig.tokenProvider = {
-        enableCache: true,
-        cacheTTLInSeconds: 3600
+    let management;
+    try {
+      // Use the exact same configuration as the working update-user-profile function
+      const managementConfig = {
+        domain: domain,
+        clientId: clientId,
+        clientSecret: clientSecret,
+        scope: 'read:users update:users'
+      };
+      
+      // Add token configuration to help the SDK authenticate properly
+      if (!managementConfig.domain.startsWith('https://')) {
+        // Ensure we're using HTTPS for the token endpoint
+        managementConfig.audience = `https://${domain}/api/v2/`;
+        managementConfig.tokenProvider = {
+          enableCache: true,
+          cacheTTLInSeconds: 3600
+        };
+      }
+      
+      console.log('Management config:', {
+        domain: managementConfig.domain,
+        audience: managementConfig.audience,
+        clientId: managementConfig.clientId ? 'present' : 'missing'
+      });
+      
+      management = new ManagementClient(managementConfig);
+      console.log('Management client initialized successfully');
+    } catch (initError) {
+      console.error('Failed to initialize Auth0 Management Client:', initError);
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: 'Failed to initialize Auth0 Management API client. Please check your Auth0 Management API configuration.',
+          details: {
+            message: initError.message
+          }
+        })
       };
     }
-    
-    console.log('Management config:', {
-      domain: managementConfig.domain,
-      audience: managementConfig.audience,
-      clientId: managementConfig.clientId ? 'present' : 'missing'
-    });
-    
-    const management = new ManagementClient(managementConfig);
 
     // Use the token's sub claim as the authoritative user ID
     const userIdToUpdate = tokenClaims.sub;
