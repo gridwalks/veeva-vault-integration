@@ -146,9 +146,11 @@ export const handler = async (event) => {
     const clientSecret = process.env.AUTH0_MGMT_CLIENT_SECRET;
 
     console.log('Auth0 Management API credentials check:', {
-      domain: domain ? 'present' : 'missing',
+      domain: domain,
+      domainLength: domain ? domain.length : 0,
       clientId: clientId ? 'present' : 'missing',
-      clientSecret: clientSecret ? 'present' : 'missing'
+      clientSecret: clientSecret ? 'present' : 'missing',
+      allEnvVars: Object.keys(process.env).filter(key => key.includes('AUTH0'))
     });
 
     if (!domain || !clientId || !clientSecret) {
@@ -171,13 +173,16 @@ export const handler = async (event) => {
     let accessToken;
     try {
       console.log('Getting Auth0 Management API access token...');
-      const tokenUrl = `https://${domain}/oauth/token`;
+      // Clean domain - remove https:// if it's already there
+      const cleanDomain = domain.replace(/^https?:\/\//, '');
+      const tokenUrl = `https://${cleanDomain}/oauth/token`;
       console.log('Token request details:', {
-        domain: domain,
+        originalDomain: domain,
+        cleanDomain: cleanDomain,
         tokenUrl: tokenUrl,
         clientId: clientId ? 'present' : 'missing',
         clientSecret: clientSecret ? 'present' : 'missing',
-        audience: `https://${domain}/api/v2/`
+        audience: `https://${cleanDomain}/api/v2/`
       });
       
       const tokenResponse = await makeHttpsRequest(tokenUrl, {
@@ -188,7 +193,7 @@ export const handler = async (event) => {
         body: JSON.stringify({
           client_id: clientId,
           client_secret: clientSecret,
-          audience: `https://${domain}/api/v2/`,
+          audience: `https://${cleanDomain}/api/v2/`,
           grant_type: 'client_credentials'
         })
       });
@@ -260,7 +265,7 @@ export const handler = async (event) => {
     try {
       console.log('Getting current user info for:', userId);
       
-      const getUserResponse = await makeHttpsRequest(`https://${domain}/api/v2/users/${encodeURIComponent(userId)}`, {
+      const getUserResponse = await makeHttpsRequest(`https://${cleanDomain}/api/v2/users/${encodeURIComponent(userId)}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -303,7 +308,7 @@ export const handler = async (event) => {
     try {
       console.log('Updating user with data:', { id: userId, updateData });
       
-      const updateUserResponse = await makeHttpsRequest(`https://${domain}/api/v2/users/${encodeURIComponent(userId)}`, {
+      const updateUserResponse = await makeHttpsRequest(`https://${cleanDomain}/api/v2/users/${encodeURIComponent(userId)}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
