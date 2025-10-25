@@ -15,6 +15,7 @@
     "auth0": "^5.0.0",
     "cloudconvert": "^3.0.0",
     "docx-parser": "^0.2.1",
+    "express-oauth2-jwt-bearer": "^1.7.1",
     "groq-sdk": "^0.7.0",
     "lucide-react": "^0.263.1",
     "mammoth": "^1.6.0",
