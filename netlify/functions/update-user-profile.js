@@ -139,9 +139,10 @@ export const handler = async (event) => {
         console.log('User found with encoded ID:', { userId: existingUser.user_id, name: existingUser.name });
       }
 
-      // Now update the user using the ID returned from Auth0 (preferred) or the format that succeeded
-      const updateRequestId = updateId.includes('%') ? updateId : encodeURIComponent(updateId);
-      console.log('Updating user with data:', updateData, 'using ID:', updateId, 'request ID:', updateRequestId);
+      // Now update the user using the ID returned from Auth0 (preferred). The Auth0 SDK handles URL
+      // encoding internally, so pass the raw identifier to avoid double-encoding issues.
+      const updateRequestId = existingUser?.user_id || updateId;
+      console.log('Updating user with data:', updateData, 'using ID:', updateRequestId);
       updatedUser = await management.users.update({ id: updateRequestId }, updateData);
     } catch (auth0Error) {
       console.error('Auth0 Management API error:', {
