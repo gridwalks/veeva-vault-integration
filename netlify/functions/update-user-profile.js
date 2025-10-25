@@ -116,7 +116,7 @@ export const handler = async (event) => {
     try {
       // First, let's try to list users to see what's available
       console.log('Attempting to list users to debug...');
-      const users = await management.users.getAll({ per_page: 5 });
+      const users = await management.users.list({ per_page: 5 });
       console.log('Found users:', users.map(u => ({ id: u.user_id, name: u.name, email: u.email })));
       
       // URL encode the user ID in case it contains special characters
