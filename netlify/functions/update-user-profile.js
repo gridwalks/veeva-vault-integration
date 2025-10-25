@@ -5,14 +5,28 @@ const ALLOWED_METHODS = ['PUT', 'PATCH'];
 // Helper function to make HTTPS requests
 function makeHttpsRequest(url, options = {}) {
   return new Promise((resolve, reject) => {
-    const urlObj = new URL(url);
+    console.log('Making HTTPS request to:', url);
+    
+    // Parse URL manually since URL constructor might not be available
+    const urlMatch = url.match(/^https:\/\/([^\/]+)(.*)$/);
+    if (!urlMatch) {
+      console.error('Invalid HTTPS URL:', url);
+      reject(new Error(`Invalid HTTPS URL: ${url}`));
+      return;
+    }
+    
+    const hostname = urlMatch[1];
+    const path = urlMatch[2] || '/';
+    
     const requestOptions = {
-      hostname: urlObj.hostname,
-      port: urlObj.port || 443,
-      path: urlObj.pathname + urlObj.search,
+      hostname: hostname,
+      port: 443,
+      path: path,
       method: options.method || 'GET',
       headers: options.headers || {}
     };
+    
+    console.log('Request options:', requestOptions);
 
     const req = https.request(requestOptions, (res) => {
       let data = '';
