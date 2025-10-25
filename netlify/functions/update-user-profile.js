@@ -104,11 +104,7 @@ export const handler = async (event) => {
     });
 
     if (!domain || !clientId || !clientSecret) {
-      console.error('Missing Auth0 Management API credentials:', {
-        domain: !!domain,
-        clientId: !!clientId,
-        clientSecret: !!clientSecret
-      });
+      console.error('Missing Auth0 Management API credentials');
       return {
         statusCode: 500,
         headers,
@@ -133,117 +129,65 @@ export const handler = async (event) => {
     if (name !== undefined) updateData.name = name;
     if (picture !== undefined) updateData.picture = picture;
 
-    console.log('Updating Auth0 user with data:', updateData);
-    console.log('User ID supplied by request body:', userId);
-    if (tokenClaims.sub && tokenClaims.sub !== userId) {
-      console.log('User ID mismatch detected between token sub and request payload.');
-    }
+    console.log('Updating Auth0 user:', userId);
+    console.log('Update data:', updateData);
 
-    // Helper function to handle different SDK versions
-    const callManagementApi = async (methodPath, ...args) => {
-      // Try modern SDK format (direct methods)
-      const methodName = methodPath.split('.').pop();
-      if (typeof management[methodName] === 'function') {
-        const result = await management[methodName](...args);
-        return result.data || result;
-      }
-      
-      // Try legacy SDK format (nested under resource)
-      const parts = methodPath.split('.');
-      if (parts.length === 2) {
-        const [resource, method] = parts;
-        if (management[resource] && typeof management[resource][method] === 'function') {
-          const result = await management[resource][method](...args);
-          return result.data || result;
-        }
-      }
-      
-      throw new Error(`Method ${methodPath} not found on management client`);
-    };
+    // Use the token's sub claim as the authoritative user ID
+    const userIdToUpdate = tokenClaims.sub || userId;
+    console.log('Using user ID from token sub claim:', userIdToUpdate);
 
     // Update the user in Auth0
     let updatedUser;
     try {
-      const candidateIds = new Set();
-      if (userId) {
-        candidateIds.add(userId);
+      // First verify the user exists and get current data
+      console.log('Fetching current user data...');
+      let currentUser;
+      
+      // Try the management.users.get method (most common)
+      if (management.users && typeof management.users.get === 'function') {
+        console.log('Using management.users.get()');
+        currentUser = await management.users.get({ id: userIdToUpdate });
+      } 
+      // Try alternative method
+      else if (typeof management.getUser === 'function') {
+        console.log('Using management.getUser()');
+        const result = await management.getUser({ id: userIdToUpdate });
+        currentUser = result.data || result;
       }
-      if (tokenClaims.sub) {
-        candidateIds.add(tokenClaims.sub);
-      }
-
-      const lookupIds = [];
-      for (const candidateId of candidateIds) {
-        lookupIds.push(candidateId);
-        const encodedCandidate = encodeURIComponent(candidateId);
-        if (encodedCandidate !== candidateId) {
-          lookupIds.push(encodedCandidate);
-        }
-      }
-
-      console.log('Candidate Auth0 user IDs for lookup:', lookupIds);
-
-      let existingUser;
-      let resolvedId;
-
-      // Try to find the user with different ID formats
-      for (const candidateId of lookupIds) {
-        console.log('Attempting to get user with ID:', candidateId);
-        try {
-          // Try different API call formats
-          try {
-            existingUser = await callManagementApi('users.get', { id: candidateId });
-          } catch (e1) {
-            try {
-              existingUser = await callManagementApi('getUser', { id: candidateId });
-            } catch (e2) {
-              // Last resort: direct call
-              if (management.users && typeof management.users.get === 'function') {
-                existingUser = await management.users.get({ id: candidateId });
-              } else {
-                throw e2;
-              }
-            }
-          }
-          
-          resolvedId = existingUser.user_id;
-          console.log('User found:', {
-            requestedId: candidateId,
-            userId: existingUser.user_id,
-            name: existingUser.name
-          });
-          break;
-        } catch (getError) {
-          if (getError.statusCode === 404 || getError.status === 404 || getError.message?.includes('404')) {
-            console.log('User not found with ID, trying next candidate...');
-            continue;
-          }
-          console.error('Error getting user:', getError.message);
-          throw getError;
-        }
+      else {
+        throw new Error('Unable to find getUser method on management client');
       }
 
-      if (!existingUser || !resolvedId) {
-        throw Object.assign(new Error('User not found in Auth0'), { statusCode: 404 });
+      console.log('Current user found:', {
+        user_id: currentUser.user_id,
+        name: currentUser.name,
+        email: currentUser.email
+      });
+
+      // Now update the user
+      console.log('Updating user with ID:', currentUser.user_id);
+      
+      if (management.users && typeof management.users.update === 'function') {
+        console.log('Using management.users.update()');
+        updatedUser = await management.users.update(
+          { id: currentUser.user_id }, 
+          updateData
+        );
+      }
+      else if (typeof management.updateUser === 'function') {
+        console.log('Using management.updateUser()');
+        const result = await management.updateUser(
+          { id: currentUser.user_id }, 
+          updateData
+        );
+        updatedUser = result.data || result;
+      }
+      else {
+        throw new Error('Unable to find updateUser method on management client');
       }
 
-      console.log('Updating user with resolved ID:', resolvedId);
+      console.log('User updated successfully');
 
-      // Try different update methods
-      try {
-        updatedUser = await callManagementApi('users.update', { id: resolvedId }, updateData);
-      } catch (e1) {
-        try {
-          updatedUser = await callManagementApi('updateUser', { id: resolvedId }, updateData);
-        } catch (e2) {
-          // Last resort
-          if (management.users && typeof management.users.update === 'function') {
-            updatedUser = await management.users.update({ id: resolvedId }, updateData);
-          } else {
-            throw e2;
-          }
-        }
-      }
     } catch (auth0Error) {
       console.error('Auth0 Management API error:', {
         message: auth0Error.message,
@@ -251,17 +195,18 @@ export const handler = async (event) => {
         statusCode: auth0Error.statusCode,
         error: auth0Error.error,
         error_description: auth0Error.error_description,
-        stack: auth0Error.stack
+        originalError: auth0Error.originalError
       });
-      const responseStatus = auth0Error.statusCode || auth0Error.status;
+      
+      const responseStatus = auth0Error.statusCode || auth0Error.status || 500;
       return {
-        statusCode: responseStatus === 404 ? 404 : 500,
+        statusCode: responseStatus,
         headers,
         body: JSON.stringify({
           success: false,
           error: 'Failed to update user profile in Auth0: ' + (auth0Error.message || 'Unknown error'),
           details: {
-            status: auth0Error.status || auth0Error.statusCode,
+            status: responseStatus,
             error: auth0Error.error,
             error_description: auth0Error.error_description
           }
