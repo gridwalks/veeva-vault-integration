@@ -195,16 +195,7 @@ export const handler = async (event) => {
 
       console.log('Updating user with data:', updateData, 'using resolved ID:', resolvedId);
 
-      const encodedResolvedId =
-        typeof resolvedId === 'string' && !resolvedId.includes('%')
-          ? encodeURIComponent(resolvedId)
-          : resolvedId;
-
-      if (encodedResolvedId !== resolvedId) {
-        console.log('Using URL-encoded identifier for update:', encodedResolvedId);
-      }
-
-      updatedUser = await management.users.update({ id: encodedResolvedId }, updateData);
+      updatedUser = await management.users.update({ id: resolvedId }, updateData);
     } catch (auth0Error) {
       console.error('Auth0 Management API error:', {
         message: auth0Error.message,
