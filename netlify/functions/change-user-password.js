@@ -95,6 +95,13 @@ export const handler = async (event) => {
     }
 
     console.log('Password change request for user:', tokenClaims.sub);
+    console.log('Token claims details:', {
+      sub: tokenClaims.sub,
+      iss: tokenClaims.iss,
+      aud: tokenClaims.aud,
+      exp: tokenClaims.exp,
+      iat: tokenClaims.iat
+    });
 
     // Get Auth0 Management API credentials
     let domain = process.env.AUTH0_MGMT_DOMAIN || process.env.VITE_AUTH0_DOMAIN;
@@ -119,6 +126,11 @@ export const handler = async (event) => {
     }
     if (domain && domain.endsWith('/api/v2')) {
       domain = domain.replace('/api/v2', '');
+    }
+    
+    // Ensure domain ends with .auth0.com or .auth0.com/ if it doesn't already
+    if (domain && !domain.includes('.auth0.com')) {
+      domain = domain + '.auth0.com';
     }
 
     console.log('Auth0 Management API credentials check:', {
@@ -160,6 +172,9 @@ export const handler = async (event) => {
           enableCache: true,
           cacheTTLInSeconds: 3600
         };
+      } else {
+        // If domain already has https://, use it directly for audience
+        managementConfig.audience = `${domain}/api/v2/`;
       }
       
       console.log('Management config:', {
@@ -188,6 +203,21 @@ export const handler = async (event) => {
     // Use the token's sub claim as the authoritative user ID
     const userIdToUpdate = tokenClaims.sub;
     console.log('Using user ID from token sub claim:', userIdToUpdate);
+    
+    if (!userIdToUpdate) {
+      console.error('No user ID found in token sub claim');
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: 'Unable to identify user from authentication token. Please log out and log back in.',
+          details: {
+            tokenClaims: tokenClaims
+          }
+        })
+      };
+    }
 
     // First verify the user exists and get current data
     console.log('Fetching current user data...');
@@ -275,17 +305,29 @@ export const handler = async (event) => {
         originalError: auth0Error.originalError
       });
       
+      // Handle specific Auth0 errors
+      let errorMessage = 'Failed to update password: ' + (auth0Error.message || 'Unknown error');
+      
+      if (auth0Error.error === 'invalid_uri' || auth0Error.message?.includes('invalid_uri')) {
+        errorMessage = 'Invalid Auth0 configuration. Please check that AUTH0_MGMT_DOMAIN is set correctly (should be your Auth0 domain without https://, e.g., "your-domain.auth0.com").';
+      } else if (auth0Error.status === 401 || auth0Error.statusCode === 401) {
+        errorMessage = 'Authentication failed. Please check your Auth0 Management API credentials (AUTH0_MGMT_CLIENT_ID and AUTH0_MGMT_CLIENT_SECRET).';
+      } else if (auth0Error.status === 403 || auth0Error.statusCode === 403) {
+        errorMessage = 'Insufficient permissions. Please ensure your Auth0 Management API application has the required scopes (read:users, update:users).';
+      }
+      
       const responseStatus = auth0Error.statusCode || auth0Error.status || 500;
       return {
         statusCode: responseStatus,
         headers,
         body: JSON.stringify({
           success: false,
-          error: 'Failed to update password: ' + (auth0Error.message || 'Unknown error'),
+          error: errorMessage,
           details: {
             status: responseStatus,
             error: auth0Error.error,
-            error_description: auth0Error.error_description
+            error_description: auth0Error.error_description,
+            user_id: tokenClaims.sub || 'undefined'
           }
         })
       };
