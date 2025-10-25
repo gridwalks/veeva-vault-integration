@@ -123,12 +123,33 @@ export const handler = async (event) => {
 
     // Initialize Auth0 Management Client
     console.log('Initializing Auth0 Management Client with domain:', domain);
-    const management = new ManagementClient({
+    
+    // The Management Client needs to authenticate to get an access token
+    // Some SDK versions require different configuration formats
+    const managementConfig = {
       domain: domain,
       clientId: clientId,
       clientSecret: clientSecret,
       scope: 'read:users update:users'
+    };
+    
+    // Add token configuration to help the SDK authenticate properly
+    if (!managementConfig.domain.startsWith('https://')) {
+      // Ensure we're using HTTPS for the token endpoint
+      managementConfig.audience = `https://${domain}/api/v2/`;
+      managementConfig.tokenProvider = {
+        enableCache: true,
+        cacheTTLInSeconds: 3600
+      };
+    }
+    
+    console.log('Management config:', {
+      domain: managementConfig.domain,
+      audience: managementConfig.audience,
+      clientId: managementConfig.clientId ? 'present' : 'missing'
     });
+    
+    const management = new ManagementClient(managementConfig);
 
     // Prepare update data
     const updateData = {};
@@ -150,9 +171,21 @@ export const handler = async (event) => {
       let currentUser;
       
       // Try the management.users.get method (most common)
+      // Some SDK versions expect the ID as a string, others as an object
       if (management.users && typeof management.users.get === 'function') {
         console.log('Using management.users.get()');
-        currentUser = await management.users.get({ id: userIdToUpdate });
+        try {
+          // Try passing as object first (newer SDK versions)
+          currentUser = await management.users.get({ id: userIdToUpdate });
+        } catch (e) {
+          if (e.message && e.message.includes("didn't pass validation")) {
+            console.log('Retrying with ID as direct parameter...');
+            // Try passing ID directly (older SDK versions)
+            currentUser = await management.users.get(userIdToUpdate);
+          } else {
+            throw e;
+          }
+        }
       } 
       // Try alternative method
       else if (typeof management.getUser === 'function') {
@@ -175,10 +208,21 @@ export const handler = async (event) => {
       
       if (management.users && typeof management.users.update === 'function') {
         console.log('Using management.users.update()');
-        updatedUser = await management.users.update(
-          { id: currentUser.user_id }, 
-          updateData
-        );
+        try {
+          // Try object format first
+          updatedUser = await management.users.update(
+            { id: currentUser.user_id }, 
+            updateData
+          );
+        } catch (e) {
+          if (e.message && e.message.includes("didn't pass validation")) {
+            console.log('Retrying update with direct parameters...');
+            // Try direct parameters (ID as string, data as second param)
+            updatedUser = await management.users.update(currentUser.user_id, updateData);
+          } else {
+            throw e;
+          }
+        }
       }
       else if (typeof management.updateUser === 'function') {
         console.log('Using management.updateUser()');
