@@ -140,8 +140,9 @@ export const handler = async (event) => {
       }
 
       // Now update the user using the ID returned from Auth0 (preferred) or the format that succeeded
-      console.log('Updating user with data:', updateData, 'using ID:', updateId);
-      updatedUser = await management.users.update({ id: updateId }, updateData);
+      const updateRequestId = updateId.includes('%') ? updateId : encodeURIComponent(updateId);
+      console.log('Updating user with data:', updateData, 'using ID:', updateId, 'request ID:', updateRequestId);
+      updatedUser = await management.users.update({ id: updateRequestId }, updateData);
     } catch (auth0Error) {
       console.error('Auth0 Management API error:', {
         message: auth0Error.message,
