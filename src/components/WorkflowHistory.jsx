@@ -718,8 +718,8 @@ export default function WorkflowHistory() {
                         {instance.isPublic ? 'Make Private' : 'Make Public'}
                       </button>
                     )}
-                    {/* Show Resume button for paused workflows */}
-                    {instance.status === 'paused' && (
+                    {/* Show Resume button for paused and in-progress workflows */}
+                    {(instance.status === 'paused' || instance.status === 'in_progress') && (
                       <button
                         onClick={() => handleResumeWorkflow(instance.id)}
                         style={{

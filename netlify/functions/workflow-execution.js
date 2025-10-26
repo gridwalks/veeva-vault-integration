@@ -550,7 +550,7 @@ async function resumeWorkflow(pool, requestBody) {
       SELECT wi.*, wt.name as workflow_name
       FROM qms_chat_workflow_instances wi
       JOIN qms_chat_workflow_templates wt ON wi.workflow_template_id = wt.id
-      WHERE wi.id = $1 AND wi.user_id = $2 AND wi.status = 'paused'
+      WHERE wi.id = $1 AND wi.user_id = $2 AND wi.status IN ('paused', 'in_progress')
     `, [instanceId, userId]);
     
     if (result.rows.length === 0) {
@@ -559,26 +559,28 @@ async function resumeWorkflow(pool, requestBody) {
         headers: setCorsHeaders(),
         body: JSON.stringify({
           success: false,
-          error: 'Workflow not found or not paused'
+          error: 'Workflow not found or not resumable'
         })
       };
     }
     
     const instance = result.rows[0];
     
-    // Check if workflow is expired (30 days)
-    const pausedDate = new Date(instance.paused_at);
-    const daysSincePaused = (Date.now() - pausedDate.getTime()) / (1000 * 60 * 60 * 24);
-    
-    if (daysSincePaused > 30) {
-      return {
-        statusCode: 410,
-        headers: setCorsHeaders(),
-        body: JSON.stringify({
-          success: false,
-          error: 'Workflow has expired (paused for more than 30 days)'
-        })
-      };
+    // Check if workflow is expired (30 days) - only for paused workflows
+    if (instance.status === 'paused' && instance.paused_at) {
+      const pausedDate = new Date(instance.paused_at);
+      const daysSincePaused = (Date.now() - pausedDate.getTime()) / (1000 * 60 * 60 * 24);
+      
+      if (daysSincePaused > 30) {
+        return {
+          statusCode: 410,
+          headers: setCorsHeaders(),
+          body: JSON.stringify({
+            success: false,
+            error: 'Workflow has expired (paused for more than 30 days)'
+          })
+        };
+      }
     }
     
     // Get current step details
