@@ -13,48 +13,58 @@ This was caused by:
 Made the following optimizations to the document comparison flow in `netlify/functions/chat-with-documents.js`:
 
 ### 1. Reduced Chunk Count for Comparisons
-- **Before**: 12 chunks for comparison queries (originally 20)
-- **After**: 8 chunks for comparison queries
-- **Reason**: Further reduces context size to prevent prompt overflow
+- **Before**: 20 chunks for comparison queries
+- **After**: 6 chunks for comparison queries
+- **Reason**: Aggressively reduces context size to prevent prompt overflow and "length" errors
 
 ### 2. Truncated Chunk Text
 - Added intelligent text truncation to limit chunk content size
-- **Comparison queries**: Max 800 characters per chunk (reduced from 1200)
+- **Comparison queries**: Max 600 characters per chunk (aggressive truncation)
 - **Regular queries**: Max 1500 characters per chunk
-- **Benefit**: Prevents oversized contexts that lead to timeouts
+- **Benefit**: Prevents oversized contexts that lead to "finish_reason: length" errors
 
 ### 3. Truncated Document Summaries
 - AI summaries and manual summaries are now truncated for comparison queries
-- **Comparison queries**: Max 400 characters per summary (reduced from 600)
+- **Comparison queries**: Max 300 characters per summary (very aggressive truncation)
 - **Regular queries**: Max 800 characters per summary
 - **Applied to**: Document summaries, keyword search results, and documents without chunks
 
 ### 4. Limited Keyword Search Documents
 - **Before**: Up to 10 documents from keyword search added to context
-- **After**: Max 3 keyword documents for comparison queries
-- **Reason**: Prevents context bloat from loosely related documents
+- **After**: Max 2 keyword documents for comparison queries
+- **Reason**: Dramatically reduces context bloat from loosely related documents
 
-### 5. Increased Time Budget for Comparisons
+### 5. Reduced Attachment Text Size
+- **Comparison queries**: Max 3,000 characters per attachment (down from 6,000)
+- **Regular queries**: Max 6,000 characters per attachment
+- **Reason**: Attachments can be large and contribute significantly to context size
+
+### 6. Increased Time Budget for Comparisons
 - Reduced the response finalization buffer for comparison queries (extra 2 seconds for processing)
 - Added a 3-second budget boost specifically for comparison queries
 - **Result**: More time available for LLM to complete comparison analysis
 
-### 6. Increased Max Tokens for Comparison Responses
-- **Before**: 3000 max_tokens for comparison queries
-- **After**: 4000 max_tokens for comparison queries
-- **Benefit**: Allows the AI to generate more detailed comparison analysis without hitting token limits
+### 7. Increased Max Tokens for Comparison Responses
+- **Before**: 4000 max_tokens for comparison queries
+- **After**: 8000 max_tokens for comparison queries (doubled!)
+- **Benefit**: Allows the AI to generate very detailed comparison analysis without hitting token limits
 
 ### Issue Identified
-The error `finish_reason: length` indicates the model ran out of completion tokens, not that it timed out. The system prompt was 32KB (33,000 characters), which was too large. The changes above reduce the context size significantly while maintaining comprehensive analysis capabilities.
+The error `finish_reason: length` indicates the model ran out of completion tokens, not that it timed out. From the logs:
+- **Original attempt**: 33KB prompt → `finish_reason: length`
+- **After first fix**: 23KB prompt → still `finish_reason: length`
+
+The issue was that even with 4000 max_tokens, the model's response needed more room. By reducing the prompt size further AND increasing max_tokens to 8000, we give the model enough room to generate comprehensive responses.
 
 ## Impact
 These changes will:
-- ✅ Dramatically reduce context size (from 33KB to estimated ~8-12KB)
+- ✅ Dramatically reduce context size (from 33KB to estimated ~6-10KB)
 - ✅ Prevent "length" finish reason errors (running out of completion tokens)
 - ✅ Prevent timeout errors during document comparisons
-- ✅ Allow for more comprehensive comparison analysis (4000 tokens)
-- ✅ Maintain quality while improving reliability
+- ✅ Allow for extremely detailed comparison analysis (8000 tokens - quadruple the original)
+- ✅ Maintain quality with more focused, relevant content
 - ✅ Better balance between detail and performance
+- ✅ More reliable document comparison functionality
 
 ## Testing Recommendations
 1. Test document comparison with 2-3 documents
