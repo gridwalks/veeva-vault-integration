@@ -1435,16 +1435,9 @@ The documents will be automatically included in the comparison analysis.
           }}>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
               <button
-                onClick={() => {
-                  // Simulate user typing "yes"
-                  setCurrentMessage('yes');
-                  // Trigger send immediately
-                  setTimeout(() => {
-                    const sendBtn = document.querySelector('button[type="button"]');
-                    if (sendBtn && sendBtn.textContent === 'Send') {
-                      sendBtn.click();
-                    }
-                  }, 100);
+                onClick={async () => {
+                  // Directly start the workflow
+                  await startWorkflow(message.metadata.workflowTemplate, message.metadata.workflowFirstStep);
                 }}
                 style={{
                   padding: '10px 20px',
@@ -1469,15 +1462,14 @@ The documents will be automatically included in the comparison analysis.
               </button>
               <button
                 onClick={() => {
-                  // Simulate user typing "no"
-                  setCurrentMessage('no');
-                  // Trigger send immediately
-                  setTimeout(() => {
-                    const sendBtn = document.querySelector('button[type="button"]');
-                    if (sendBtn && sendBtn.textContent === 'Send') {
-                      sendBtn.click();
+                  // Directly handle workflow decline
+                  setConversationHistory(prev => [
+                    ...prev,
+                    { 
+                      role: 'assistant', 
+                      content: `No problem! Let me know if you need anything else.` 
                     }
-                  }, 100);
+                  ]);
                 }}
                 style={{
                   padding: '10px 20px',
