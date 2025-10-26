@@ -140,6 +140,8 @@ export const handler = async (event) => {
           return await pauseWorkflow(pool, event.body);
         } else if (action === 'resume-workflow') {
           return await resumeWorkflow(pool, event.body);
+        } else if (action === 'delete-workflow') {
+          return await deleteWorkflow(pool, event.body);
         }
 
       case 'GET':
@@ -658,6 +660,73 @@ async function resumeWorkflow(pool, requestBody) {
     
   } catch (error) {
     console.error('Error resuming workflow:', error);
+    throw error;
+  }
+}
+
+// Delete a workflow instance
+async function deleteWorkflow(pool, requestBody) {
+  try {
+    const { instanceId, userId } = JSON.parse(requestBody);
+    
+    if (!instanceId || !userId) {
+      return {
+        statusCode: 400,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'Instance ID and user ID are required'
+        })
+      };
+    }
+    
+    // Verify user owns this workflow
+    const instance = await pool.query(
+      'SELECT user_id FROM qms_chat_workflow_instances WHERE id = $1',
+      [instanceId]
+    );
+    
+    if (instance.rows.length === 0) {
+      return {
+        statusCode: 404,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'Workflow instance not found'
+        })
+      };
+    }
+    
+    if (instance.rows[0].user_id !== userId) {
+      return {
+        statusCode: 403,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'Unauthorized'
+        })
+      };
+    }
+    
+    // Delete the workflow instance
+    await pool.query(
+      'DELETE FROM qms_chat_workflow_instances WHERE id = $1',
+      [instanceId]
+    );
+    
+    console.log(`Workflow instance ${instanceId} deleted by user ${userId}`);
+    
+    return {
+      statusCode: 200,
+      headers: setCorsHeaders(),
+      body: JSON.stringify({
+        success: true,
+        message: 'Workflow deleted successfully'
+      })
+    };
+    
+  } catch (error) {
+    console.error('Error deleting workflow:', error);
     throw error;
   }
 }

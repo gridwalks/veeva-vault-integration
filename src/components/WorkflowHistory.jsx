@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
-import { getWorkflowInstances, refineWorkflowDocument, updateWorkflowVisibility, resumeWorkflow } from '../api';
+import { getWorkflowInstances, refineWorkflowDocument, updateWorkflowVisibility, resumeWorkflow, deleteWorkflow } from '../api';
 import { useAdminRole } from '../hooks/useAdminRole';
 
 export default function WorkflowHistory() {
@@ -99,6 +99,39 @@ export default function WorkflowHistory() {
     } catch (error) {
       console.error('Error resuming workflow:', error);
       alert(error.message || 'Failed to resume workflow. It may have expired.');
+    }
+  };
+
+  const handleDeleteWorkflow = async (instanceId, workflowName) => {
+    try {
+      if (!user) {
+        alert('User not authenticated');
+        return;
+      }
+      
+      // Confirm deletion
+      const confirmed = window.confirm(
+        `Are you sure you want to delete the workflow "${workflowName}"?\n\nThis action cannot be undone.`
+      );
+      
+      if (!confirmed) {
+        return;
+      }
+      
+      // Call the delete API
+      await deleteWorkflow({
+        instanceId,
+        userId: user.sub
+      });
+      
+      alert('Workflow deleted successfully!');
+      
+      // Reload instances to reflect the deletion
+      await loadInstances();
+      
+    } catch (error) {
+      console.error('Error deleting workflow:', error);
+      alert(error.message || 'Failed to delete workflow. Please try again.');
     }
   };
 
@@ -743,6 +776,26 @@ export default function WorkflowHistory() {
                         }}
                       >
                         Resume Workflow
+                      </button>
+                    )}
+                    {/* Show Delete button for workflow owners or admins */}
+                    {(instance.userId === user?.sub || isAdmin) && (
+                      <button
+                        onClick={() => handleDeleteWorkflow(instance.id, instance.workflowName)}
+                        style={{
+                          padding: '6px 12px',
+                          backgroundColor: '#dc2626',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Delete
                       </button>
                     )}
                   </div>

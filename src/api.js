@@ -1471,3 +1471,43 @@ export async function resumeWorkflow({ instanceId, userId }) {
     throw error;
   }
 }
+
+// Delete a workflow instance
+export async function deleteWorkflow({ instanceId, userId }) {
+  const startTime = Date.now();
+  console.log('Deleting workflow...', { instanceId, userId });
+  
+  try {
+    const res = await fetch('/api/workflow-execution/delete-workflow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ instanceId, userId })
+    });
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to delete workflow:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText
+      });
+      throw new Error(`Failed to delete workflow: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Workflow deleted in ${duration}ms:`, {
+      instanceId,
+      success: data.success
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error deleting workflow after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
