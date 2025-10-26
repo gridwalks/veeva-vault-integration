@@ -692,7 +692,10 @@ The documents will be automatically included in the comparison analysis.
       
       // Store interaction ID for feedback functionality
       if (messageIndex !== null && result?.id) {
+        console.log('Storing interaction ID:', { messageIndex, interactionId: result.id });
         setInteractionIds(prev => new Map(prev).set(messageIndex, result.id));
+      } else {
+        console.warn('No interaction ID available for message:', { messageIndex, result });
       }
       
       return result;
@@ -1087,9 +1090,13 @@ The documents will be automatically included in the comparison analysis.
     };
 
     const handleLike = async () => {
+      console.log('Thumbs up clicked for message index:', index);
+      console.log('Current interaction IDs:', Array.from(interactionIds.entries()));
+      
       const interactionId = interactionIds.get(index);
       if (interactionId) {
         try {
+          console.log('Submitting like for interaction ID:', interactionId);
           await updateQAFeedback({ interactionId, user_rating: 1 });
           console.log('Message liked successfully');
           // You could add visual feedback here
@@ -1097,14 +1104,18 @@ The documents will be automatically included in the comparison analysis.
           console.error('Error submitting like:', error);
         }
       } else {
-        console.warn('No interaction ID found for this message');
+        console.warn('No interaction ID found for this message:', { index, availableIds: Array.from(interactionIds.keys()) });
       }
     };
 
     const handleDislike = async () => {
+      console.log('Thumbs down clicked for message index:', index);
+      console.log('Current interaction IDs:', Array.from(interactionIds.entries()));
+      
       const interactionId = interactionIds.get(index);
       if (interactionId) {
         try {
+          console.log('Submitting dislike for interaction ID:', interactionId);
           await updateQAFeedback({ interactionId, user_rating: -1 });
           console.log('Message disliked successfully');
           // You could add visual feedback here
@@ -1112,7 +1123,7 @@ The documents will be automatically included in the comparison analysis.
           console.error('Error submitting dislike:', error);
         }
       } else {
-        console.warn('No interaction ID found for this message');
+        console.warn('No interaction ID found for this message:', { index, availableIds: Array.from(interactionIds.keys()) });
       }
     };
 
