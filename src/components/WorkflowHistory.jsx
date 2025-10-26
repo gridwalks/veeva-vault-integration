@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
 import { getWorkflowInstances, refineWorkflowDocument, updateWorkflowVisibility } from '../api';
+import { useAdminRole } from '../hooks/useAdminRole';
 
 export default function WorkflowHistory() {
+  const { user } = useAuth0();
+  const { isAdmin } = useAdminRole();
   const [instances, setInstances] = useState([]);
   const [filteredInstances, setFilteredInstances] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -10,8 +14,6 @@ export default function WorkflowHistory() {
   
   // New state for user-specific and public workflows
   const [viewMode, setViewMode] = useState('my_workflows'); // 'my_workflows', 'public', 'all'
-  const [currentUserId, setCurrentUserId] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   
   // Filter state
   const [filters, setFilters] = useState({
@@ -38,10 +40,15 @@ export default function WorkflowHistory() {
 
   const handleToggleVisibility = async (instanceId, currentIsPublic) => {
     try {
+      if (!user) {
+        alert('User not authenticated');
+        return;
+      }
+      
       await updateWorkflowVisibility({
         instanceId,
         isPublic: !currentIsPublic,
-        userId: currentUserId,
+        userId: user.sub, // Auth0 user ID
         isAdmin: isAdmin
       });
       
@@ -57,19 +64,17 @@ export default function WorkflowHistory() {
   const loadInstances = async () => {
     setLoading(true);
     try {
-      // For now, we'll use a mock user ID. In a real app, this would come from authentication
-      const mockUserId = 'user123';
-      const mockIsAdmin = false; // This would be determined by user role
-      
-      setCurrentUserId(mockUserId);
-      setIsAdmin(mockIsAdmin);
+      if (!user) {
+        console.log('No user data available');
+        return;
+      }
       
       const data = await getWorkflowInstances({ 
         status: filters.status === 'all' ? undefined : filters.status,
         limit: 500, // Get more for client-side filtering
-        userId: mockUserId,
+        userId: user.sub, // Auth0 user ID
         viewMode: viewMode,
-        isAdmin: mockIsAdmin
+        isAdmin: isAdmin
       });
       
       if (data.success && data.instances) {
@@ -648,7 +653,7 @@ export default function WorkflowHistory() {
                       Download
                     </button>
                     {/* Show visibility toggle only for workflow owners or admins */}
-                    {(instance.userId === currentUserId || isAdmin) && (
+                    {(instance.userId === user?.sub || isAdmin) && (
                       <button
                         onClick={() => handleToggleVisibility(instance.id, instance.isPublic)}
                         style={{

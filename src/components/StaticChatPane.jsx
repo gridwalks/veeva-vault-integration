@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useAuth0 } from '@auth0/auth0-react';
 import DocumentViewer from './DocumentViewer.jsx';
 import ChatPromptBox from './ChatPromptBox.jsx';
 import { createQAInteraction, getUploadedDocuments, downloadUploadedDocumentUrl, updateQAFeedback } from '../api';
@@ -21,6 +22,7 @@ const estimateConversationTokens = (conversationHistory) => {
 };
 
 export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane, userId }) {
+  const { user } = useAuth0();
   const [conversationHistory, setConversationHistory] = useState([]);
   const [attachedDocuments, setAttachedDocuments] = useState([]);
   const [isProcessingAttachments, setIsProcessingAttachments] = useState(false);
@@ -736,9 +738,10 @@ The documents will be automatically included in the comparison analysis.
 
   const startWorkflow = async (template, firstStep) => {
     try {
-      // Mock user information - in a real app, this would come from authentication
-      const mockUserId = 'user123';
-      const mockUserName = 'John Doe';
+      if (!user) {
+        alert('User not authenticated');
+        return;
+      }
       
       const response = await fetch('/api/workflow-execution/start-workflow', {
         method: 'POST',
@@ -747,8 +750,8 @@ The documents will be automatically included in the comparison analysis.
         },
         body: JSON.stringify({
           templateId: template.id,
-          userId: mockUserId,
-          createdByUserName: mockUserName,
+          userId: user.sub, // Auth0 user ID
+          createdByUserName: user.name || user.email || 'Unknown User', // Use Auth0 name or email
           sessionId: Date.now().toString(),
           isPublic: false // Default to private
         })
