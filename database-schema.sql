@@ -187,6 +187,25 @@ ON qms_chat_qa_interactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_qms_chat_qa_interactions_session_id 
 ON qms_chat_qa_interactions(session_id);
 
+-- Table for storing chat sessions
+CREATE TABLE IF NOT EXISTS qms_chat_sessions (
+  id SERIAL PRIMARY KEY,
+  user_id VARCHAR(255) NOT NULL,
+  session_name VARCHAR(500),
+  conversation_history JSONB NOT NULL,
+  document_metadata JSONB,
+  message_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for chat sessions
+CREATE INDEX IF NOT EXISTS idx_qms_chat_sessions_user_id 
+ON qms_chat_sessions(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_qms_chat_sessions_created_at 
+ON qms_chat_sessions(created_at);
+
 -- Workflow Configuration Tables
 
 -- Table for workflow templates (CAPA, Deviations, Change Control, etc.)

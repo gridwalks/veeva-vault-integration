@@ -1511,3 +1511,208 @@ export async function deleteWorkflow({ instanceId, userId }) {
     throw error;
   }
 }
+
+// Save a chat session
+export async function saveChatSession({ userId, sessionName, conversationHistory, documentMetadata }) {
+  const startTime = Date.now();
+  console.log('Saving chat session...', { userId, sessionName, messageCount: conversationHistory?.length });
+  
+  try {
+    const res = await fetch('/api/chat-sessions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        session_name: sessionName,
+        conversation_history: conversationHistory,
+        document_metadata: documentMetadata
+      })
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to save chat session:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error
+      });
+      throw new Error(errorData.error || `Failed to save chat session: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Chat session saved in ${duration}ms:`, {
+      sessionId: data.data?.id,
+      sessionName: data.data?.session_name,
+      messageCount: data.data?.message_count
+    });
+    
+    return data.data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error saving chat session after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
+// Get chat sessions with pagination and filtering
+export async function getChatSessions({ userId, limit = 20, offset = 0, searchText, startDate, endDate }) {
+  const startTime = Date.now();
+  console.log('Fetching chat sessions...', { userId, limit, offset, searchText, startDate, endDate });
+  
+  try {
+    const params = new URLSearchParams({ user_id: userId, limit, offset });
+    if (searchText) params.set('search', searchText);
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    
+    const res = await fetch(`/api/chat-sessions?${params}`);
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to fetch chat sessions:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error
+      });
+      throw new Error(errorData.error || `Failed to fetch chat sessions: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Chat sessions fetched in ${duration}ms:`, {
+      sessionCount: data.data?.items?.length || 0,
+      total: data.data?.total || 0
+    });
+    
+    return data.data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error fetching chat sessions after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
+// Get a specific chat session
+export async function getChatSession({ sessionId }) {
+  const startTime = Date.now();
+  console.log('Fetching chat session...', { sessionId });
+  
+  try {
+    const res = await fetch(`/api/chat-sessions/${sessionId}`);
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to fetch chat session:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error
+      });
+      throw new Error(errorData.error || `Failed to fetch chat session: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Chat session fetched in ${duration}ms:`, {
+      sessionId: data.data?.id,
+      messageCount: data.data?.message_count
+    });
+    
+    return data.data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error fetching chat session after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
+// Update chat session name
+export async function updateChatSessionName({ sessionId, sessionName }) {
+  const startTime = Date.now();
+  console.log('Updating chat session name...', { sessionId, sessionName });
+  
+  try {
+    const res = await fetch(`/api/chat-sessions/${sessionId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ session_name: sessionName })
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to update chat session name:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error
+      });
+      throw new Error(errorData.error || `Failed to update chat session name: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Chat session name updated in ${duration}ms:`, {
+      sessionId: data.data?.id,
+      sessionName: data.data?.session_name
+    });
+    
+    return data.data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error updating chat session name after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
+// Delete a chat session
+export async function deleteChatSession({ sessionId }) {
+  const startTime = Date.now();
+  console.log('Deleting chat session...', { sessionId });
+  
+  try {
+    const res = await fetch(`/api/chat-sessions/${sessionId}`, {
+      method: 'DELETE'
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to delete chat session:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error
+      });
+      throw new Error(errorData.error || `Failed to delete chat session: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Chat session deleted in ${duration}ms:`, {
+      sessionId: data.data?.id,
+      success: data.success
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error deleting chat session after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}

@@ -19,6 +19,7 @@ export default function App() {
   const [localUser, setLocalUser] = useState(null);
   const [showMyNotebook, setShowMyNotebook] = useState(false);
   const [resumeWorkflowId, setResumeWorkflowId] = useState(null);
+  const [loadChatSessionId, setLoadChatSessionId] = useState(null);
   const documentViewerRef = useRef(null);
 
   // Set up inactivity logout for authenticated users
@@ -82,6 +83,11 @@ useEffect(() => {
       setCurrentScreen('main'); // Switch to main chat screen
     } else if (event.data && event.data.type === 'CLOSE_MY_NOTEBOOK') {
       console.log('Received close My Notebook message');
+      setShowMyNotebook(false); // Close the My Notebook modal
+    } else if (event.data && event.data.type === 'LOAD_CHAT_SESSION') {
+      console.log('Received load chat session message:', event.data);
+      setLoadChatSessionId(event.data.sessionId);
+      setCurrentScreen('main'); // Switch to main chat screen
       setShowMyNotebook(false); // Close the My Notebook modal
     }
   };
@@ -207,6 +213,8 @@ useEffect(() => {
               userId={(localUser || user)?.sub}
               resumeWorkflowId={resumeWorkflowId}
               onResumeWorkflowComplete={() => setResumeWorkflowId(null)}
+              loadChatSessionId={loadChatSessionId}
+              onLoadChatSessionComplete={() => setLoadChatSessionId(null)}
             />
           </div>
 

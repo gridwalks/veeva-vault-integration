@@ -1,8 +1,24 @@
 import { useState, useEffect } from 'react';
 import WorkflowHistory from './WorkflowHistory';
+import ChatHistory from './ChatHistory';
 
 export default function MyNotebook({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('workflow-history');
+
+  const handleLoadSession = (sessionId) => {
+    console.log('MyNotebook: Loading chat session:', sessionId);
+    
+    // Send message to parent window
+    if (window.parent && window.parent.postMessage) {
+      window.parent.postMessage({
+        type: 'LOAD_CHAT_SESSION',
+        sessionId: sessionId
+      }, '*');
+    }
+    
+    // Close the modal
+    onClose();
+  };
 
   // Handle ESC key to close modal
   useEffect(() => {
@@ -32,6 +48,12 @@ export default function MyNotebook({ isOpen, onClose }) {
       label: 'Workflow History',
       icon: '📋',
       component: <WorkflowHistory />
+    },
+    {
+      id: 'chat-history',
+      label: 'Chat History',
+      icon: '💬',
+      component: <ChatHistory onLoadSession={handleLoadSession} />
     }
   ];
 

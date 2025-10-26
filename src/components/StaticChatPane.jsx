@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { useAuth0 } from '@auth0/auth0-react';
 import DocumentViewer from './DocumentViewer.jsx';
 import ChatPromptBox from './ChatPromptBox.jsx';
-import { createQAInteraction, getUploadedDocuments, downloadUploadedDocumentUrl, updateQAFeedback, pauseWorkflow, resumeWorkflow } from '../api';
+import { createQAInteraction, getUploadedDocuments, downloadUploadedDocumentUrl, updateQAFeedback, pauseWorkflow, resumeWorkflow, saveChatSession, getChatSession } from '../api';
 
 // Helper function to estimate token count (rough approximation)
 const estimateTokens = (text) => {
@@ -21,7 +21,7 @@ const estimateConversationTokens = (conversationHistory) => {
   }, 0);
 };
 
-export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane, userId, resumeWorkflowId, onResumeWorkflowComplete }) {
+export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane, userId, resumeWorkflowId, onResumeWorkflowComplete, loadChatSessionId, onLoadChatSessionComplete }) {
   const { user } = useAuth0();
   const [conversationHistory, setConversationHistory] = useState([]);
   const [attachedDocuments, setAttachedDocuments] = useState([]);
@@ -114,6 +114,64 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       }
     }
   }, [resumeWorkflowId, user, onResumeWorkflowComplete]);
+
+  // Handle load chat session
+  useEffect(() => {
+    if (loadChatSessionId && user) {
+      console.log('Loading chat session:', loadChatSessionId);
+      handleLoadChatSession(loadChatSessionId);
+      // Clear the loadChatSessionId to prevent re-triggering
+      if (onLoadChatSessionComplete) {
+        onLoadChatSessionComplete();
+      }
+    }
+  }, [loadChatSessionId, user, onLoadChatSessionComplete]);
+
+  const handleLoadChatSession = async (sessionId) => {
+    try {
+      const sessionData = await getChatSession({ sessionId });
+      
+      if (sessionData && sessionData.conversation_history) {
+        // Parse JSON if it's a string
+        const history = typeof sessionData.conversation_history === 'string' 
+          ? JSON.parse(sessionData.conversation_history)
+          : sessionData.conversation_history;
+        
+        // Load conversation history
+        setConversationHistory(history);
+        
+        // Restore document metadata if available
+        if (sessionData.document_metadata) {
+          const metadata = typeof sessionData.document_metadata === 'string'
+            ? JSON.parse(sessionData.document_metadata)
+            : sessionData.document_metadata;
+          
+          // Note: We're setting metadata but the actual documents may not be available
+          // This is informational for the user
+          console.log('Session document metadata:', metadata);
+          
+          // Attempt to restore uploaded blobs (these may no longer exist)
+          if (metadata.uploadedBlobs && Array.isArray(metadata.uploadedBlobs)) {
+            setUploadedBlobs(metadata.uploadedBlobs);
+          }
+        }
+        
+        // Scroll to top of messages
+        setTimeout(() => {
+          if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 100);
+        
+        console.log('Chat session loaded successfully');
+      } else {
+        console.error('Invalid session data received');
+      }
+    } catch (error) {
+      console.error('Error loading chat session:', error);
+      setError(`Failed to load chat session: ${error.message}`);
+    }
+  };
 
 
   const uploadFileToBlob = async (file) => {
@@ -616,7 +674,61 @@ The documents will be automatically included in the comparison analysis.
     sendMessage(message, files);
   };
 
-  const clearConversation = () => {
+  // Helper function to generate session name from first user question
+  const generateSessionName = () => {
+    const firstUserMessage = conversationHistory.find(msg => msg.role === 'user');
+    if (!firstUserMessage) return null;
+    
+    const text = firstUserMessage.content;
+    if (!text) return 'Chat Session';
+    
+    // Truncate intelligently at word boundaries (max 50 chars)
+    if (text.length <= 50) return text;
+    
+    const truncated = text.substring(0, 50);
+    const lastSpace = truncated.lastIndexOf(' ');
+    return lastSpace > 0 ? truncated.substring(0, lastSpace) + '...' : truncated + '...';
+  };
+
+  const clearConversation = async () => {
+    // Auto-save session before clearing if there are messages
+    if (conversationHistory.length > 0 && user?.sub) {
+      try {
+        const sessionName = generateSessionName();
+        const documentMetadata = {
+          selectedDocuments: selectedDocuments.map(doc => ({
+            id: doc.veeva_document_id,
+            name: getDocumentDisplayName(doc),
+            number: getDocumentDisplayNumber(doc)
+          })),
+          attachedDocuments: attachedDocuments.map(doc => ({
+            id: doc.id,
+            name: getDocumentDisplayName(doc),
+            number: getDocumentDisplayNumber(doc)
+          })),
+          uploadedBlobs: uploadedBlobs.map(blob => ({
+            key: blob.key,
+            name: blob.name,
+            size: blob.size,
+            type: blob.type
+          }))
+        };
+
+        await saveChatSession({
+          userId: user.sub,
+          sessionName: sessionName || 'Chat Session',
+          conversationHistory: conversationHistory,
+          documentMetadata: documentMetadata
+        });
+        
+        console.log('Chat session saved successfully');
+      } catch (error) {
+        console.error('Error saving chat session:', error);
+        // Don't block clearing if save fails
+      }
+    }
+
+    // Now clear the conversation
     setConversationHistory([]);
     setUsedDocuments([]);
     setError(null);
