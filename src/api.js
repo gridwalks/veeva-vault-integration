@@ -1,297 +1,189 @@
-export async function listApproved({ name = "", limit = 50, offset = 0 } = {}) {
+/**
+ * Generic API request wrapper
+ * Handles timing, error handling, and logging for all API requests
+ */
+async function apiRequest({ url, params = {}, method = 'GET', body = null, successMessage, errorMessage, headers = {} }) {
   const startTime = Date.now();
-  console.log('Fetching approved documents...', { name, limit, offset });
   
   try {
-    const p = new URLSearchParams({ name, limit, offset });
-    const res = await fetch(`/api/list-approved?${p}`);
+    // Build query string from params
+    const queryString = params ? new URLSearchParams(params).toString() : '';
+    const fullUrl = queryString ? `${url}?${queryString}` : url;
     
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to load documents:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText,
-        url: res.url,
-        params: { name, limit, offset }
-      });
-      throw new Error(`Failed to load documents: ${res.status} ${res.statusText}`);
+    console.log(successMessage || 'API request...', params);
+    
+    // Build request config
+    const config = { method };
+    
+    // Add headers
+    if (Object.keys(headers).length > 0) {
+      config.headers = { ...headers };
+    }
+    if (body) {
+      if (!config.headers) config.headers = {};
+      config.headers['Content-Type'] = 'application/json';
+      config.body = JSON.stringify(body);
     }
     
+    // Make request
+    const res = await fetch(fullUrl, config);
+    
+    // Handle error response
+    if (!res.ok) {
+      let errorText;
+      try {
+        errorText = await res.text();
+        let parsedError;
+        try {
+          parsedError = JSON.parse(errorText);
+        } catch {
+          parsedError = { error: errorText };
+        }
+        console.error(errorMessage || 'Request failed:', {
+          status: res.status,
+          statusText: res.statusText,
+          error: parsedError.error,
+          details: parsedError.details,
+          url: res.url,
+          params
+        });
+        throw new Error(parsedError.error || errorMessage || `Request failed: ${res.status} ${res.statusText}`);
+      } catch (parseError) {
+        console.error(errorMessage || 'Request failed:', {
+          status: res.status,
+          statusText: res.statusText,
+          errorText,
+          url: res.url,
+          params
+        });
+        throw new Error(errorMessage || `Request failed: ${res.statusText}`);
+      }
+    }
+    // Parse successful response
     const data = await res.json();
     const duration = Date.now() - startTime;
-    console.log(`Approved documents fetched in ${duration}ms:`, {
-      total: data.total,
-      itemsReturned: data.items?.length || 0,
-      pageOffset: data.pageOffset,
-      pageSize: data.pageSize
-    });
+    console.log(`Request completed in ${duration}ms`, data);
     
     return data;
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`Error fetching approved documents after ${duration}ms:`, {
+    console.error(`Request error after ${duration}ms:`, {
       message: error.message,
       stack: error.stack,
-      params: { name, limit, offset }
+      params
     });
     throw error;
   }
+}
+
+/**
+ * Extract specific data path from response
+ */
+function extractData(data, path = 'data') {
+  if (path === 'data.data') {
+    return data?.data?.data || data?.data || data;
+  }
+  return path ? data?.[path] : data;
+}
+
+// Document listing functions
+export async function listApproved({ name = "", limit = 50, offset = 0 } = {}) {
+  const data = await apiRequest({
+    url: '/api/list-approved',
+    params: { name, limit, offset },
+    successMessage: 'Fetching approved documents...',
+    errorMessage: 'Failed to load documents'
+  });
+  return data;
 }
 
 export async function indexDocuments({ name = "", limit = 100, force = false, batchSize = 5, batchOffset = 0 } = {}) {
-  const startTime = Date.now();
-  console.log('Starting document indexing...', { name, limit, force, batchSize, batchOffset });
+  const params = { name, limit };
+  if (force) params.force = 'true';
+  if (batchSize) params.batchSize = batchSize;
+  if (batchOffset) params.batchOffset = batchOffset;
   
-  try {
-    const p = new URLSearchParams({ name, limit });
-    if (force) p.set('force', 'true');
-    if (batchSize) p.set('batchSize', batchSize);
-    if (batchOffset) p.set('batchOffset', batchOffset);
-    const res = await fetch(`/api/index-documents?${p}`);
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to index documents:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText,
-        url: res.url,
-        params: { name, limit, force }
-      });
-      throw new Error(`Failed to index documents: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Document indexing completed in ${duration}ms:`, {
-      total: data.total,
-      processed: data.processed,
-      duration: data.duration,
-      stats: data.stats,
-      batchInfo: data.batchInfo
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error indexing documents after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack,
-      params: { name, limit, force }
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: '/api/index-documents',
+    params,
+    successMessage: 'Starting document indexing...',
+    errorMessage: 'Failed to index documents'
+  });
 }
 
 export async function getIndexedDocuments({ name = "", limit = 50, offset = 0 } = {}) {
-  const startTime = Date.now();
-  console.log('Fetching indexed documents...', { name, limit, offset });
-  
-  try {
-    const p = new URLSearchParams({ name, limit, offset });
-    const res = await fetch(`/api/get-indexed-documents?${p}`);
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to load indexed documents:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText,
-        url: res.url,
-        params: { name, limit, offset }
-      });
-      throw new Error(`Failed to load indexed documents: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Indexed documents fetched in ${duration}ms:`, {
-      total: data.total,
-      itemsReturned: data.items?.length || 0,
-      pageOffset: data.pageOffset,
-      pageSize: data.pageSize,
-      apiDuration: data.duration
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error fetching indexed documents after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack,
-      params: { name, limit, offset }
-    });
-    throw error;
-  }
+  const data = await apiRequest({
+    url: '/api/get-indexed-documents',
+    params: { name, limit, offset },
+    successMessage: 'Fetching indexed documents...',
+    errorMessage: 'Failed to load indexed documents'
+  });
+  console.log(`Indexed documents fetched:`, {
+    total: data.total,
+    itemsReturned: data.items?.length || 0,
+    pageOffset: data.pageOffset,
+    pageSize: data.pageSize,
+    apiDuration: data.duration
+  });
+  return data;
 }
 
 export async function getCfrTitle21({ packageId = null, fromDate = null } = {}) {
-  const startTime = Date.now();
-  console.log('Fetching CFR Title 21 data...', { packageId, fromDate });
-
-  try {
-    const params = new URLSearchParams();
-    if (packageId) {
-      params.set('packageId', packageId);
-    }
-    if (fromDate) {
-      params.set('fromDate', fromDate);
-    }
-
-    const url = `/api/cfr-title-21${params.toString() ? `?${params.toString()}` : ''}`;
-    const res = await fetch(url);
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to load CFR Title 21 data:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText,
-        url: res.url,
-        packageId,
-        fromDate
-      });
-      throw new Error(`Failed to load CFR Title 21 data: ${res.status} ${res.statusText}`);
-    }
-
-    const data = await res.json();
-
-    if (data && data.success === false) {
-      console.warn('CFR Title 21 API returned an application error', {
-        packageId,
-        fromDate,
-        code: data.code,
-        error: data.error,
-        details: data.details
-      });
-      const message = data.error || 'Unable to load CFR Title 21 data.';
-      throw new Error(message);
-    }
-
-    const duration = Date.now() - startTime;
-    console.log('CFR Title 21 data fetched successfully', {
-      packageId,
-      fromDate,
-      hasPackages: Array.isArray(data.packages),
-      packageCount: data.packages?.length || 0,
-      totalGranules: data.totalGranules || null,
-      duration
-    });
-
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error('Error fetching CFR Title 21 data', {
-      message: error.message,
-      stack: error.stack,
-      packageId,
-      fromDate,
-      duration
-    });
-    throw error;
-  }
-}
-
-export async function getIndexingLogs({ 
-  limit = 50, 
-  offset = 0, 
-  operationType = null, 
-  sourceType = null, 
-  status = null, 
-  batchId = null, 
-  startDate = null, 
-  endDate = null 
-} = {}) {
-  const startTime = Date.now();
-  console.log('Fetching indexing logs...', { 
-    limit, offset, operationType, sourceType, status, batchId, startDate, endDate 
+  const params = {};
+  if (packageId) params.packageId = packageId;
+  if (fromDate) params.fromDate = fromDate;
+  
+  const data = await apiRequest({
+    url: '/api/cfr-title-21',
+    params,
+    successMessage: 'Fetching CFR Title 21 data...',
+    errorMessage: 'Failed to load CFR Title 21 data'
   });
   
-  try {
-    const params = new URLSearchParams({ limit, offset });
-    if (operationType) params.set('operationType', operationType);
-    if (sourceType) params.set('sourceType', sourceType);
-    if (status) params.set('status', status);
-    if (batchId) params.set('batchId', batchId);
-    if (startDate) params.set('startDate', startDate);
-    if (endDate) params.set('endDate', endDate);
-    
-    const res = await fetch(`/api/get-indexing-logs?${params}`);
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to fetch indexing logs:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText,
-        url: res.url,
-        params: { limit, offset, operationType, sourceType, status, batchId, startDate, endDate }
-      });
-      throw new Error(`Failed to fetch indexing logs: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Indexing logs fetched in ${duration}ms:`, {
-      logCount: data.logs?.length || 0,
-      total: data.pagination?.total || 0,
-      hasMore: data.pagination?.hasMore || false
+  // Handle application-level errors
+  if (data && data.success === false) {
+    console.warn('CFR Title 21 API returned an application error', {
+      packageId, fromDate, code: data.code, error: data.error, details: data.details
     });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error fetching indexing logs after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack,
-      params: { limit, offset, operationType, sourceType, status, batchId, startDate, endDate }
-    });
-    throw error;
+    throw new Error(data.error || 'Unable to load CFR Title 21 data.');
   }
+  
+  return data;
+}
+
+export async function getIndexingLogs({ limit = 50, offset = 0, operationType = null, sourceType = null, status = null, batchId = null, startDate = null, endDate = null } = {}) {
+  const params = { limit, offset };
+  if (operationType) params.operationType = operationType;
+  if (sourceType) params.sourceType = sourceType;
+  if (status) params.status = status;
+  if (batchId) params.batchId = batchId;
+  if (startDate) params.startDate = startDate;
+  if (endDate) params.endDate = endDate;
+  
+  const data = await apiRequest({
+    url: '/api/get-indexing-logs',
+    params,
+    successMessage: 'Fetching indexing logs...',
+    errorMessage: 'Failed to fetch indexing logs'
+  });
+  
+  console.log(`Indexing logs fetched:`, {
+    logCount: data.logs?.length || 0,
+    total: data.pagination?.total || 0,
+    hasMore: data.pagination?.hasMore || false
+  });
+  
+  return data;
 }
 
 export async function cleanupIndexingLogs({ retentionDays = 30, dryRun = false } = {}) {
-  const startTime = Date.now();
-  console.log('Cleaning up indexing logs...', { retentionDays, dryRun });
-  
-  try {
-    const params = new URLSearchParams({ retentionDays, dryRun });
-    
-    const res = await fetch(`/api/cleanup-indexing-logs?${params}`, {
-      method: 'POST'
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to cleanup indexing logs:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText,
-        url: res.url,
-        params: { retentionDays, dryRun }
-      });
-      throw new Error(`Failed to cleanup indexing logs: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Indexing logs cleanup completed in ${duration}ms:`, {
-      success: data.success,
-      logsDeleted: data.logsDeleted,
-      dryRun: data.dryRun
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error cleaning up indexing logs after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack,
-      params: { retentionDays, dryRun }
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: '/api/cleanup-indexing-logs',
+    params: { retentionDays, dryRun },
+    method: 'POST',
+    successMessage: 'Cleaning up indexing logs...',
+    errorMessage: 'Failed to cleanup indexing logs'
+  });
 }
 
 export function downloadUrl({ id, major, minor }) {
@@ -306,1413 +198,368 @@ export function downloadUploadedDocumentUrl({ documentId }) {
 }
 
 export async function deleteDocument({ documentId, sourceType }) {
-  const startTime = Date.now();
-  console.log('Deleting document...', { documentId, sourceType });
+  const data = await apiRequest({
+    url: '/api/delete-document',
+    params: { id: documentId, source_type: sourceType },
+    method: 'DELETE',
+    successMessage: 'Deleting document...',
+    errorMessage: 'Failed to delete document'
+  });
   
-  try {
-    const p = new URLSearchParams({ id: documentId, source_type: sourceType });
-    const res = await fetch(`/api/delete-document?${p}`, {
-      method: 'DELETE'
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to delete document:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText,
-        url: res.url,
-        params: { documentId, sourceType }
-      });
-      throw new Error(`Failed to delete document: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Document deleted in ${duration}ms:`, {
-      documentId,
-      sourceType,
-      deletedChunks: data.deletedChunks,
-      duration: data.duration
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error deleting document after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack,
-      params: { documentId, sourceType }
-    });
-    throw error;
-  }
+  console.log(`Document deleted:`, {
+    documentId, sourceType, deletedChunks: data.deletedChunks, duration: data.duration
+  });
+  
+  return data;
 }
 
 export async function getUploadedDocuments({ limit = 50, offset = 0, search = '', userId } = {}) {
-  const startTime = Date.now();
-  console.log('Fetching uploaded documents...', { limit, offset, search, userId });
-
-  try {
-    const params = new URLSearchParams({ limit, offset, userId });
-    if (search) params.set('search', search);
-
-    const res = await fetch(`/api/list-uploaded-documents?${params}`);
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to load uploaded documents:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText,
-        url: res.url,
-        params: { limit, offset, search }
-      });
-      throw new Error(`Failed to load uploaded documents: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Uploaded documents fetched in ${duration}ms:`, {
-      total: data.total,
-      itemsReturned: data.items?.length || 0,
-      pageOffset: data.pageOffset,
-      pageSize: data.pageSize
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error fetching uploaded documents after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack,
-      params: { limit, offset, search }
-    });
-    throw error;
-  }
+  const params = { limit, offset, userId };
+  if (search) params.search = search;
+  
+  return apiRequest({
+    url: '/api/list-uploaded-documents',
+    params,
+    successMessage: 'Fetching uploaded documents...',
+    errorMessage: 'Failed to load uploaded documents'
+  });
 }
 
 export async function getBlobDocuments({ limit = 50, offset = 0, search = '', userId } = {}) {
-  const startTime = Date.now();
-  console.log('Fetching blob documents...', { limit, offset, search, userId });
-
-  try {
-    const params = new URLSearchParams({ limit, offset, userId });
-    if (search) params.set('search', search);
-
-    const res = await fetch(`/api/list-blob-documents?${params}`);
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to load blob documents:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText,
-        url: res.url,
-        params: { limit, offset, search }
-      });
-      throw new Error(`Failed to load blob documents: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Blob documents fetched in ${duration}ms:`, {
-      total: data.total,
-      itemsReturned: data.items?.length || 0,
-      pageOffset: data.pageOffset,
-      pageSize: data.pageSize,
-      source: data.source
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error fetching blob documents after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack,
-      params: { limit, offset, search }
-    });
-    throw error;
-  }
+  const params = { limit, offset, userId };
+  if (search) params.search = search;
+  
+  return apiRequest({
+    url: '/api/list-blob-documents',
+    params,
+    successMessage: 'Fetching blob documents...',
+    errorMessage: 'Failed to load blob documents'
+  });
 }
 
-export async function updateUploadedDocumentMetadata({
-  documentId,
-  userId,
-  documentName,
-  safeFileName,
-  documentType,
-  version,
-  manualSummary,
-  aiSummary
-}) {
-  const startTime = Date.now();
-  console.log('Updating uploaded document metadata...', {
-    documentId,
-    userId,
-    hasName: typeof documentName !== 'undefined',
-    hasSafeName: typeof safeFileName !== 'undefined',
-    hasType: typeof documentType !== 'undefined',
-    hasVersion: typeof version !== 'undefined',
-    hasManualSummary: typeof manualSummary !== 'undefined',
-    hasSummary: typeof aiSummary !== 'undefined'
+export async function updateUploadedDocumentMetadata({ documentId, userId, documentName, safeFileName, documentType, version, manualSummary, aiSummary }) {
+  return apiRequest({
+    url: '/api/update-uploaded-document',
+    method: 'PUT',
+    body: { documentId, userId, documentName, safeFileName, documentType, version, manualSummary, aiSummary },
+    successMessage: 'Updating uploaded document metadata...',
+    errorMessage: 'Failed to update metadata'
   });
-
-  try {
-    const res = await fetch('/api/update-uploaded-document', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        documentId,
-        userId,
-        documentName,
-        safeFileName,
-        documentType,
-        version,
-        manualSummary,
-        aiSummary
-      })
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to update uploaded document metadata:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText,
-        documentId,
-        userId
-      });
-      throw new Error(`Failed to update metadata: ${res.status} ${res.statusText}`);
-    }
-
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Uploaded document metadata updated in ${duration}ms`, {
-      documentId,
-      userId
-    });
-
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error updating uploaded document metadata after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack,
-      documentId,
-      userId
-    });
-    throw error;
-  }
 }
 
 export async function chatWithDocuments({ message, documentIds = [], conversationHistory = [], userId, attachments = [] }) {
-  const startTime = Date.now();
-  console.log('Sending chat message...', {
-    message: message.substring(0, 100) + '...',
-    documentIds,
-    userId,
-    attachmentCount: attachments.length
+  return apiRequest({
+    url: '/api/chat-with-documents',
+    method: 'POST',
+    body: { message, documentIds, conversationHistory, userId, attachments },
+    successMessage: 'Sending chat message...',
+    errorMessage: 'Failed to send chat message'
   });
-
-  try {
-    const res = await fetch('/api/chat-with-documents', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message,
-        documentIds,
-        conversationHistory,
-        userId,
-        attachments
-      })
-    });
-    
-    if (!res.ok) {
-      let errorMessage = `Failed to send chat message: ${res.status} ${res.statusText}`;
-      let errorDetails = null;
-      
-      try {
-        const errorData = await res.json();
-        if (errorData.error) {
-          errorMessage = errorData.error;
-          errorDetails = errorData.details;
-        }
-      } catch (parseError) {
-        // If parsing fails, fall back to text
-        const errorText = await res.text();
-        console.error('Failed to send chat message:', {
-          status: res.status,
-          statusText: res.statusText,
-          errorText
-        });
-      }
-      
-      console.error('Failed to send chat message:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorMessage,
-        errorDetails
-      });
-      
-      throw new Error(errorDetails ? `${errorMessage}\nDetails: ${errorDetails}` : errorMessage);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Chat response received in ${duration}ms:`, {
-      responseLength: data.response?.length || 0,
-      documentsUsed: data.documents?.length || 0,
-      metadata: data.metadata
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error sending chat message after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
 }
 
 export async function updateManualSummary({ documentId, manualSummary }) {
-  const startTime = Date.now();
-  console.log('Updating manual summary...', { documentId, summaryLength: manualSummary?.length });
-  
-  try {
-    const res = await fetch('/api/update-manual-summary', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        documentId,
-        manualSummary
-      })
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to update manual summary:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText
-      });
-      throw new Error(`Failed to update manual summary: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Manual summary updated in ${duration}ms:`, {
-      documentId: data.document?.id,
-      summaryLength: data.document?.manual_summary?.length
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error updating manual summary after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: '/api/update-manual-summary',
+    method: 'POST',
+    body: { documentId, manualSummary },
+    successMessage: 'Updating manual summary...',
+    errorMessage: 'Failed to update manual summary'
+  });
 }
 
 // External Resources API functions
 export async function getExternalResources() {
-  const startTime = Date.now();
-  console.log('Fetching external resources...');
-  
-  try {
-    const res = await fetch('/api/external-resources');
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to load external resources:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText
-      });
-      throw new Error(`Failed to load external resources: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`External resources fetched in ${duration}ms:`, {
-      count: data.resources?.length || 0
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error fetching external resources after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: '/api/external-resources',
+    successMessage: 'Fetching external resources...',
+    errorMessage: 'Failed to load external resources'
+  });
 }
 
 export async function createExternalResource({ title, url, description, category, tags }) {
-  const startTime = Date.now();
-  console.log('Creating external resource...', { title, url, category });
-  
-  try {
-    const res = await fetch('/api/external-resources', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        title,
-        url,
-        description,
-        category,
-        tags
-      })
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to create external resource:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error,
-        details: errorData.details
-      });
-      throw new Error(errorData.error || `Failed to create external resource: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`External resource created in ${duration}ms:`, {
-      id: data.resource?.id,
-      title: data.resource?.title
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error creating external resource after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: '/api/external-resources',
+    method: 'POST',
+    body: { title, url, description, category, tags },
+    successMessage: 'Creating external resource...',
+    errorMessage: 'Failed to create external resource'
+  });
 }
 
 export async function updateExternalResource({ id, title, url, description, category, tags }) {
-  const startTime = Date.now();
-  console.log('Updating external resource...', { id, title, url, category });
-  
-  try {
-    const res = await fetch(`/api/external-resources/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        title,
-        url,
-        description,
-        category,
-        tags
-      })
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to update external resource:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error,
-        details: errorData.details
-      });
-      throw new Error(errorData.error || `Failed to update external resource: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`External resource updated in ${duration}ms:`, {
-      id: data.resource?.id,
-      title: data.resource?.title
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error updating external resource after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: `/api/external-resources/${id}`,
+    method: 'PUT',
+    body: { title, url, description, category, tags },
+    successMessage: 'Updating external resource...',
+    errorMessage: 'Failed to update external resource'
+  });
 }
 
 export async function deleteExternalResource({ id }) {
-  const startTime = Date.now();
-  console.log('Deleting external resource...', { id });
-  
-  try {
-    const res = await fetch(`/api/external-resources/${id}`, {
-      method: 'DELETE'
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to delete external resource:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error
-      });
-      throw new Error(errorData.error || `Failed to delete external resource: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`External resource deleted in ${duration}ms:`, {
-      id
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error deleting external resource after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: `/api/external-resources/${id}`,
+    method: 'DELETE',
+    successMessage: 'Deleting external resource...',
+    errorMessage: 'Failed to delete external resource'
+  });
 }
 
 export async function updateUserProfile({ userId, name, picture, accessToken }) {
-  const startTime = Date.now();
-  console.log('Updating user profile...', { userId, name, picture });
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
   
-  try {
-    const headers = {
-      'Content-Type': 'application/json',
-    };
-    
-    // Add Authorization header if access token is provided
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
-    }
-    
-    const res = await fetch('/api/update-user-profile', {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify({
-        userId,
-        name,
-        picture
-      })
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to update user profile:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error,
-        details: errorData.details
-      });
-      throw new Error(errorData.error || `Failed to update user profile: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`User profile updated in ${duration}ms:`, {
-      userId: data.user?.sub,
-      name: data.user?.name
-    });
-    
-    return data.user;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error updating user profile after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  const data = await apiRequest({
+    url: '/api/update-user-profile',
+    method: 'PUT',
+    body: { userId, name, picture },
+    headers,
+    successMessage: 'Updating user profile...',
+    errorMessage: 'Failed to update user profile'
+  });
+  
+  return data.user;
 }
 
 export async function changeUserPassword({ currentPassword, newPassword, userId, accessToken }) {
-  const startTime = Date.now();
-  console.log('Changing user password...');
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
   
-  try {
-    const headers = {
-      'Content-Type': 'application/json',
-    };
-    
-    // Add Authorization header if access token is provided
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
-    }
-    
-    const res = await fetch('/api/change-user-password', {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify({
-        currentPassword,
-        newPassword,
-        userId  // Add userId to the request body
-      })
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to change password:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error,
-        details: errorData.details
-      });
-      throw new Error(errorData.error || `Failed to change password: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Password changed successfully in ${duration}ms`);
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error changing password after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: '/api/change-user-password',
+    method: 'PUT',
+    body: { currentPassword, newPassword, userId },
+    headers,
+    successMessage: 'Changing user password...',
+    errorMessage: 'Failed to change password'
+  });
 }
 
 // Q&A Interactions API functions
 export async function getQAInteractions({ page = 1, limit = 50, search = '', user_id, session_id } = {}) {
-  const startTime = Date.now();
-  console.log('Fetching Q&A interactions...', { page, limit, search, user_id, session_id });
+  const params = { page, limit };
+  if (search) params.search = search;
+  if (user_id) params.user_id = user_id;
+  if (session_id) params.session_id = session_id;
   
-  try {
-    const params = new URLSearchParams({ page, limit });
-    if (search) params.set('search', search);
-    if (user_id) params.set('user_id', user_id);
-    if (session_id) params.set('session_id', session_id);
-    
-    const res = await fetch(`/api/qa-interactions?${params}`);
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to load Q&A interactions:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText
-      });
-      throw new Error(`Failed to load Q&A interactions: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Q&A interactions fetched in ${duration}ms:`, {
-      total: data.data?.total || 0,
-      itemsReturned: data.data?.items?.length || 0,
-      page: data.data?.page,
-      totalPages: data.data?.totalPages
-    });
-    
-    return data.data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error fetching Q&A interactions after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  const data = await apiRequest({
+    url: '/api/qa-interactions',
+    params,
+    successMessage: 'Fetching Q&A interactions...',
+    errorMessage: 'Failed to load Q&A interactions'
+  });
+  
+  return extractData(data, 'data');
 }
 
 export async function createQAInteraction({ question, answer, document_ids = [], document_names = [], user_id, session_id, user_rating = null, feedback_notes = null }) {
-  const startTime = Date.now();
-  console.log('Creating Q&A interaction...', { question: question.substring(0, 100) + '...' });
+  const data = await apiRequest({
+    url: '/api/qa-interactions',
+    method: 'POST',
+    body: { question, answer, document_ids, document_names, user_id, session_id, user_rating, feedback_notes },
+    successMessage: 'Creating Q&A interaction...',
+    errorMessage: 'Failed to create Q&A interaction'
+  });
   
-  try {
-    const res = await fetch('/api/qa-interactions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        question,
-        answer,
-        document_ids,
-        document_names,
-        user_id,
-        session_id,
-        user_rating,
-        feedback_notes
-      })
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to create Q&A interaction:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error
-      });
-      throw new Error(errorData.error || `Failed to create Q&A interaction: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Q&A interaction created in ${duration}ms:`, {
-      id: data.data?.id
-    });
-    
-    return data.data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error creating Q&A interaction after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return extractData(data, 'data');
 }
 
 export async function updateQAFeedback({ interactionId, user_rating, feedback_notes = null }) {
-  const startTime = Date.now();
-  console.log('Updating Q&A feedback...', { interactionId, user_rating });
+  const data = await apiRequest({
+    url: `/api/qa-interactions/${interactionId}/feedback`,
+    method: 'PUT',
+    body: { user_rating, feedback_notes },
+    successMessage: 'Updating Q&A feedback...',
+    errorMessage: 'Failed to update Q&A feedback'
+  });
   
-  try {
-    const res = await fetch(`/api/qa-interactions/${interactionId}/feedback`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user_rating,
-        feedback_notes
-      })
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to update Q&A feedback:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error
-      });
-      throw new Error(errorData.error || `Failed to update Q&A feedback: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Q&A feedback updated in ${duration}ms:`, {
-      interactionId: data.data?.id,
-      rating: data.data?.user_rating
-    });
-    
-    return data.data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error updating Q&A feedback after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return extractData(data, 'data');
 }
 
 export async function deleteQAInteraction({ id }) {
-  const startTime = Date.now();
-  console.log('Deleting Q&A interaction...', { id });
-  
-  try {
-    const res = await fetch(`/api/qa-interactions/${id}`, {
-      method: 'DELETE'
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to delete Q&A interaction:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error
-      });
-      throw new Error(errorData.error || `Failed to delete Q&A interaction: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Q&A interaction deleted in ${duration}ms:`, {
-      id
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error deleting Q&A interaction after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: `/api/qa-interactions/${id}`,
+    method: 'DELETE',
+    successMessage: 'Deleting Q&A interaction...',
+    errorMessage: 'Failed to delete Q&A interaction'
+  });
 }
 
 export async function exportQAInteractions({ search = '', user_id, session_id, start_date, end_date } = {}) {
-  const startTime = Date.now();
-  console.log('Exporting Q&A interactions...', { search, user_id, session_id, start_date, end_date });
+  const params = {};
+  if (search) params.search = search;
+  if (user_id) params.user_id = user_id;
+  if (session_id) params.session_id = session_id;
+  if (start_date) params.start_date = start_date;
+  if (end_date) params.end_date = end_date;
   
-  try {
-    const params = new URLSearchParams();
-    if (search) params.set('search', search);
-    if (user_id) params.set('user_id', user_id);
-    if (session_id) params.set('session_id', session_id);
-    if (start_date) params.set('start_date', start_date);
-    if (end_date) params.set('end_date', end_date);
-    
-    const res = await fetch(`/api/qa-interactions/export?${params}`);
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to export Q&A interactions:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText
-      });
-      throw new Error(`Failed to export Q&A interactions: ${res.status} ${res.statusText}`);
-    }
-    
-    const csvContent = await res.text();
-    const duration = Date.now() - startTime;
-    console.log(`Q&A interactions exported in ${duration}ms:`, {
-      contentLength: csvContent.length
-    });
-    
-    // Create and download the CSV file
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `qa-interactions-${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-    
-    return { success: true, contentLength: csvContent.length };
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error exporting Q&A interactions after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  const csvContent = await fetch(`/api/qa-interactions/export?${new URLSearchParams(params)}`)
+    .then(res => res.ok ? res.text() : Promise.reject(new Error(`Failed to export: ${res.status}`)));
+  
+  // Create and download the CSV file
+  const blob = new Blob([csvContent], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `qa-interactions-${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+  
+  return { success: true, contentLength: csvContent.length };
 }
 
 // Workflow Instances API functions
 export async function getWorkflowInstances({ status, limit = 50, offset = 0, userId, viewMode = 'my_workflows', isAdmin = false } = {}) {
-  const startTime = Date.now();
-  console.log('Fetching workflow instances...', { status, limit, offset, userId, viewMode, isAdmin });
+  const params = { limit, offset };
+  if (status) params.status = status;
+  if (userId) params.userId = userId;
+  if (viewMode) params.viewMode = viewMode;
+  if (isAdmin) params.isAdmin = isAdmin;
   
-  try {
-    const params = new URLSearchParams({ limit, offset });
-    if (status) params.set('status', status);
-    if (userId) params.set('userId', userId);
-    if (viewMode) params.set('viewMode', viewMode);
-    if (isAdmin) params.set('isAdmin', isAdmin);
-    
-    const res = await fetch(`/api/workflow-management/workflow-instances?${params}`);
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to load workflow instances:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText
-      });
-      throw new Error(`Failed to load workflow instances: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Workflow instances fetched in ${duration}ms:`, {
-      count: data.instances?.length || 0
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error fetching workflow instances after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: '/api/workflow-management/workflow-instances',
+    params,
+    successMessage: 'Fetching workflow instances...',
+    errorMessage: 'Failed to load workflow instances'
+  });
 }
 
 export async function updateWorkflowVisibility({ instanceId, isPublic, userId, isAdmin = false }) {
-  const startTime = Date.now();
-  console.log('Updating workflow visibility...', { instanceId, isPublic, userId, isAdmin });
-  
-  try {
-    const res = await fetch(`/api/workflow-management/workflow-instances/${instanceId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        isPublic,
-        userId,
-        isAdmin
-      })
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to update workflow visibility:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText
-      });
-      throw new Error(`Failed to update workflow visibility: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Workflow visibility updated in ${duration}ms:`, {
-      instanceId,
-      isPublic
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error updating workflow visibility after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: `/api/workflow-management/workflow-instances/${instanceId}`,
+    method: 'PUT',
+    body: { isPublic, userId, isAdmin },
+    successMessage: 'Updating workflow visibility...',
+    errorMessage: 'Failed to update workflow visibility'
+  });
 }
 
 export async function repolishWorkflowDocument({ instanceId, editedDocument }) {
-  const startTime = Date.now();
-  console.log('Re-polishing workflow document...', { instanceId, contentLength: editedDocument?.length });
-  
-  try {
-    const res = await fetch('/api/workflow-execution/repolish-document', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        instanceId,
-        editedDocument
-      })
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to re-polish document:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error
-      });
-      throw new Error(errorData.error || `Failed to re-polish document: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Document re-polished in ${duration}ms:`, {
-      versions: data.versions?.length || 0,
-      currentVersion: data.currentVersion,
-      hasImprovements: data.hasAiImprovements
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error re-polishing document after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: '/api/workflow-execution/repolish-document',
+    method: 'POST',
+    body: { instanceId, editedDocument },
+    successMessage: 'Re-polishing workflow document...',
+    errorMessage: 'Failed to re-polish document'
+  });
 }
 
 export async function refineWorkflowDocument({ instanceId, currentDocument, instructions }) {
-  const startTime = Date.now();
-  console.log('Refining workflow document with AI...', { 
-    instanceId, 
-    contentLength: currentDocument?.length,
-    instructionsLength: instructions?.length 
+  return apiRequest({
+    url: '/api/workflow-execution/refine-document',
+    method: 'POST',
+    body: { instanceId, currentDocument, instructions },
+    successMessage: 'Refining workflow document with AI...',
+    errorMessage: 'Failed to refine document'
   });
-  
-  try {
-    const res = await fetch('/api/workflow-execution/refine-document', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        instanceId,
-        currentDocument,
-        instructions
-      })
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to refine document:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error
-      });
-      throw new Error(errorData.error || `Failed to refine document: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Document refined in ${duration}ms:`, {
-      versions: data.versions?.length || 0,
-      currentVersion: data.currentVersion,
-      hasImprovements: data.hasAiImprovements,
-      aiSuggestions: data.aiSuggestions
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error refining document after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
 }
 
 export async function regenerateDocumentSummary({ documentId, sourceType }) {
-  const startTime = Date.now();
-  console.log('Regenerating document summary...', { documentId, sourceType });
-  
-  try {
-    const res = await fetch('/api/regenerate-document-summary', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        documentId,
-        sourceType
-      })
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to regenerate document summary:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error
-      });
-      throw new Error(errorData.error || `Failed to regenerate summary: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Document summary regenerated in ${duration}ms:`, {
-      documentId: data.documentId,
-      documentName: data.documentName,
-      summaryLength: data.summaryLength,
-      chunksRegenerated: data.chunksRegenerated,
-      chunkCount: data.chunkCount
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error regenerating document summary after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: '/api/regenerate-document-summary',
+    method: 'POST',
+    body: { documentId, sourceType },
+    successMessage: 'Regenerating document summary...',
+    errorMessage: 'Failed to regenerate summary'
+  });
 }
 
 export async function acceptRegeneratedSummary({ documentId, newSummary }) {
-  const startTime = Date.now();
-  console.log('Accepting regenerated summary...', { documentId, summaryLength: newSummary?.length });
-  
-  try {
-    const res = await fetch('/api/accept-regenerated-summary', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        documentId,
-        newSummary
-      })
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to accept regenerated summary:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error
-      });
-      throw new Error(errorData.error || `Failed to accept summary: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Regenerated summary accepted in ${duration}ms:`, {
-      documentId: data.documentId,
-      summaryLength: data.summary?.length
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error accepting regenerated summary after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: '/api/accept-regenerated-summary',
+    method: 'POST',
+    body: { documentId, newSummary },
+    successMessage: 'Accepting regenerated summary...',
+    errorMessage: 'Failed to accept summary'
+  });
 }
 
-// Pause a workflow instance
 export async function pauseWorkflow({ instanceId, userId }) {
-  const startTime = Date.now();
-  console.log('Pausing workflow...', { instanceId, userId });
-  
-  try {
-    const res = await fetch('/api/workflow-execution/pause-workflow', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ instanceId, userId })
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to pause workflow:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText
-      });
-      throw new Error(`Failed to pause workflow: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Workflow paused in ${duration}ms:`, {
-      instanceId,
-      success: data.success
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error pausing workflow after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: '/api/workflow-execution/pause-workflow',
+    method: 'POST',
+    body: { instanceId, userId },
+    successMessage: 'Pausing workflow...',
+    errorMessage: 'Failed to pause workflow'
+  });
 }
 
-// Resume a paused workflow instance
 export async function resumeWorkflow({ instanceId, userId }) {
-  const startTime = Date.now();
-  console.log('Resuming workflow...', { instanceId, userId });
-  
-  try {
-    const res = await fetch('/api/workflow-execution/resume-workflow', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ instanceId, userId })
-    });
-    
-    if (!res.ok) {
-      const error = await res.json();
-      console.error('Failed to resume workflow:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: error.error
-      });
-      throw new Error(error.error || 'Failed to resume workflow');
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Workflow resumed in ${duration}ms:`, {
-      instanceId,
-      success: data.success,
-      workflowName: data.instance?.workflowName
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error resuming workflow after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: '/api/workflow-execution/resume-workflow',
+    method: 'POST',
+    body: { instanceId, userId },
+    successMessage: 'Resuming workflow...',
+    errorMessage: 'Failed to resume workflow'
+  });
 }
 
-// Delete a workflow instance
 export async function deleteWorkflow({ instanceId, userId }) {
-  const startTime = Date.now();
-  console.log('Deleting workflow...', { instanceId, userId });
-  
-  try {
-    const res = await fetch('/api/workflow-execution/delete-workflow', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ instanceId, userId })
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('Failed to delete workflow:', {
-        status: res.status,
-        statusText: res.statusText,
-        errorText
-      });
-      throw new Error(`Failed to delete workflow: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Workflow deleted in ${duration}ms:`, {
-      instanceId,
-      success: data.success
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error deleting workflow after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: '/api/workflow-execution/delete-workflow',
+    method: 'POST',
+    body: { instanceId, userId },
+    successMessage: 'Deleting workflow...',
+    errorMessage: 'Failed to delete workflow'
+  });
 }
 
-// Save a chat session
+// Chat session functions
 export async function saveChatSession({ userId, sessionName, conversationHistory, documentMetadata }) {
-  const startTime = Date.now();
-  console.log('Saving chat session...', { userId, sessionName, messageCount: conversationHistory?.length });
+  const data = await apiRequest({
+    url: '/api/chat-sessions',
+    method: 'POST',
+    body: { user_id: userId, session_name: sessionName, conversation_history: conversationHistory, document_metadata: documentMetadata },
+    successMessage: 'Saving chat session...',
+    errorMessage: 'Failed to save chat session'
+  });
   
-  try {
-    const res = await fetch('/api/chat-sessions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user_id: userId,
-        session_name: sessionName,
-        conversation_history: conversationHistory,
-        document_metadata: documentMetadata
-      })
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to save chat session:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error
-      });
-      throw new Error(errorData.error || `Failed to save chat session: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Chat session saved in ${duration}ms:`, {
-      sessionId: data.data?.id,
-      sessionName: data.data?.session_name,
-      messageCount: data.data?.message_count
-    });
-    
-    return data.data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error saving chat session after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return extractData(data, 'data');
 }
 
-// Get chat sessions with pagination and filtering
 export async function getChatSessions({ userId, limit = 20, offset = 0, searchText, startDate, endDate }) {
-  const startTime = Date.now();
-  console.log('Fetching chat sessions...', { userId, limit, offset, searchText, startDate, endDate });
+  const params = { user_id: userId, limit, offset };
+  if (searchText) params.search = searchText;
+  if (startDate) params.startDate = startDate;
+  if (endDate) params.endDate = endDate;
   
-  try {
-    const params = new URLSearchParams({ user_id: userId, limit, offset });
-    if (searchText) params.set('search', searchText);
-    if (startDate) params.set('startDate', startDate);
-    if (endDate) params.set('endDate', endDate);
-    
-    const res = await fetch(`/api/chat-sessions?${params}`);
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to fetch chat sessions:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error
-      });
-      throw new Error(errorData.error || `Failed to fetch chat sessions: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Chat sessions fetched in ${duration}ms:`, {
-      sessionCount: data.data?.items?.length || 0,
-      total: data.data?.total || 0
-    });
-    
-    return data.data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error fetching chat sessions after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  const data = await apiRequest({
+    url: '/api/chat-sessions',
+    params,
+    successMessage: 'Fetching chat sessions...',
+    errorMessage: 'Failed to fetch chat sessions'
+  });
+  
+  return extractData(data, 'data');
 }
 
-// Get a specific chat session
 export async function getChatSession({ sessionId }) {
-  const startTime = Date.now();
-  console.log('Fetching chat session...', { sessionId });
+  const data = await apiRequest({
+    url: `/api/chat-sessions/${sessionId}`,
+    successMessage: 'Fetching chat session...',
+    errorMessage: 'Failed to fetch chat session'
+  });
   
-  try {
-    const res = await fetch(`/api/chat-sessions/${sessionId}`);
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to fetch chat session:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error
-      });
-      throw new Error(errorData.error || `Failed to fetch chat session: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Chat session fetched in ${duration}ms:`, {
-      sessionId: data.data?.id,
-      messageCount: data.data?.message_count
-    });
-    
-    return data.data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error fetching chat session after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return extractData(data, 'data');
 }
 
-// Update chat session name
 export async function updateChatSessionName({ sessionId, sessionName }) {
-  const startTime = Date.now();
-  console.log('Updating chat session name...', { sessionId, sessionName });
+  const data = await apiRequest({
+    url: `/api/chat-sessions/${sessionId}`,
+    method: 'PUT',
+    body: { session_name: sessionName },
+    successMessage: 'Updating chat session name...',
+    errorMessage: 'Failed to update chat session name'
+  });
   
-  try {
-    const res = await fetch(`/api/chat-sessions/${sessionId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ session_name: sessionName })
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to update chat session name:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error
-      });
-      throw new Error(errorData.error || `Failed to update chat session name: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Chat session name updated in ${duration}ms:`, {
-      sessionId: data.data?.id,
-      sessionName: data.data?.session_name
-    });
-    
-    return data.data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error updating chat session name after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return extractData(data, 'data');
 }
 
-// Delete a chat session
 export async function deleteChatSession({ sessionId }) {
-  const startTime = Date.now();
-  console.log('Deleting chat session...', { sessionId });
-  
-  try {
-    const res = await fetch(`/api/chat-sessions/${sessionId}`, {
-      method: 'DELETE'
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error('Failed to delete chat session:', {
-        status: res.status,
-        statusText: res.statusText,
-        error: errorData.error
-      });
-      throw new Error(errorData.error || `Failed to delete chat session: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    const duration = Date.now() - startTime;
-    console.log(`Chat session deleted in ${duration}ms:`, {
-      sessionId: data.data?.id,
-      success: data.success
-    });
-    
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`Error deleting chat session after ${duration}ms:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
+  return apiRequest({
+    url: `/api/chat-sessions/${sessionId}`,
+    method: 'DELETE',
+    successMessage: 'Deleting chat session...',
+    errorMessage: 'Failed to delete chat session'
+  });
 }
