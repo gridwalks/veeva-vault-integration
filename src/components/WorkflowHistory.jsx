@@ -86,6 +86,13 @@ export default function WorkflowHistory() {
       
       alert('Workflow resumed! Switching to chat...');
       
+      // Close the My Notebook modal by sending a close message
+      if (window.parent && window.parent.postMessage) {
+        window.parent.postMessage({
+          type: 'CLOSE_MY_NOTEBOOK'
+        }, '*');
+      }
+      
       // Reload instances to reflect the status change
       await loadInstances();
       

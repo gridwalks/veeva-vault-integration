@@ -80,6 +80,9 @@ useEffect(() => {
       console.log('Received resume workflow message:', event.data);
       setResumeWorkflowId(event.data.instanceId);
       setCurrentScreen('main'); // Switch to main chat screen
+    } else if (event.data && event.data.type === 'CLOSE_MY_NOTEBOOK') {
+      console.log('Received close My Notebook message');
+      setShowMyNotebook(false); // Close the My Notebook modal
     }
   };
 
