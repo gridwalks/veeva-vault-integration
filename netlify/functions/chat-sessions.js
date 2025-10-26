@@ -202,7 +202,7 @@ async function getChatSessions(pool, queryParams, headers) {
       ORDER BY created_at DESC
       LIMIT $${paramCount} OFFSET $${paramCount + 1}
     `;
-    queryParams_array.push(limit, offset);
+    queryParams_array.push(parseInt(limit), parseInt(offset));
     
     const dataResult = await pool.query(dataQuery, queryParams_array);
     
