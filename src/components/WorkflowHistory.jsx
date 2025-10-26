@@ -18,7 +18,7 @@ export default function WorkflowHistory() {
   // Filter state
   const [filters, setFilters] = useState({
     workflowType: 'all',
-    status: 'completed',
+    status: 'all',
     searchText: '',
     startDate: '',
     endDate: ''
@@ -207,7 +207,7 @@ export default function WorkflowHistory() {
   const clearFilters = () => {
     setFilters({
       workflowType: 'all',
-      status: 'completed',
+      status: 'all',
       searchText: '',
       startDate: '',
       endDate: ''
