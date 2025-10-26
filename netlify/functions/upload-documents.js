@@ -1,19 +1,11 @@
-import { Pool } from 'pg';
+import { getPool, initDatabase } from './db.js';
 import { OpenAI } from 'openai';
 import Groq from 'groq-sdk';
 import { createHash } from 'crypto';
-// Dynamic imports to avoid test file issues
-// import mammoth from 'mammoth';
-// import { parseDocument } from 'docx-parser';
-// import pdfParse from 'pdf-parse';
-// import { chunkText, validateChunks } from './chunking-utils.js';
 import { getStore } from '@netlify/blobs';
 import { ensureUploadedDocumentColumnSupport } from './uploaded-document-columns.js';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+import { extractTextFromFile } from './text-extraction-utils.js';
+import { getCorsHeaders } from './shared-utils.js';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -98,91 +90,7 @@ function parseMultipartFormData(body, contentType, isBase64Encoded = true) {
 //   return null;
 // }
 
-// Helper function to extract text from different file types
-async function extractTextFromFile(fileBuffer, fileName) {
-  const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
-  let extractedText = '';
-  let extractionMethod = '';
-
-  console.log(`Extracting text from ${fileName} (${fileExtension})`);
-
-  try {
-    if (fileExtension === 'txt' || fileExtension === 'rtf') {
-      extractedText = fileBuffer.toString('utf-8');
-      extractionMethod = 'utf8';
-    } else if (fileExtension === 'pdf') {
-      try {
-        console.log(`Attempting PDF text extraction for ${fileName}...`);
-        
-        // Use the PDF extraction wrapper to handle pdf-parse issues
-        const { extractTextFromPDF, createPDFFallbackText, createScannedPDFText } = await import('./pdf-extraction-wrapper.js');
-        
-        const pdfResult = await extractTextFromPDF(fileBuffer, fileName);
-        
-        if (pdfResult.text && pdfResult.text.trim().length >= 10) {
-          extractedText = pdfResult.text;
-          extractionMethod = pdfResult.method;
-          
-          console.log('PDF extraction successful:', {
-            method: pdfResult.method,
-            pages: pdfResult.pages,
-            textLength: pdfResult.text.length
-          });
-        } else if (pdfResult.method === 'pdf_extraction_failed') {
-          // Use the structured fallback text
-          extractedText = createPDFFallbackText(fileName, fileBuffer.length, pdfResult.error);
-          extractionMethod = 'pdf_extraction_failed';
-        } else {
-          // PDF was processed but appears to be scanned
-          extractedText = createScannedPDFText(fileName, fileBuffer.length);
-          extractionMethod = 'pdf_scanned_document';
-        }
-        
-      } catch (pdfError) {
-        console.error(`PDF extraction failed for ${fileName}:`, pdfError);
-        extractedText = `[PDF Content: ${fileName}] - PDF text extraction failed: ${pdfError.message}`;
-        extractionMethod = 'pdf_error_fallback';
-      }
-    } else if (fileExtension === 'docx') {
-      try {
-        const mammoth = await import('mammoth');
-        const result = await mammoth.default.extractRawText({ buffer: fileBuffer });
-        extractedText = result.value;
-        extractionMethod = 'mammoth';
-      } catch (mammothError) {
-        console.log('Mammoth failed, trying docx-parser...');
-        try {
-          const { parseDocument } = await import('docx-parser');
-          const docxResult = await parseDocument(fileBuffer);
-          extractedText = docxResult.text || '';
-          extractionMethod = 'docx_parser';
-        } catch (docxError) {
-          console.error('Both docx extraction methods failed:', docxError);
-          extractedText = `[DOCX Content: ${fileName}] - Text extraction failed`;
-          extractionMethod = 'extraction_failed';
-        }
-      }
-    } else if (fileExtension === 'doc') {
-      extractedText = `[DOC Content: ${fileName}] - DOC text extraction not yet implemented`;
-      extractionMethod = 'doc_placeholder';
-    } else if (fileExtension === 'csv') {
-      extractedText = fileBuffer.toString('utf-8');
-      extractionMethod = 'csv';
-    } else if (fileExtension === 'zip') {
-      extractedText = `[ZIP Archive: ${fileName}] - ZIP processing not yet implemented`;
-      extractionMethod = 'zip_placeholder';
-    } else {
-      extractedText = `[Unknown file type: ${fileName}]`;
-      extractionMethod = 'unknown';
-    }
-
-    console.log(`Text extraction completed for ${fileName}: ${extractedText.length} characters using ${extractionMethod}`);
-    return { text: extractedText, method: extractionMethod };
-  } catch (error) {
-    console.error(`Error extracting text from ${fileName}:`, error);
-    return { text: `[Error extracting text from ${fileName}]`, method: 'error' };
-  }
-}
+// Note: extractTextFromFile is imported from text-extraction-utils.js to avoid duplication
 
 // Helper function to generate AI summary
 async function generateSummary(text, fileName) {
@@ -652,15 +560,18 @@ export const handler = async (event) => {
     }
   });
 
+  // Initialize database connection
+  await initDatabase();
+  const pool = getPool();
+
+  // Get CORS headers
+  const corsHeaders = getCorsHeaders(['POST', 'OPTIONS']);
+
   // Handle OPTIONS request for CORS
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS'
-      },
+      headers: corsHeaders,
       body: ''
     };
   }
@@ -669,11 +580,9 @@ export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      },
+      headers: corsHeaders,
       body: JSON.stringify({
+        success: false,
         error: 'Method not allowed',
         allowedMethods: ['POST', 'OPTIONS']
       })
@@ -700,12 +609,7 @@ export const handler = async (event) => {
       console.error('Error parsing multipart form data:', parseError);
       return {
         statusCode: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS'
-        },
+        headers: corsHeaders,
         body: JSON.stringify({
           success: false,
           error: 'Failed to parse form data',
@@ -761,12 +665,7 @@ export const handler = async (event) => {
     if (files.length === 0) {
       return {
         statusCode: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS'
-        },
+        headers: corsHeaders,
         body: JSON.stringify({
           success: false,
           error: 'No files received'
@@ -778,12 +677,7 @@ export const handler = async (event) => {
     if (!userId) {
       return {
         statusCode: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS'
-        },
+        headers: corsHeaders,
         body: JSON.stringify({
           success: false,
           error: 'User ID is required for document upload'
@@ -1061,12 +955,7 @@ export const handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS'
-      },
+      headers: corsHeaders,
       body: JSON.stringify({
         success: true,
         message: `Successfully processed ${successCount} of ${files.length} files`,
@@ -1094,12 +983,7 @@ export const handler = async (event) => {
     
     return {
       statusCode: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS'
-      },
+      headers: corsHeaders,
       body: JSON.stringify({
         success: false,
         error: 'Upload failed',
