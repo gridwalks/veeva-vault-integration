@@ -1,7 +1,8 @@
 import { getStore } from '@netlify/blobs';
 import { writeBlobAudit } from './blob-audit.js';
+import { STORE_NAMES } from './blob-storage-config.js';
 
-const STORE_NAME = 'chat-uploads';
+const STORE_NAME = STORE_NAMES.UPLOADS;
 const MAX_BLOB_AGE_MS = 48 * 60 * 60 * 1000; // 48 hours
 
 function parseTimestamp(value) {

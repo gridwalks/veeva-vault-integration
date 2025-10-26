@@ -52,7 +52,8 @@ export const handler = async (event) => {
 
     // Initialize blob store
     console.log('Initializing blob store...');
-    const STORE_NAME = 'chat-uploads';
+    const { STORE_NAMES } = await import('./blob-storage-config.js');
+    const STORE_NAME = STORE_NAMES.UPLOADS;
     let store;
     try {
       store = await getStore({

@@ -4,41 +4,12 @@ import { writeBlobAudit } from './blob-audit.js';
 import { getPool } from './db.js';
 import { ensureUploadedDocumentColumnSupport } from './uploaded-document-columns.js';
 import { OpenAI } from 'openai';
-import mammoth from 'mammoth';
-import { parseDocument } from 'docx-parser';
 import { chunkText } from './chunking-utils.js';
+import { generateSafeFileName } from './utils.js';
+import { STORE_NAMES } from './blob-storage-config.js';
+import { extractTextFromFile } from './text-extraction-utils.js';
 
-const STORE_NAME = 'chat-uploads';
-
-function generateSafeFileName(fileName) {
-  if (!fileName) {
-    return '';
-  }
-
-  const trimmed = fileName.trim();
-  if (!trimmed) {
-    return '';
-  }
-
-  const lower = trimmed.toLowerCase();
-  const lastDotIndex = lower.lastIndexOf('.');
-  let base = lower;
-  let extension = '';
-
-  if (lastDotIndex > 0 && lastDotIndex < lower.length - 1) {
-    base = lower.substring(0, lastDotIndex);
-    extension = lower.substring(lastDotIndex + 1);
-  }
-
-  const safeBase = base
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+/, '')
-    .replace(/-+$/, '')
-    .substring(0, 96) || 'document';
-
-  const safeExtension = extension.replace(/[^a-z0-9]+/g, '').substring(0, 16);
-  return safeExtension ? `${safeBase}.${safeExtension}` : safeBase;
-}
+const STORE_NAME = STORE_NAMES.UPLOADS;
 
 // Function to log indexing activities
 async function logIndexingActivity(pool, logData) {
@@ -134,64 +105,7 @@ async function generateSignedUrl(store, key, expiresAt) {
   return null;
 }
 
-// Helper function to extract text from different file types
-async function extractTextFromFile(fileBuffer, fileName) {
-  const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
-  
-  try {
-    switch (fileExtension) {
-      case 'pdf':
-        try {
-          // Use the PDF extraction wrapper to handle pdf-parse issues
-          const { extractTextFromPDF, createPDFFallbackText, createScannedPDFText } = await import('./pdf-extraction-wrapper.js');
-          
-          const pdfResult = await extractTextFromPDF(fileBuffer, fileName);
-          
-          if (pdfResult.text && pdfResult.text.trim().length >= 10) {
-            return { text: pdfResult.text, method: pdfResult.method };
-          } else if (pdfResult.method === 'pdf_extraction_failed') {
-            // Use the structured fallback text
-            return { 
-              text: createPDFFallbackText(fileName, fileBuffer.length, pdfResult.error), 
-              method: 'pdf_extraction_failed' 
-            };
-          } else {
-            // PDF was processed but appears to be scanned
-            return { 
-              text: createScannedPDFText(fileName, fileBuffer.length), 
-              method: 'pdf_scanned_document' 
-            };
-          }
-        } catch (pdfError) {
-          console.error(`PDF extraction failed for ${fileName}:`, pdfError);
-          return { 
-            text: `[PDF Content: ${fileName}] - PDF text extraction failed: ${pdfError.message}`, 
-            method: 'pdf_error_fallback' 
-          };
-        }
-        
-      case 'docx':
-        const docxResult = await parseDocument(fileBuffer);
-        return { text: docxResult.text || '', method: 'docx' };
-        
-      case 'doc':
-        const docResult = await mammoth.extractRawText({ buffer: fileBuffer });
-        return { text: docResult.value || '', method: 'doc' };
-        
-      case 'txt':
-        return { text: fileBuffer.toString('utf-8'), method: 'txt' };
-        
-      case 'csv':
-        return { text: fileBuffer.toString('utf-8'), method: 'csv' };
-        
-      default:
-        return { text: `[Unsupported file type: ${fileExtension}]`, method: 'unsupported' };
-    }
-  } catch (error) {
-    console.error(`Error extracting text from ${fileName}:`, error);
-    return { text: `[Error extracting text from ${fileName}: ${error.message}]`, method: 'error' };
-  }
-}
+// Note: extractTextFromFile is now imported from text-extraction-utils.js
 
 // Helper function to process and index the uploaded document
 async function processAndIndexDocument(fileBuffer, fileName, blobKey, userId = null) {

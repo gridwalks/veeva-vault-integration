@@ -1,7 +1,8 @@
 import { getStore } from '@netlify/blobs';
 import { writeBlobAudit } from './blob-audit.js';
+import { STORE_NAMES } from './blob-storage-config.js';
 
-const STORE_NAME = 'chat-uploads';
+const STORE_NAME = STORE_NAMES.UPLOADS;
 
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {

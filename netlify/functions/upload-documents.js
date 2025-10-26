@@ -6,6 +6,7 @@ import { getStore } from '@netlify/blobs';
 import { ensureUploadedDocumentColumnSupport } from './uploaded-document-columns.js';
 import { extractTextFromFile } from './text-extraction-utils.js';
 import { getCorsHeaders } from './shared-utils.js';
+import { generateSafeFileName } from './utils.js';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -226,35 +227,7 @@ async function createDocumentsTable() {
 }
 
 // Helper function to store document in database
-function generateSafeFileName(fileName) {
-  if (!fileName) {
-    return '';
-  }
-
-  const trimmed = fileName.trim();
-  if (!trimmed) {
-    return '';
-  }
-
-  const lower = trimmed.toLowerCase();
-  const lastDotIndex = lower.lastIndexOf('.');
-  let base = lower;
-  let extension = '';
-
-  if (lastDotIndex > 0 && lastDotIndex < lower.length - 1) {
-    base = lower.substring(0, lastDotIndex);
-    extension = lower.substring(lastDotIndex + 1);
-  }
-
-  const safeBase = base
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+/, '')
-    .replace(/-+$/, '')
-    .substring(0, 96) || 'document';
-
-  const safeExtension = extension.replace(/[^a-z0-9]+/g, '').substring(0, 16);
-  return safeExtension ? `${safeBase}.${safeExtension}` : safeBase;
-}
+// Note: generateSafeFileName is now imported from utils.js
 
 async function storeDocument(fileName, extractedText, summary, fileSize, extractionMethod, blobUrl, originalFileName, mimeType, userId) {
   try {

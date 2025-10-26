@@ -1,5 +1,6 @@
 import { getPool } from './db.js';
 import { ensureUploadedDocumentColumnSupport } from './uploaded-document-columns.js';
+import { generateSafeFileName } from './utils.js';
 
 const ALLOWED_METHODS = ['PUT', 'PATCH'];
 
@@ -140,13 +141,7 @@ export const handler = async (event) => {
 
     if (typeof trimmedSafeName !== 'undefined') {
       if (hasSafeFileName) {
-        const safeBase = trimmedSafeName
-          .toLowerCase()
-          .replace(/[^a-z0-9._-]+/g, '-')
-          .replace(/-+/g, '-')
-          .replace(/^-+/, '')
-          .replace(/-+$/, '');
-        const sanitizedSafeName = safeBase.substring(0, 120) || null;
+        const sanitizedSafeName = generateSafeFileName(trimmedSafeName).substring(0, 120) || null;
         setClauses.push(`safe_file_name = $${values.length + 1}`);
         values.push(sanitizedSafeName);
       } else {
