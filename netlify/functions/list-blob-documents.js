@@ -1,4 +1,10 @@
+import { Pool } from 'pg';
 import { getStore } from '@netlify/blobs';
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
 
 export const handler = async (event) => {
   console.log('=== LIST BLOB DOCUMENTS ===');
@@ -47,55 +53,99 @@ export const handler = async (event) => {
     // Initialize blob store
     console.log('Initializing blob store...');
     const STORE_NAME = 'chat-uploads';
-    const store = await getStore({
-      name: STORE_NAME,
-      siteID: process.env.NETLIFY_BLOBS_SITE_ID,
-      token: process.env.NETLIFY_BLOBS_TOKEN
-    });
-
-    // List all blobs from storage
-    console.log('Listing all blobs from blob storage...');
-    const listResult = await store.list();
-    const blobs = Array.isArray(listResult?.blobs) ? listResult.blobs : Array.isArray(listResult) ? listResult : [];
+    let store;
+    try {
+      store = await getStore({
+        name: STORE_NAME,
+        siteID: process.env.NETLIFY_BLOBS_SITE_ID,
+        token: process.env.NETLIFY_BLOBS_TOKEN
+      });
+    } catch (storeError) {
+      console.error('Failed to initialize blob store:', storeError);
+      throw new Error('Blob storage is unavailable');
+    }
     
-    console.log(`Found ${blobs.length} blobs in storage`);
-
-    // Process blobs to extract directory structure and documents
+    // List all blobs from storage directly
+    console.log('Listing all blobs from blob storage...');
+    let allBlobs = [];
+    
+    try {
+      // Try to list all blobs
+      if (typeof store.list === 'function') {
+        const listResult = await store.list();
+        allBlobs = Array.isArray(listResult?.blobs) ? listResult.blobs : Array.isArray(listResult) ? listResult : [];
+        console.log(`store.list() returned ${allBlobs.length} blobs`);
+      } else if (typeof store.listEntries === 'function') {
+        const listResult = await store.listEntries();
+        allBlobs = Array.isArray(listResult?.blobs) ? listResult.blobs : Array.isArray(listResult) ? listResult : [];
+        console.log(`store.listEntries() returned ${allBlobs.length} blobs`);
+      } else {
+        console.log('Available store methods:', Object.keys(store));
+        throw new Error('list method not available on store');
+      }
+    } catch (listError) {
+      console.error('Error listing blobs:', listError);
+      throw new Error(`Failed to list blobs: ${listError.message}`);
+    }
+    
+    console.log(`Found ${allBlobs.length} blobs in storage`);
+    
+    // Get all documents from database for comparison
+    console.log('Querying database for blob document references...');
+    const dbResult = await pool.query(`
+      SELECT blob_url, document_name, original_filename, file_size, created_at, mime_type, ai_summary, user_id
+      FROM qms_chat_documents 
+      WHERE blob_url IS NOT NULL AND blob_url != ''
+    `);
+    const dbBlobKeys = new Set(dbResult.rows.map(doc => doc.blob_url));
+    const dbDocsMap = new Map();
+    dbResult.rows.forEach(doc => {
+      dbDocsMap.set(doc.blob_url, doc);
+    });
+    
+    console.log(`Found ${dbBlobKeys.size} blob references in database`);
+    
+    // Process all blobs and extract directory structure
     const directoryMap = new Map();
     const documents = [];
+    let orphanedCount = 0;
     
-    for (const blob of blobs) {
-      const key = blob.key;
+    for (const blob of allBlobs) {
+      const blobKey = blob.key;
       
-      // Extract directory structure (first part before /)
-      const pathParts = key.split('/');
+      // Extract directory structure
+      const pathParts = blobKey.split('/');
       const directory = pathParts.length > 1 ? pathParts[0] : '';
-      const fileName = pathParts.length > 1 ? pathParts.slice(1).join('/') : key;
+      const fileName = pathParts.length > 1 ? pathParts.slice(1).join('/') : blobKey;
+      
+      // Check if this blob exists in database
+      const dbDoc = dbDocsMap.get(blobKey);
+      const isOrphaned = !dbDoc;
+      
+      if (isOrphaned) {
+        orphanedCount++;
+      }
       
       // Store directory info
       if (!directoryMap.has(directory)) {
         directoryMap.set(directory, []);
       }
       directoryMap.get(directory).push({
-        key: key,
-        fileName: fileName,
-        size: blob.size || 0,
-        metadata: blob.metadata,
-        lastModified: blob.metadata?.createdAt || blob.uploadedAt || new Date().toISOString()
+        key: blobKey,
+        fileName: dbDoc?.original_filename || dbDoc?.document_name || fileName,
+        size: dbDoc?.file_size || blob.size || 0,
+        metadata: blob.metadata || null,
+        lastModified: dbDoc?.created_at || blob.metadata?.createdAt || new Date().toISOString(),
+        dbData: dbDoc || null,
+        isOrphaned: isOrphaned
       });
     }
     
-    console.log(`Found ${directoryMap.size} directories`);
+    console.log(`Found ${directoryMap.size} directories, ${orphanedCount} orphaned blobs`);
 
     // Convert to document format
     for (const [directory, files] of directoryMap.entries()) {
       for (const file of files) {
-        // Apply search filter if provided
-        if (search && !file.fileName.toLowerCase().includes(search.toLowerCase()) && 
-            !directory.toLowerCase().includes(search.toLowerCase())) {
-          continue;
-        }
-        
         const document = {
           id: file.key,
           document_id: file.key,
@@ -106,8 +156,11 @@ export const handler = async (event) => {
           file_size: file.size,
           created_at: file.lastModified,
           updated_at: file.lastModified,
-          mime_type: 'application/octet-stream',
+          mime_type: file.dbData?.mime_type || 'application/octet-stream',
+          ai_summary: file.dbData?.ai_summary || null,
+          user_id: file.dbData?.user_id || null,
           chunk_count: 0,
+          is_orphaned: file.isOrphaned,
           blob_metadata: {
             key: file.key,
             directory: directory,
@@ -146,7 +199,8 @@ export const handler = async (event) => {
         pageOffset: offset,
         duration: `${duration}ms`,
         source: 'blob',
-        directories: directoryMap.size
+        directories: directoryMap.size,
+        orphanedCount: orphanedCount
       })
     };
 

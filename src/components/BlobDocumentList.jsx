@@ -227,9 +227,14 @@ export default function BlobDocumentList({ userId, onDocumentDeleted }) {
                 {documents.map((doc) => (
                   <tr key={doc.id} style={{ borderBottom: '1px solid #dee2e6' }}>
                     <td style={{ padding: '8px' }}>
-                      <div style={{ fontWeight: '500', color: '#495057' }}>
+                      <div style={{ fontWeight: '500', color: doc.is_orphaned ? '#dc3545' : '#495057' }}>
                         {doc.document_name || doc.original_filename || 'Untitled'}
                       </div>
+                      {doc.is_orphaned && (
+                        <div style={{ fontSize: '11px', color: '#dc3545', marginTop: '2px', fontWeight: '600' }}>
+                          ⚠️ ORPHANED - Not in database
+                        </div>
+                      )}
                       {doc.blob_metadata && doc.blob_metadata.directory && (
                         <div style={{ fontSize: '11px', color: '#007bff', marginTop: '2px' }}>
                           📁 {doc.blob_metadata.directory}
