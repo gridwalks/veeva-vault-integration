@@ -46,6 +46,9 @@ export const handler = async (event, context) => {
       return await getQAInteractions(pool, event.queryStringParameters, headers);
     } else if (method === 'GET' && path.includes('/qa-interactions/export')) {
       return await exportQAInteractions(pool, event.queryStringParameters, headers);
+    } else if (method === 'PUT' && path.includes('/qa-interactions/') && path.includes('/feedback')) {
+      const id = path.split('/')[path.split('/').length - 2]; // Get ID before 'feedback'
+      return await updateQAFeedback(pool, id, body, headers);
     } else if (method === 'DELETE' && path.includes('/qa-interactions/')) {
       const id = path.split('/').pop();
       return await deleteQAInteraction(pool, id, headers);
@@ -75,7 +78,7 @@ export const handler = async (event, context) => {
 
 // Create a new Q&A interaction
 async function createQAInteraction(pool, body, headers) {
-  const { question, answer, document_ids = [], document_names = [], user_id, session_id } = body;
+  const { question, answer, document_ids = [], document_names = [], user_id, session_id, user_rating = null, feedback_notes = null } = body;
 
   if (!question || !answer) {
     return {
@@ -88,10 +91,10 @@ async function createQAInteraction(pool, body, headers) {
   try {
     const result = await pool.query(`
       INSERT INTO qms_chat_qa_interactions 
-      (question, answer, document_ids, document_names, user_id, session_id)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      (question, answer, document_ids, document_names, user_id, session_id, user_rating, feedback_notes, feedback_submitted_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $7 IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END)
       RETURNING *
-    `, [question, answer, document_ids, document_names, user_id, session_id]);
+    `, [question, answer, document_ids, document_names, user_id, session_id, user_rating, feedback_notes]);
 
     return {
       statusCode: 201,
@@ -122,6 +125,7 @@ async function getQAInteractions(pool, queryParams, headers) {
   const search = queryParams?.search || '';
   const user_id = queryParams?.user_id;
   const session_id = queryParams?.session_id;
+  const rating = queryParams?.rating; // 'liked', 'disliked', 'unrated'
 
   try {
     let whereClause = '';
@@ -144,6 +148,19 @@ async function getQAInteractions(pool, queryParams, headers) {
       paramCount++;
       whereClause += whereClause ? ` AND session_id = $${paramCount}` : ` WHERE session_id = $${paramCount}`;
       queryParams_array.push(session_id);
+    }
+
+    if (rating) {
+      paramCount++;
+      if (rating === 'liked') {
+        whereClause += whereClause ? ` AND user_rating = $${paramCount}` : ` WHERE user_rating = $${paramCount}`;
+        queryParams_array.push(1);
+      } else if (rating === 'disliked') {
+        whereClause += whereClause ? ` AND user_rating = $${paramCount}` : ` WHERE user_rating = $${paramCount}`;
+        queryParams_array.push(-1);
+      } else if (rating === 'unrated') {
+        whereClause += whereClause ? ` AND user_rating IS NULL` : ` WHERE user_rating IS NULL`;
+      }
     }
 
     // Get total count
@@ -327,6 +344,66 @@ async function deleteQAInteraction(pool, id, headers) {
       headers,
       body: JSON.stringify({ 
         error: 'Failed to delete Q&A interaction',
+        details: error.message 
+      })
+    };
+  }
+}
+
+// Update Q&A interaction feedback
+async function updateQAFeedback(pool, id, body, headers) {
+  const { user_rating, feedback_notes = null } = body;
+
+  if (user_rating === undefined || user_rating === null) {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: 'User rating is required' })
+    };
+  }
+
+  if (user_rating !== 1 && user_rating !== -1) {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: 'User rating must be 1 (like) or -1 (dislike)' })
+    };
+  }
+
+  try {
+    const result = await pool.query(`
+      UPDATE qms_chat_qa_interactions 
+      SET user_rating = $1, 
+          feedback_notes = $2, 
+          feedback_submitted_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+      RETURNING *
+    `, [user_rating, feedback_notes, id]);
+
+    if (result.rows.length === 0) {
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({ error: 'Q&A interaction not found' })
+      };
+    }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        success: true,
+        data: result.rows[0]
+      })
+    };
+  } catch (error) {
+    console.error('Error updating Q&A feedback:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Failed to update Q&A feedback',
         details: error.message 
       })
     };

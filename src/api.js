@@ -937,7 +937,7 @@ export async function getQAInteractions({ page = 1, limit = 50, search = '', use
   }
 }
 
-export async function createQAInteraction({ question, answer, document_ids = [], document_names = [], user_id, session_id }) {
+export async function createQAInteraction({ question, answer, document_ids = [], document_names = [], user_id, session_id, user_rating = null, feedback_notes = null }) {
   const startTime = Date.now();
   console.log('Creating Q&A interaction...', { question: question.substring(0, 100) + '...' });
   
@@ -953,7 +953,9 @@ export async function createQAInteraction({ question, answer, document_ids = [],
         document_ids,
         document_names,
         user_id,
-        session_id
+        session_id,
+        user_rating,
+        feedback_notes
       })
     });
     
@@ -977,6 +979,50 @@ export async function createQAInteraction({ question, answer, document_ids = [],
   } catch (error) {
     const duration = Date.now() - startTime;
     console.error(`Error creating Q&A interaction after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
+export async function updateQAFeedback({ interactionId, user_rating, feedback_notes = null }) {
+  const startTime = Date.now();
+  console.log('Updating Q&A feedback...', { interactionId, user_rating });
+  
+  try {
+    const res = await fetch(`/api/qa-interactions/${interactionId}/feedback`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_rating,
+        feedback_notes
+      })
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Failed to update Q&A feedback:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorData.error
+      });
+      throw new Error(errorData.error || `Failed to update Q&A feedback: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Q&A feedback updated in ${duration}ms:`, {
+      interactionId: data.data?.id,
+      rating: data.data?.user_rating
+    });
+    
+    return data.data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error updating Q&A feedback after ${duration}ms:`, {
       message: error.message,
       stack: error.stack
     });

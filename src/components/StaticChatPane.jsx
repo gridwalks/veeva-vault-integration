@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import DocumentViewer from './DocumentViewer.jsx';
 import ChatPromptBox from './ChatPromptBox.jsx';
-import { createQAInteraction, getUploadedDocuments, downloadUploadedDocumentUrl } from '../api';
+import { createQAInteraction, getUploadedDocuments, downloadUploadedDocumentUrl, updateQAFeedback } from '../api';
 
 // Helper function to estimate token count (rough approximation)
 const estimateTokens = (text) => {
@@ -26,6 +26,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
   const [isProcessingAttachments, setIsProcessingAttachments] = useState(false);
   const [uploadedBlobs, setUploadedBlobs] = useState([]);
   const [purgeUploadsOnClear, setPurgeUploadsOnClear] = useState(true);
+  const [interactionIds, setInteractionIds] = useState(new Map()); // Track interaction IDs by message index
   
   // Debug conversation history changes
   useEffect(() => {
@@ -502,7 +503,7 @@ The documents will be automatically included in the comparison analysis.
 
       // Capture Q&A interaction for storage
       if (data.response && (data.documents || []).length > 0) {
-        await captureQAInteraction(userMessage, data.response, data.documents || []);
+        await captureQAInteraction(userMessage, data.response, data.documents || [], conversationHistory.length);
       }
 
       console.log('Chat response received:', {
@@ -663,7 +664,7 @@ The documents will be automatically included in the comparison analysis.
     setSelectedDocument(null);
   };
 
-  const captureQAInteraction = async (question, answer, documents) => {
+  const captureQAInteraction = async (question, answer, documents, messageIndex = null) => {
     try {
       console.log('Capturing Q&A interaction:', {
         question: question.substring(0, 100) + '...',
@@ -688,9 +689,17 @@ The documents will be automatically included in the comparison analysis.
       });
 
       console.log('Q&A interaction captured successfully:', result);
+      
+      // Store interaction ID for feedback functionality
+      if (messageIndex !== null && result?.id) {
+        setInteractionIds(prev => new Map(prev).set(messageIndex, result.id));
+      }
+      
+      return result;
     } catch (error) {
       console.warn('Error capturing Q&A interaction:', error);
       // Don't throw error as this shouldn't break the chat functionality
+      return null;
     }
   };
 
@@ -1077,12 +1086,34 @@ The documents will be automatically included in the comparison analysis.
       // You can implement regeneration logic here
     };
 
-    const handleLike = () => {
-      console.log('Message liked');
+    const handleLike = async () => {
+      const interactionId = interactionIds.get(index);
+      if (interactionId) {
+        try {
+          await updateQAFeedback({ interactionId, user_rating: 1 });
+          console.log('Message liked successfully');
+          // You could add visual feedback here
+        } catch (error) {
+          console.error('Error submitting like:', error);
+        }
+      } else {
+        console.warn('No interaction ID found for this message');
+      }
     };
 
-    const handleDislike = () => {
-      console.log('Message disliked');
+    const handleDislike = async () => {
+      const interactionId = interactionIds.get(index);
+      if (interactionId) {
+        try {
+          await updateQAFeedback({ interactionId, user_rating: -1 });
+          console.log('Message disliked successfully');
+          // You could add visual feedback here
+        } catch (error) {
+          console.error('Error submitting dislike:', error);
+        }
+      } else {
+        console.warn('No interaction ID found for this message');
+      }
     };
 
 

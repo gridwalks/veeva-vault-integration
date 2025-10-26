@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import DocumentViewer from './DocumentViewer.jsx';
 import ChatPromptBox from './ChatPromptBox.jsx';
-import { chatWithDocuments, createQAInteraction, getUploadedDocuments } from '../api';
+import { chatWithDocuments, createQAInteraction, getUploadedDocuments, updateQAFeedback } from '../api';
 import { getSessionId } from '../utils/sessionManager';
 
 // Helper function to estimate token count (rough approximation)
@@ -33,6 +33,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
   const [isProcessingAttachments, setIsProcessingAttachments] = useState(false);
   const [uploadedBlobs, setUploadedBlobs] = useState([]);
   const [purgeUploadsOnClear, setPurgeUploadsOnClear] = useState(true);
+  const [interactionIds, setInteractionIds] = useState(new Map()); // Track interaction IDs by message index
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [userId, setUserId] = useState(null);
@@ -425,7 +426,7 @@ The files will upload automatically and I'll be able to perform a detailed compa
 
 
       // Capture Q&A interaction for storage
-      await captureQAInteraction(userMessage, data.response, data.documents);
+      await captureQAInteraction(userMessage, data.response, data.documents, conversationHistory.length);
 
       console.log('Chat response received:', {
         responseLength: data.response.length,
@@ -521,7 +522,7 @@ The files will upload automatically and I'll be able to perform a detailed compa
     setSelectedDocument(null);
   };
 
-  const captureQAInteraction = async (question, answer, documents) => {
+  const captureQAInteraction = async (question, answer, documents, messageIndex = null) => {
     try {
       console.log('Capturing Q&A interaction:', {
         question: question.substring(0, 100) + '...',
@@ -546,9 +547,17 @@ The files will upload automatically and I'll be able to perform a detailed compa
       });
 
       console.log('Q&A interaction captured successfully:', result);
+      
+      // Store interaction ID for feedback functionality
+      if (messageIndex !== null && result?.id) {
+        setInteractionIds(prev => new Map(prev).set(messageIndex, result.id));
+      }
+      
+      return result;
     } catch (error) {
       console.warn('Error capturing Q&A interaction:', error);
       // Don't throw error as this shouldn't break the chat functionality
+      return null;
     }
   };
 
@@ -587,12 +596,34 @@ The files will upload automatically and I'll be able to perform a detailed compa
       // You can implement regeneration logic here
     };
 
-    const handleLike = () => {
-      console.log('Message liked');
+    const handleLike = async () => {
+      const interactionId = interactionIds.get(index);
+      if (interactionId) {
+        try {
+          await updateQAFeedback({ interactionId, user_rating: 1 });
+          console.log('Message liked successfully');
+          // You could add visual feedback here
+        } catch (error) {
+          console.error('Error submitting like:', error);
+        }
+      } else {
+        console.warn('No interaction ID found for this message');
+      }
     };
 
-    const handleDislike = () => {
-      console.log('Message disliked');
+    const handleDislike = async () => {
+      const interactionId = interactionIds.get(index);
+      if (interactionId) {
+        try {
+          await updateQAFeedback({ interactionId, user_rating: -1 });
+          console.log('Message disliked successfully');
+          // You could add visual feedback here
+        } catch (error) {
+          console.error('Error submitting dislike:', error);
+        }
+      } else {
+        console.warn('No interaction ID found for this message');
+      }
     };
 
 

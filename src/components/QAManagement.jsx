@@ -4,12 +4,13 @@ import { getQAInteractions, deleteQAInteraction, exportQAInteractions } from '..
 export default function QAManagement() {
   const [qaData, setQaData] = useState({ items: [], total: 0, page: 1, totalPages: 0 });
   const [searchQuery, setSearchQuery] = useState('');
+  const [ratingFilter, setRatingFilter] = useState('all'); // 'all', 'liked', 'disliked', 'unrated'
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedItems, setSelectedItems] = useState([]);
   const [isExporting, setIsExporting] = useState(false);
 
-  const loadQAInteractions = async (page = 1, search = '') => {
+  const loadQAInteractions = async (page = 1, search = '', rating = '') => {
     setIsLoading(true);
     setError(null);
     
@@ -17,7 +18,8 @@ export default function QAManagement() {
       const data = await getQAInteractions({ 
         page, 
         limit: 20, 
-        search: search || searchQuery 
+        search: search || searchQuery,
+        rating: rating || ratingFilter
       });
       setQaData(data);
     } catch (err) {
@@ -30,7 +32,7 @@ export default function QAManagement() {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    loadQAInteractions(1, searchQuery);
+    loadQAInteractions(1, searchQuery, ratingFilter);
   };
 
   const handleDelete = async (id) => {
@@ -40,7 +42,7 @@ export default function QAManagement() {
 
     try {
       await deleteQAInteraction({ id });
-      await loadQAInteractions(qaData.page, searchQuery);
+      await loadQAInteractions(qaData.page, searchQuery, ratingFilter);
       setSelectedItems(prev => prev.filter(item => item !== id));
     } catch (err) {
       console.error('Error deleting Q&A interaction:', err);
@@ -57,7 +59,7 @@ export default function QAManagement() {
 
     try {
       await Promise.all(selectedItems.map(id => deleteQAInteraction({ id })));
-      await loadQAInteractions(qaData.page, searchQuery);
+      await loadQAInteractions(qaData.page, searchQuery, ratingFilter);
       setSelectedItems([]);
     } catch (err) {
       console.error('Error bulk deleting Q&A interactions:', err);
@@ -173,6 +175,27 @@ export default function QAManagement() {
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}
         />
+        <select
+          value={ratingFilter}
+          onChange={(e) => {
+            setRatingFilter(e.target.value);
+            loadQAInteractions(1, searchQuery, e.target.value);
+          }}
+          style={{
+            padding: '6px 10px',
+            border: '1px solid #d1d5db',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            backgroundColor: 'white',
+            minWidth: '120px'
+          }}
+        >
+          <option value="all">All Ratings</option>
+          <option value="liked">👍 Liked</option>
+          <option value="disliked">👎 Disliked</option>
+          <option value="unrated">No Rating</option>
+        </select>
         <button
           type="submit"
           disabled={isLoading}
@@ -253,6 +276,13 @@ export default function QAManagement() {
                 fontSize: '12px',
                 fontWeight: '600'
               }}><span style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Documents</span></th>
+              <th style={{ 
+                padding: '8px', 
+                textAlign: 'left', 
+                borderBottom: '1px solid #e5e7eb',
+                fontSize: '12px',
+                fontWeight: '600'
+              }}><span style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Rating</span></th>
               <th style={{ 
                 padding: '8px', 
                 textAlign: 'left', 
@@ -343,6 +373,17 @@ export default function QAManagement() {
                 </td>
                 <td style={{ padding: '8px' }}>
                   <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                    {item.user_rating === 1 ? (
+                      <span style={{ color: '#10b981', fontWeight: '500' }}>👍 Liked</span>
+                    ) : item.user_rating === -1 ? (
+                      <span style={{ color: '#ef4444', fontWeight: '500' }}>👎 Disliked</span>
+                    ) : (
+                      <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>No rating</span>
+                    )}
+                  </div>
+                </td>
+                <td style={{ padding: '8px' }}>
+                  <div style={{ fontSize: '11px', color: '#6b7280' }}>
                     {formatDate(item.created_at)}
                   </div>
                 </td>
@@ -414,7 +455,7 @@ export default function QAManagement() {
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
         }}>
           <button
-            onClick={() => loadQAInteractions(qaData.page - 1, searchQuery)}
+            onClick={() => loadQAInteractions(qaData.page - 1, searchQuery, ratingFilter)}
             disabled={qaData.page <= 1 || isLoading}
             style={{
               padding: '6px 10px',
@@ -435,7 +476,7 @@ export default function QAManagement() {
           </span>
           
           <button
-            onClick={() => loadQAInteractions(qaData.page + 1, searchQuery)}
+            onClick={() => loadQAInteractions(qaData.page + 1, searchQuery, ratingFilter)}
             disabled={qaData.page >= qaData.totalPages || isLoading}
             style={{
               padding: '6px 10px',
