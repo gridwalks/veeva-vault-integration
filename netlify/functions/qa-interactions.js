@@ -89,12 +89,34 @@ async function createQAInteraction(pool, body, headers) {
   }
 
   try {
-    const result = await pool.query(`
-      INSERT INTO qms_chat_qa_interactions 
-      (question, answer, document_ids, document_names, user_id, session_id, user_rating, feedback_notes, feedback_submitted_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $7 IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END)
-      RETURNING *
-    `, [question, answer, document_ids, document_names, user_id, session_id, user_rating, feedback_notes]);
+    // Check if the new columns exist before trying to use them
+    const columnCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'qms_chat_qa_interactions' 
+      AND column_name IN ('user_rating', 'feedback_notes', 'feedback_submitted_at')
+    `);
+    
+    const hasNewColumns = columnCheck.rows.length >= 3;
+    
+    let result;
+    if (hasNewColumns) {
+      // Use new columns if they exist
+      result = await pool.query(`
+        INSERT INTO qms_chat_qa_interactions 
+        (question, answer, document_ids, document_names, user_id, session_id, user_rating, feedback_notes, feedback_submitted_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $7 IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END)
+        RETURNING *
+      `, [question, answer, document_ids, document_names, user_id, session_id, user_rating, feedback_notes]);
+    } else {
+      // Fallback to original columns if migration hasn't been run
+      result = await pool.query(`
+        INSERT INTO qms_chat_qa_interactions 
+        (question, answer, document_ids, document_names, user_id, session_id)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *
+      `, [question, answer, document_ids, document_names, user_id, session_id]);
+    }
 
     return {
       statusCode: 201,
@@ -151,16 +173,27 @@ async function getQAInteractions(pool, queryParams, headers) {
     }
 
     if (rating) {
-      paramCount++;
-      if (rating === 'liked') {
-        whereClause += whereClause ? ` AND user_rating = $${paramCount}` : ` WHERE user_rating = $${paramCount}`;
-        queryParams_array.push(1);
-      } else if (rating === 'disliked') {
-        whereClause += whereClause ? ` AND user_rating = $${paramCount}` : ` WHERE user_rating = $${paramCount}`;
-        queryParams_array.push(-1);
-      } else if (rating === 'unrated') {
-        whereClause += whereClause ? ` AND user_rating IS NULL` : ` WHERE user_rating IS NULL`;
+      // Check if the new columns exist before trying to use them
+      const columnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'qms_chat_qa_interactions' 
+        AND column_name = 'user_rating'
+      `);
+      
+      if (columnCheck.rows.length > 0) {
+        paramCount++;
+        if (rating === 'liked') {
+          whereClause += whereClause ? ` AND user_rating = $${paramCount}` : ` WHERE user_rating = $${paramCount}`;
+          queryParams_array.push(1);
+        } else if (rating === 'disliked') {
+          whereClause += whereClause ? ` AND user_rating = $${paramCount}` : ` WHERE user_rating = $${paramCount}`;
+          queryParams_array.push(-1);
+        } else if (rating === 'unrated') {
+          whereClause += whereClause ? ` AND user_rating IS NULL` : ` WHERE user_rating IS NULL`;
+        }
       }
+      // If columns don't exist, ignore rating filter (show all results)
     }
 
     // Get total count
@@ -371,15 +404,39 @@ async function updateQAFeedback(pool, id, body, headers) {
   }
 
   try {
-    const result = await pool.query(`
-      UPDATE qms_chat_qa_interactions 
-      SET user_rating = $1, 
-          feedback_notes = $2, 
-          feedback_submitted_at = CURRENT_TIMESTAMP,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = $3
-      RETURNING *
-    `, [user_rating, feedback_notes, id]);
+    // Check if the new columns exist before trying to use them
+    const columnCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'qms_chat_qa_interactions' 
+      AND column_name IN ('user_rating', 'feedback_notes', 'feedback_submitted_at')
+    `);
+    
+    const hasNewColumns = columnCheck.rows.length >= 3;
+    
+    let result;
+    if (hasNewColumns) {
+      // Use new columns if they exist
+      result = await pool.query(`
+        UPDATE qms_chat_qa_interactions 
+        SET user_rating = $1, 
+            feedback_notes = $2, 
+            feedback_submitted_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $3
+        RETURNING *
+      `, [user_rating, feedback_notes, id]);
+    } else {
+      // Return error if columns don't exist
+      return {
+        statusCode: 503,
+        headers,
+        body: JSON.stringify({ 
+          error: 'Feedback system not available - database migration required',
+          details: 'Please run the database migration to enable feedback functionality'
+        })
+      };
+    }
 
     if (result.rows.length === 0) {
       return {
