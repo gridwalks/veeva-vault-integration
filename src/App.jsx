@@ -77,6 +77,11 @@ useEffect(() => {
 // Listen for resume workflow messages from WorkflowHistory
 useEffect(() => {
   const handleMessage = (event) => {
+    // Verify the origin to ensure the message is from an authorized sender
+    if (event.origin !== window.location.origin) {
+      return;
+    }
+
     if (event.data && event.data.type === 'RESUME_WORKFLOW') {
       console.log('Received resume workflow message:', event.data);
       setResumeWorkflowId(event.data.instanceId);

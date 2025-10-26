@@ -13,7 +13,7 @@ export default function MyNotebook({ isOpen, onClose }) {
       window.parent.postMessage({
         type: 'LOAD_CHAT_SESSION',
         sessionId: sessionId
-      }, '*');
+      }, window.location.origin);
     }
     
     // Close the modal

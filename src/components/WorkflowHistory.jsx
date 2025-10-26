@@ -81,7 +81,7 @@ export default function WorkflowHistory() {
           type: 'RESUME_WORKFLOW',
           instanceId: instanceId,
           workflowData: data
-        }, '*');
+        }, window.location.origin);
       }
       
       alert('Workflow resumed! Switching to chat...');
@@ -90,7 +90,7 @@ export default function WorkflowHistory() {
       if (window.parent && window.parent.postMessage) {
         window.parent.postMessage({
           type: 'CLOSE_MY_NOTEBOOK'
-        }, '*');
+        }, window.location.origin);
       }
       
       // Reload instances to reflect the status change
