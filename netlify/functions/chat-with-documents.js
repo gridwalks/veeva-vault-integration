@@ -813,8 +813,8 @@ export const handler = async (event) => {
         }
         
         // Combine and sort by similarity
-        // For comparison mode, keep more chunks to ensure comprehensive analysis
-        const maxChunks = isComparisonQuery ? 20 : 5;
+        // For comparison mode, keep more chunks but limit to avoid timeout
+        const maxChunks = isComparisonQuery ? 12 : 5;
         relevantChunks = [...veevaChunks, ...uploadedChunks]
           .sort((a, b) => b.similarity - a.similarity)
           .slice(0, maxChunks);
@@ -1224,6 +1224,9 @@ export const handler = async (event) => {
       );
       const manualSummariesIncluded = new Set();
 
+      // Truncate chunk text to prevent oversized contexts (especially for comparison queries)
+      const MAX_CHUNK_TEXT_LENGTH = isComparisonQuery ? 1200 : 1500;
+      
       const chunkContext = relevantChunks.map((chunk, index) => {
         const docId = chunk.veeva_document_id || chunk.upload_document_id;
         const docMetadata = documentMetadataMap.get(docId);
@@ -1237,7 +1240,13 @@ Similarity: ${(chunk.similarity * 100).toFixed(1)}%`;
           manualSummariesIncluded.add(docId);
         }
 
-        context += `\n\n${chunk.chunk_text}`;
+        // Truncate chunk text if it's too long
+        const chunkText = chunk.chunk_text || '';
+        const truncatedText = chunkText.length > MAX_CHUNK_TEXT_LENGTH
+          ? chunkText.substring(0, MAX_CHUNK_TEXT_LENGTH) + '... [truncated]'
+          : chunkText;
+        
+        context += `\n\n${truncatedText}`;
         context += `\n\n---`;
 
         return context;
@@ -1257,14 +1266,22 @@ Similarity: ${(chunk.similarity * 100).toFixed(1)}%`;
 Type: ${doc.document_type || 'Unknown'}
 Status: ${doc.status || 'Unknown'}`;
 
-          // Add AI summary if available
+          // Add AI summary if available (truncated for comparison queries)
           if (doc.summary) {
-            context += `\nAI Summary: ${doc.summary}`;
+            const maxSummaryLength = isComparisonQuery ? 600 : 800;
+            const summaryText = doc.summary.length > maxSummaryLength 
+              ? doc.summary.substring(0, maxSummaryLength) + '...' 
+              : doc.summary;
+            context += `\nAI Summary: ${summaryText}`;
           }
 
-          // Add manual summary if available
+          // Add manual summary if available (truncated for comparison queries)
           if (doc.manual_summary) {
-            context += `\nManual Summary: ${doc.manual_summary}`;
+            const maxSummaryLength = isComparisonQuery ? 600 : 800;
+            const summaryText = doc.manual_summary.length > maxSummaryLength 
+              ? doc.manual_summary.substring(0, maxSummaryLength) + '...' 
+              : doc.manual_summary;
+            context += `\nManual Summary: ${summaryText}`;
           }
 
           // If no summaries available
@@ -1295,14 +1312,22 @@ Status: ${doc.status || 'Unknown'}`;
 Type: ${doc.document_type || 'Unknown'}
 Status: ${doc.status || 'Unknown'}`;
 
-          // Add AI summary if available
+          // Add AI summary if available (truncated for comparison queries)
           if (doc.summary) {
-            context += `\nAI Summary: ${doc.summary}`;
+            const maxSummaryLength = isComparisonQuery ? 600 : 800;
+            const summaryText = doc.summary.length > maxSummaryLength 
+              ? doc.summary.substring(0, maxSummaryLength) + '...' 
+              : doc.summary;
+            context += `\nAI Summary: ${summaryText}`;
           }
 
-          // Add manual summary if available
+          // Add manual summary if available (truncated for comparison queries)
           if (doc.manual_summary) {
-            context += `\nManual Summary: ${doc.manual_summary}`;
+            const maxSummaryLength = isComparisonQuery ? 600 : 800;
+            const summaryText = doc.manual_summary.length > maxSummaryLength 
+              ? doc.manual_summary.substring(0, maxSummaryLength) + '...' 
+              : doc.manual_summary;
+            context += `\nManual Summary: ${summaryText}`;
           }
 
           // If no summaries available
@@ -1316,9 +1341,13 @@ Type: ${doc.document_type || 'uploaded_document'}
 File Size: ${fileSizeKB} KB
 Original Filename: ${doc.original_filename || doc.document_name}`;
 
-          // Add AI summary if available
+          // Add AI summary if available (truncated for comparison queries)
           if (doc.ai_summary) {
-            context += `\nAI Summary: ${doc.ai_summary}`;
+            const maxSummaryLength = isComparisonQuery ? 600 : 800;
+            const summaryText = doc.ai_summary.length > maxSummaryLength 
+              ? doc.ai_summary.substring(0, maxSummaryLength) + '...' 
+              : doc.ai_summary;
+            context += `\nAI Summary: ${summaryText}`;
           } else {
             context += `\nSummary: No AI summary available for this uploaded document.`;
           }
@@ -1470,7 +1499,9 @@ ${externalResourcesContext}`;
 
     const elapsedBeforeLLM = Date.now() - startTime;
     const remainingBudget = FUNCTION_TIMEOUT_MS - elapsedBeforeLLM;
-    const usableModelBudget = remainingBudget - RESPONSE_FINALIZATION_BUFFER_MS;
+    // For comparison queries, reduce the buffer to allow more time for LLM processing
+    const bufferMs = isComparisonQuery ? Math.max(RESPONSE_FINALIZATION_BUFFER_MS - 2000, 800) : RESPONSE_FINALIZATION_BUFFER_MS;
+    const usableModelBudget = remainingBudget - bufferMs;
 
     if (usableModelBudget <= MIN_LLM_TIME_BUDGET_MS) {
       console.warn("Skipping LLM call due to low time budget", {
@@ -1561,7 +1592,9 @@ ${externalResourcesContext}`;
 
     // Call language model API with Groq primary and OpenAI fallback
     const primaryModel = "openai/gpt-oss-20b";
-    const groqTimeBudget = Math.min(usableModelBudget, GROQ_TIMEOUT_MS);
+    // For comparison queries, ensure we have adequate time budget
+    const comparisonBudgetBoost = isComparisonQuery ? 3000 : 0;
+    const groqTimeBudget = Math.min(usableModelBudget + comparisonBudgetBoost, GROQ_TIMEOUT_MS);
     const llmStartTime = Date.now();
     let completion;
     let response = "";
@@ -1571,10 +1604,13 @@ ${externalResourcesContext}`;
     let llmBudgetMs = groqTimeBudget;
 
     try {
+      // For comparison queries, increase max_tokens to allow detailed analysis
+      const maxTokens = isComparisonQuery ? 3000 : 2000;
+      
       completion = await runChatCompletionWithTimeout(groq, {
         model: primaryModel,
         messages,
-        max_tokens: 2000,
+        max_tokens: maxTokens,
         temperature: 0.3,
       }, {
         timeoutMs: groqTimeBudget,
@@ -1652,10 +1688,13 @@ ${externalResourcesContext}`;
 
         try {
           const fallbackStart = Date.now();
+          // For comparison queries, increase max_tokens to allow detailed analysis
+          const fallbackMaxTokens = isComparisonQuery ? 3000 : 2000;
+          
           const fallbackCompletion = await runChatCompletionWithTimeout(openai, {
             model: fallbackModel,
             messages,
-            max_tokens: 2000,
+            max_tokens: fallbackMaxTokens,
             temperature: 0.3,
           }, {
             timeoutMs: openaiTimeBudget,
