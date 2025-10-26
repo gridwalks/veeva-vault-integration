@@ -72,13 +72,14 @@ export default function UserProfile({ user, onUpdateUser }) {
     if (password.length < 8) {
       return 'Password must be at least 8 characters long';
     }
-    if (!/(?=.*[a-z])/.test(password)) {
+    // Use simple character checks instead of lookahead to avoid ReDoS
+    if (!/[a-z]/.test(password)) {
       return 'Password must contain at least one lowercase letter';
     }
-    if (!/(?=.*[A-Z])/.test(password)) {
+    if (!/[A-Z]/.test(password)) {
       return 'Password must contain at least one uppercase letter';
     }
-    if (!/(?=.*\d)/.test(password)) {
+    if (!/\d/.test(password)) {
       return 'Password must contain at least one number';
     }
     return null;

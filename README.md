@@ -2,6 +2,8 @@
 
 A React + Netlify Functions app that connects to **Veeva Vault** and lists **approved (steady-state)** documents. Includes secure serverless proxy for authentication, VQL querying, file downloads, document indexing with AI summarization, and health checks.
 
+**📖 For complete system documentation, see [SYSTEM-DOCUMENTATION.md](./SYSTEM-DOCUMENTATION.md)**
+
 ## Prereqs
 - Node 18+
 - Netlify account
