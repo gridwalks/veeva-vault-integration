@@ -46,22 +46,22 @@ Made the following optimizations to the document comparison flow in `netlify/fun
 
 ### 7. Increased Max Tokens for Comparison Responses
 - **Before**: 4000 max_tokens for comparison queries
-- **After**: 8000 max_tokens for comparison queries (doubled!)
-- **Benefit**: Allows the AI to generate very detailed comparison analysis without hitting token limits
+- **After**: 16000 max_tokens for comparison queries (4x increase!)
+- **Benefit**: Allows the AI to generate extremely detailed comparison analysis without hitting token limits
 
 ### Issue Identified
 The error `finish_reason: length` indicates the model ran out of completion tokens, not that it timed out. From the logs:
 - **Original attempt**: 33KB prompt → `finish_reason: length`
 - **After first fix**: 23KB prompt → still `finish_reason: length`
 
-The issue was that even with 4000 max_tokens, the model's response needed more room. By reducing the prompt size further AND increasing max_tokens to 8000, we give the model enough room to generate comprehensive responses.
+The issue was that even with 4000 max_tokens, the model's response needed more room. By reducing the prompt size further AND increasing max_tokens to 16000, we give the model plenty of room to generate comprehensive, detailed responses (well within Groq's 65,536 token limit).
 
 ## Impact
 These changes will:
 - ✅ Dramatically reduce context size (from 33KB to estimated ~6-10KB)
 - ✅ Prevent "length" finish reason errors (running out of completion tokens)
 - ✅ Prevent timeout errors during document comparisons
-- ✅ Allow for extremely detailed comparison analysis (8000 tokens - quadruple the original)
+- ✅ Allow for extremely detailed comparison analysis (16000 tokens - well within Groq's 65,536 limit)
 - ✅ Maintain quality with more focused, relevant content
 - ✅ Better balance between detail and performance
 - ✅ More reliable document comparison functionality

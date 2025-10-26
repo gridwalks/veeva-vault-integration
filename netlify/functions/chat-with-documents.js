@@ -1612,7 +1612,7 @@ ${externalResourcesContext}`;
 
     try {
       // For comparison queries, increase max_tokens to allow detailed analysis
-      const maxTokens = isComparisonQuery ? 8000 : 2000;
+      const maxTokens = isComparisonQuery ? 16000 : 2000;
       
       completion = await runChatCompletionWithTimeout(groq, {
         model: primaryModel,
@@ -1696,7 +1696,7 @@ ${externalResourcesContext}`;
         try {
           const fallbackStart = Date.now();
           // For comparison queries, increase max_tokens to allow detailed analysis
-          const fallbackMaxTokens = isComparisonQuery ? 8000 : 2000;
+          const fallbackMaxTokens = isComparisonQuery ? 16000 : 2000;
           
           const fallbackCompletion = await runChatCompletionWithTimeout(openai, {
             model: fallbackModel,
