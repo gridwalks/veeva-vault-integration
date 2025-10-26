@@ -813,8 +813,8 @@ export const handler = async (event) => {
         }
         
         // Combine and sort by similarity
-        // For comparison mode, keep more chunks but limit to avoid timeout
-        const maxChunks = isComparisonQuery ? 12 : 5;
+        // For comparison mode, limit chunks to prevent context overflow
+        const maxChunks = isComparisonQuery ? 8 : 5;
         relevantChunks = [...veevaChunks, ...uploadedChunks]
           .sort((a, b) => b.similarity - a.similarity)
           .slice(0, maxChunks);
@@ -1054,9 +1054,13 @@ export const handler = async (event) => {
         // Merge with existing documents from semantic search, avoiding duplicates
         const existingDocIds = new Set(relevantDocuments.map(doc => doc.veeva_document_id || doc.document_id));
         const newDocuments = uniqueKeywordDocuments.filter(doc => !existingDocIds.has(doc.veeva_document_id || doc.document_id));
-        relevantDocuments.push(...newDocuments);
         
-        console.log(`Added ${newDocuments.length} new documents from keyword search (${relevantDocuments.length} total)`);
+        // For comparison queries, limit keyword documents to prevent context overflow
+        const maxKeywordDocs = isComparisonQuery ? 3 : 10;
+        const limitedNewDocuments = newDocuments.slice(0, maxKeywordDocs);
+        relevantDocuments.push(...limitedNewDocuments);
+        
+        console.log(`Added ${limitedNewDocuments.length} new documents from keyword search (limited from ${newDocuments.length}, ${relevantDocuments.length} total)`);
         console.log('Final relevant documents:', relevantDocuments.map(doc => ({
           id: doc.veeva_document_id || doc.document_id,
           number: doc.document_number,
@@ -1225,7 +1229,7 @@ export const handler = async (event) => {
       const manualSummariesIncluded = new Set();
 
       // Truncate chunk text to prevent oversized contexts (especially for comparison queries)
-      const MAX_CHUNK_TEXT_LENGTH = isComparisonQuery ? 1200 : 1500;
+      const MAX_CHUNK_TEXT_LENGTH = isComparisonQuery ? 800 : 1500;
       
       const chunkContext = relevantChunks.map((chunk, index) => {
         const docId = chunk.veeva_document_id || chunk.upload_document_id;
@@ -1268,7 +1272,7 @@ Status: ${doc.status || 'Unknown'}`;
 
           // Add AI summary if available (truncated for comparison queries)
           if (doc.summary) {
-            const maxSummaryLength = isComparisonQuery ? 600 : 800;
+            const maxSummaryLength = isComparisonQuery ? 400 : 800;
             const summaryText = doc.summary.length > maxSummaryLength 
               ? doc.summary.substring(0, maxSummaryLength) + '...' 
               : doc.summary;
@@ -1277,7 +1281,7 @@ Status: ${doc.status || 'Unknown'}`;
 
           // Add manual summary if available (truncated for comparison queries)
           if (doc.manual_summary) {
-            const maxSummaryLength = isComparisonQuery ? 600 : 800;
+            const maxSummaryLength = isComparisonQuery ? 400 : 800;
             const summaryText = doc.manual_summary.length > maxSummaryLength 
               ? doc.manual_summary.substring(0, maxSummaryLength) + '...' 
               : doc.manual_summary;
@@ -1314,7 +1318,7 @@ Status: ${doc.status || 'Unknown'}`;
 
           // Add AI summary if available (truncated for comparison queries)
           if (doc.summary) {
-            const maxSummaryLength = isComparisonQuery ? 600 : 800;
+            const maxSummaryLength = isComparisonQuery ? 400 : 800;
             const summaryText = doc.summary.length > maxSummaryLength 
               ? doc.summary.substring(0, maxSummaryLength) + '...' 
               : doc.summary;
@@ -1323,7 +1327,7 @@ Status: ${doc.status || 'Unknown'}`;
 
           // Add manual summary if available (truncated for comparison queries)
           if (doc.manual_summary) {
-            const maxSummaryLength = isComparisonQuery ? 600 : 800;
+            const maxSummaryLength = isComparisonQuery ? 400 : 800;
             const summaryText = doc.manual_summary.length > maxSummaryLength 
               ? doc.manual_summary.substring(0, maxSummaryLength) + '...' 
               : doc.manual_summary;
@@ -1343,7 +1347,7 @@ Original Filename: ${doc.original_filename || doc.document_name}`;
 
           // Add AI summary if available (truncated for comparison queries)
           if (doc.ai_summary) {
-            const maxSummaryLength = isComparisonQuery ? 600 : 800;
+            const maxSummaryLength = isComparisonQuery ? 400 : 800;
             const summaryText = doc.ai_summary.length > maxSummaryLength 
               ? doc.ai_summary.substring(0, maxSummaryLength) + '...' 
               : doc.ai_summary;
@@ -1605,7 +1609,7 @@ ${externalResourcesContext}`;
 
     try {
       // For comparison queries, increase max_tokens to allow detailed analysis
-      const maxTokens = isComparisonQuery ? 3000 : 2000;
+      const maxTokens = isComparisonQuery ? 4000 : 2000;
       
       completion = await runChatCompletionWithTimeout(groq, {
         model: primaryModel,
@@ -1689,7 +1693,7 @@ ${externalResourcesContext}`;
         try {
           const fallbackStart = Date.now();
           // For comparison queries, increase max_tokens to allow detailed analysis
-          const fallbackMaxTokens = isComparisonQuery ? 3000 : 2000;
+          const fallbackMaxTokens = isComparisonQuery ? 4000 : 2000;
           
           const fallbackCompletion = await runChatCompletionWithTimeout(openai, {
             model: fallbackModel,
