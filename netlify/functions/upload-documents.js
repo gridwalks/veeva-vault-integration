@@ -632,7 +632,7 @@ export const handler = async (event) => {
       const uniqueFiles = [];
 
       for (const file of files) {
-        const hash = createHash('sha1').update(file.buffer).digest('hex');
+        const hash = createHash('sha256').update(file.buffer).digest('hex');
         const signature = `${file.fileName}:${file.size}:${hash}`;
 
         if (seenSignatures.has(signature)) {
