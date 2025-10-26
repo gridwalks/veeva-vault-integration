@@ -78,9 +78,13 @@ export default function MyNotebook({ isOpen, onClose }) {
             fontSize: '20px',
             fontWeight: '600',
             color: '#374151',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}>
-            📓 My Notebook
+            <img src="/notebook-icon.png" alt="Notebook" style={{ width: '24px', height: '24px' }} />
+            My Notebook
           </h2>
           <button
             onClick={onClose}
