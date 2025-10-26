@@ -1,9 +1,4 @@
-import { Pool } from 'pg';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+import { getStore } from '@netlify/blobs';
 
 export const handler = async (event) => {
   console.log('=== LIST BLOB DOCUMENTS ===');
@@ -49,78 +44,91 @@ export const handler = async (event) => {
 
     console.log('Query parameters:', { limit, offset, search, userId });
 
-    // Query uploaded documents from database
-    console.log('Querying uploaded documents from database...');
+    // Initialize blob store
+    console.log('Initializing blob store...');
+    const STORE_NAME = 'chat-uploads';
+    const store = await getStore({
+      name: STORE_NAME,
+      siteID: process.env.NETLIFY_BLOBS_SITE_ID,
+      token: process.env.NETLIFY_BLOBS_TOKEN
+    });
+
+    // List all blobs from storage
+    console.log('Listing all blobs from blob storage...');
+    const listResult = await store.list();
+    const blobs = Array.isArray(listResult?.blobs) ? listResult.blobs : Array.isArray(listResult) ? listResult : [];
     
-    let query = `
-      SELECT 
-        id,
-        document_name,
-        document_type,
-        version,
-        ai_summary,
-        file_size,
-        extraction_method,
-        blob_url,
-        original_filename,
-        mime_type,
-        created_at,
-        updated_at,
-        source_type,
-        user_id
-      FROM qms_chat_documents 
-      WHERE source_type = 'upload'
-    `;
+    console.log(`Found ${blobs.length} blobs in storage`);
+
+    // Process blobs to extract directory structure and documents
+    const directoryMap = new Map();
+    const documents = [];
     
-    const queryParams = [];
-    
-    // Add user filter if userId is provided
-    if (userId) {
-      query += ` AND user_id = $1`;
-      queryParams.push(userId);
+    for (const blob of blobs) {
+      const key = blob.key;
+      
+      // Extract directory structure (first part before /)
+      const pathParts = key.split('/');
+      const directory = pathParts.length > 1 ? pathParts[0] : '';
+      const fileName = pathParts.length > 1 ? pathParts.slice(1).join('/') : key;
+      
+      // Store directory info
+      if (!directoryMap.has(directory)) {
+        directoryMap.set(directory, []);
+      }
+      directoryMap.get(directory).push({
+        key: key,
+        fileName: fileName,
+        size: blob.size || 0,
+        metadata: blob.metadata,
+        lastModified: blob.metadata?.createdAt || blob.uploadedAt || new Date().toISOString()
+      });
     }
     
-    // Add search filter if search is provided
-    if (search) {
-      const searchParam = queryParams.length + 1;
-      query += ` AND (document_name ILIKE $${searchParam} OR original_filename ILIKE $${searchParam})`;
-      queryParams.push(`%${search}%`);
+    console.log(`Found ${directoryMap.size} directories`);
+
+    // Convert to document format
+    for (const [directory, files] of directoryMap.entries()) {
+      for (const file of files) {
+        // Apply search filter if provided
+        if (search && !file.fileName.toLowerCase().includes(search.toLowerCase()) && 
+            !directory.toLowerCase().includes(search.toLowerCase())) {
+          continue;
+        }
+        
+        const document = {
+          id: file.key,
+          document_id: file.key,
+          document_name: file.fileName,
+          original_filename: file.fileName,
+          document_type: 'blob_document',
+          source_type: 'blob',
+          file_size: file.size,
+          created_at: file.lastModified,
+          updated_at: file.lastModified,
+          mime_type: 'application/octet-stream',
+          chunk_count: 0,
+          blob_metadata: {
+            key: file.key,
+            directory: directory,
+            metadata: file.metadata
+          },
+          isUploaded: true
+        };
+        
+        documents.push(document);
+      }
     }
     
-    query += ` ORDER BY created_at DESC`;
-    
-    console.log('Executing query:', query);
-    console.log('Query parameters:', queryParams);
-    
-    const result = await pool.query(query, queryParams);
-    const documents = result.rows.map(doc => ({
-      id: doc.id,
-      document_id: doc.id,
-      document_name: doc.document_name,
-      document_type: doc.document_type || 'uploaded_document',
-      version: doc.version || '1.0',
-      ai_summary: doc.ai_summary,
-      file_size: doc.file_size,
-      extraction_method: doc.extraction_method,
-      blob_url: doc.blob_url,
-      original_filename: doc.original_filename,
-      mime_type: doc.mime_type || 'application/octet-stream',
-      chunk_count: 0, // Will be calculated separately if needed
-      created_at: doc.created_at,
-      updated_at: doc.updated_at,
-      source_type: doc.source_type,
-      user_id: doc.user_id,
-      isUploaded: true
-    }));
-    
-    console.log(`Found ${documents.length} uploaded documents in database`);
+    // Sort by created_at descending
+    documents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     // Apply pagination
     const total = documents.length;
     const paginatedDocuments = documents.slice(offset, offset + limit);
 
     const duration = Date.now() - startTime;
-    console.log(`Database query completed in ${duration}ms, returning ${paginatedDocuments.length} documents`);
+    console.log(`Blob listing completed in ${duration}ms, returning ${paginatedDocuments.length} documents from ${directoryMap.size} directories`);
 
     return {
       statusCode: 200,
@@ -137,7 +145,8 @@ export const handler = async (event) => {
         pageSize: limit,
         pageOffset: offset,
         duration: `${duration}ms`,
-        source: 'database'
+        source: 'blob',
+        directories: directoryMap.size
       })
     };
 

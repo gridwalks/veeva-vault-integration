@@ -230,7 +230,12 @@ export default function BlobDocumentList({ userId, onDocumentDeleted }) {
                       <div style={{ fontWeight: '500', color: '#495057' }}>
                         {doc.document_name || doc.original_filename || 'Untitled'}
                       </div>
-                      {doc.blob_metadata && (
+                      {doc.blob_metadata && doc.blob_metadata.directory && (
+                        <div style={{ fontSize: '11px', color: '#007bff', marginTop: '2px' }}>
+                          📁 {doc.blob_metadata.directory}
+                        </div>
+                      )}
+                      {doc.blob_metadata && doc.blob_metadata.key && (
                         <div style={{ fontSize: '11px', color: '#6c757d', marginTop: '2px' }}>
                           Key: {doc.blob_metadata.key}
                         </div>
