@@ -2001,15 +2001,6 @@ The documents will be automatically included in the comparison analysis.
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: '#4b5563' }}>
-                <input
-                  type="checkbox"
-                  checked={purgeUploadsOnClear}
-                  onChange={(event) => setPurgeUploadsOnClear(event.target.checked)}
-                  style={{ cursor: 'pointer' }}
-                />
-                Delete uploads on clear
-              </label>
               {conversationHistory.length > 0 && (
                 <button
                   onClick={clearConversation}
