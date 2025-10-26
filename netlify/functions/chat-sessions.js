@@ -191,10 +191,10 @@ async function getChatSessions(pool, queryParams, headers) {
     }
 
     // Get total count and paginated results
-    paramCount++;
     const countQuery = `SELECT COUNT(*) FROM qms_chat_sessions${whereClause}`;
     const countResult = await pool.query(countQuery, queryParams_array);
     
+    // Add limit and offset parameters
     paramCount++;
     const dataQuery = `
       SELECT * FROM qms_chat_sessions
