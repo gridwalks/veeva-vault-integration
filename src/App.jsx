@@ -210,6 +210,12 @@ useEffect(() => {
         /* Profile Screen */
         <UserProfile user={localUser || user} onUpdateUser={handleUserUpdate} />
       ) : null}
+
+      {/* My Notebook Modal */}
+      <MyNotebook 
+        isOpen={showMyNotebook}
+        onClose={() => setShowMyNotebook(false)}
+      />
     </div>
   );
 }
