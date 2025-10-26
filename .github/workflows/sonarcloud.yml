@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 name: SonarCloud Scan
 
 on:
@@ -40,3 +41,14 @@ jobs:
             -Dsonar.scm.forceReloadAll=true
             -Dsonar.projectVersion=${{ github.run_id }}
 
+=======
+- name: SonarCloud Scan
+  uses: SonarSource/sonarcloud-github-action@v2
+  with:
+    projectBaseDir: .
+  env:
+    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    SONAR_SCANNER_OPTS: >
+      -Dsonar.scm.forceReloadAll=true
+      -Dsonar.projectVersion=${{ github.run_id }}
+>>>>>>> dedb8e9dc83f71add4d3a34914fdbf522f0f5420
