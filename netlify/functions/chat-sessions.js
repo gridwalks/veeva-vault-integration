@@ -132,6 +132,27 @@ async function getChatSessions(pool, queryParams, headers) {
   const user_id = queryParams?.user_id;
 
   try {
+    // Try to ensure table exists first
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS qms_chat_sessions (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        session_name VARCHAR(500),
+        conversation_history JSONB NOT NULL,
+        document_metadata JSONB,
+        message_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_sessions_user_id ON qms_chat_sessions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_sessions_created_at ON qms_chat_sessions(created_at);
+    `);
+  } catch (tableError) {
+    console.error('Error ensuring table exists:', tableError);
+    // Continue anyway, table might already exist
+  }
+
+  try {
     let whereClause = '';
     let queryParams_array = [];
     let paramCount = 0;
