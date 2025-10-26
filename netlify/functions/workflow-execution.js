@@ -367,7 +367,7 @@ Examples:
 // Start a new workflow instance
 async function startWorkflow(pool, requestBody) {
   try {
-    const { templateId, userId, sessionId } = JSON.parse(requestBody);
+    const { templateId, userId, sessionId, createdByUserName, isPublic } = JSON.parse(requestBody);
     
     if (!templateId) {
       return {
@@ -382,13 +382,13 @@ async function startWorkflow(pool, requestBody) {
 
     console.log(`Starting workflow for template ID: ${templateId}`);
 
-    // Create new workflow instance
+    // Create new workflow instance with user information
     const result = await pool.query(`
       INSERT INTO qms_chat_workflow_instances 
-      (workflow_template_id, user_id, session_id, status, current_step, responses, created_at, updated_at)
-      VALUES ($1, $2, $3, 'in_progress', 1, '{}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      RETURNING id, workflow_template_id, user_id, session_id, status, current_step, responses, created_at, updated_at
-    `, [templateId, userId || null, sessionId || null]);
+      (workflow_template_id, user_id, session_id, status, current_step, responses, is_public, created_by_user_name, created_at, updated_at)
+      VALUES ($1, $2, $3, 'in_progress', 1, '{}', $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING id, workflow_template_id, user_id, session_id, status, current_step, responses, is_public, created_by_user_name, created_at, updated_at
+    `, [templateId, userId || null, sessionId || null, isPublic || false, createdByUserName || 'Unknown User']);
 
     const instance = result.rows[0];
 

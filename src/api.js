@@ -1119,14 +1119,16 @@ export async function exportQAInteractions({ search = '', user_id, session_id, s
 }
 
 // Workflow Instances API functions
-export async function getWorkflowInstances({ status, limit = 50, offset = 0, userId } = {}) {
+export async function getWorkflowInstances({ status, limit = 50, offset = 0, userId, viewMode = 'my_workflows', isAdmin = false } = {}) {
   const startTime = Date.now();
-  console.log('Fetching workflow instances...', { status, limit, offset, userId });
+  console.log('Fetching workflow instances...', { status, limit, offset, userId, viewMode, isAdmin });
   
   try {
     const params = new URLSearchParams({ limit, offset });
     if (status) params.set('status', status);
     if (userId) params.set('userId', userId);
+    if (viewMode) params.set('viewMode', viewMode);
+    if (isAdmin) params.set('isAdmin', isAdmin);
     
     const res = await fetch(`/api/workflow-management/workflow-instances?${params}`);
     
@@ -1150,6 +1152,51 @@ export async function getWorkflowInstances({ status, limit = 50, offset = 0, use
   } catch (error) {
     const duration = Date.now() - startTime;
     console.error(`Error fetching workflow instances after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
+export async function updateWorkflowVisibility({ instanceId, isPublic, userId, isAdmin = false }) {
+  const startTime = Date.now();
+  console.log('Updating workflow visibility...', { instanceId, isPublic, userId, isAdmin });
+  
+  try {
+    const res = await fetch(`/api/workflow-management/workflow-instances/${instanceId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        isPublic,
+        userId,
+        isAdmin
+      })
+    });
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to update workflow visibility:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText
+      });
+      throw new Error(`Failed to update workflow visibility: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Workflow visibility updated in ${duration}ms:`, {
+      instanceId,
+      isPublic
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error updating workflow visibility after ${duration}ms:`, {
       message: error.message,
       stack: error.stack
     });

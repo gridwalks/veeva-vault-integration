@@ -154,6 +154,8 @@ export const handler = async (event) => {
           return await updateWorkflowTemplate(pool, templateId, event.body);
         } else if (resource === 'workflow-steps' && templateId) {
           return await updateWorkflowStep(pool, templateId, event.body);
+        } else if (resource === 'workflow-instances' && templateId) {
+          return await updateWorkflowInstanceVisibility(pool, templateId, event.body);
         }
         break;
 
@@ -840,6 +842,8 @@ async function getWorkflowInstances(pool, queryParams) {
     const offset = parseInt(queryParams?.offset) || 0;
     const status = queryParams?.status;
     const userId = queryParams?.userId;
+    const viewMode = queryParams?.viewMode || 'my_workflows'; // 'my_workflows', 'public', 'all'
+    const isAdmin = queryParams?.isAdmin === 'true';
     
     let query = `
       SELECT 
@@ -852,6 +856,8 @@ async function getWorkflowInstances(pool, queryParams) {
         wi.responses,
         wi.generated_document,
         wi.document_versions,
+        wi.is_public,
+        wi.created_by_user_name,
         wi.created_at,
         wi.updated_at,
         wi.completed_at,
@@ -864,15 +870,29 @@ async function getWorkflowInstances(pool, queryParams) {
     const params = [];
     let paramIndex = 1;
     
+    // Apply view mode filtering
+    if (viewMode === 'my_workflows' && userId) {
+      // Show only user's own workflows
+      query += ` AND wi.user_id = $${paramIndex}`;
+      params.push(userId);
+      paramIndex++;
+    } else if (viewMode === 'public') {
+      // Show only public workflows
+      query += ` AND wi.is_public = true`;
+    } else if (viewMode === 'all' && isAdmin) {
+      // Admin can see all workflows - no additional filter
+    } else if (viewMode === 'all' && !isAdmin) {
+      // Non-admin trying to access 'all' - fall back to 'my_workflows'
+      if (userId) {
+        query += ` AND wi.user_id = $${paramIndex}`;
+        params.push(userId);
+        paramIndex++;
+      }
+    }
+    
     if (status) {
       query += ` AND wi.status = $${paramIndex}`;
       params.push(status);
-      paramIndex++;
-    }
-    
-    if (userId) {
-      query += ` AND wi.user_id = $${paramIndex}`;
-      params.push(userId);
       paramIndex++;
     }
     
@@ -897,6 +917,8 @@ async function getWorkflowInstances(pool, queryParams) {
           responses: row.responses,
           generatedDocument: row.generated_document,
           documentVersions: row.document_versions || [],
+          isPublic: row.is_public || false,
+          createdByUserName: row.created_by_user_name || 'Unknown User',
           createdAt: row.created_at,
           updatedAt: row.updated_at,
           completedAt: row.completed_at
@@ -931,16 +953,18 @@ async function createWorkflowInstance(pool, requestBody) {
     // Insert new instance
     const result = await pool.query(`
       INSERT INTO qms_chat_workflow_instances 
-      (workflow_template_id, user_id, session_id, status, current_step, responses, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      RETURNING id, workflow_template_id, user_id, session_id, status, current_step, responses, created_at, updated_at
+      (workflow_template_id, user_id, session_id, status, current_step, responses, is_public, created_by_user_name, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING id, workflow_template_id, user_id, session_id, status, current_step, responses, is_public, created_by_user_name, created_at, updated_at
     `, [
       data.workflowTemplateId,
       data.userId || null,
       data.sessionId || null,
       data.status || 'in_progress',
       data.currentStep || 1,
-      data.responses ? JSON.stringify(data.responses) : null
+      data.responses ? JSON.stringify(data.responses) : null,
+      data.isPublic || false,
+      data.createdByUserName || 'Unknown User'
     ]);
 
     const newInstance = result.rows[0];
@@ -961,6 +985,8 @@ async function createWorkflowInstance(pool, requestBody) {
           status: newInstance.status,
           currentStep: newInstance.current_step,
           responses: newInstance.responses,
+          isPublic: newInstance.is_public || false,
+          createdByUserName: newInstance.created_by_user_name || 'Unknown User',
           createdAt: newInstance.created_at,
           updatedAt: newInstance.updated_at
         }
@@ -968,6 +994,86 @@ async function createWorkflowInstance(pool, requestBody) {
     };
   } catch (error) {
     console.error('Error creating workflow instance:', error);
+    throw error;
+  }
+}
+
+// Update workflow instance visibility
+async function updateWorkflowInstanceVisibility(pool, instanceId, requestBody) {
+  try {
+    console.log(`Updating workflow instance visibility for ID: ${instanceId}`);
+    
+    const data = JSON.parse(requestBody);
+    const { isPublic, userId, isAdmin } = data;
+    
+    if (typeof isPublic !== 'boolean') {
+      return {
+        statusCode: 400,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'isPublic must be a boolean value'
+        })
+      };
+    }
+
+    // Check if user has permission to update this workflow
+    let permissionQuery = `
+      SELECT user_id FROM qms_chat_workflow_instances 
+      WHERE id = $1
+    `;
+    const permissionResult = await pool.query(permissionQuery, [instanceId]);
+    
+    if (permissionResult.rows.length === 0) {
+      return {
+        statusCode: 404,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'Workflow instance not found'
+        })
+      };
+    }
+    
+    const workflowUserId = permissionResult.rows[0].user_id;
+    
+    // Check permissions: user can update their own workflows, admin can update any
+    if (!isAdmin && workflowUserId !== userId) {
+      return {
+        statusCode: 403,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'You do not have permission to update this workflow'
+        })
+      };
+    }
+
+    // Update the visibility
+    const updateResult = await pool.query(`
+      UPDATE qms_chat_workflow_instances 
+      SET is_public = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING id, is_public, updated_at
+    `, [isPublic, instanceId]);
+
+    const updatedInstance = updateResult.rows[0];
+
+    return {
+      statusCode: 200,
+      headers: setCorsHeaders(),
+      body: JSON.stringify({
+        success: true,
+        message: `Workflow instance ${isPublic ? 'made public' : 'made private'} successfully`,
+        instance: {
+          id: updatedInstance.id,
+          isPublic: updatedInstance.is_public,
+          updatedAt: updatedInstance.updated_at
+        }
+      })
+    };
+  } catch (error) {
+    console.error('Error updating workflow instance visibility:', error);
     throw error;
   }
 }

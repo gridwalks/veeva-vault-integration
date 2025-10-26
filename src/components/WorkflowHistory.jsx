@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getWorkflowInstances, refineWorkflowDocument } from '../api';
+import { getWorkflowInstances, refineWorkflowDocument, updateWorkflowVisibility } from '../api';
 
 export default function WorkflowHistory() {
   const [instances, setInstances] = useState([]);
@@ -7,6 +7,11 @@ export default function WorkflowHistory() {
   const [loading, setLoading] = useState(false);
   const [selectedInstance, setSelectedInstance] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  
+  // New state for user-specific and public workflows
+  const [viewMode, setViewMode] = useState('my_workflows'); // 'my_workflows', 'public', 'all'
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   
   // Filter state
   const [filters, setFilters] = useState({
@@ -21,22 +26,50 @@ export default function WorkflowHistory() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  // Load workflow instances on mount
+  // Load workflow instances on mount and when viewMode changes
   useEffect(() => {
     loadInstances();
-  }, []);
+  }, [viewMode]);
 
   // Apply filters whenever instances or filter state changes
   useEffect(() => {
     applyFilters();
   }, [instances, filters]);
 
+  const handleToggleVisibility = async (instanceId, currentIsPublic) => {
+    try {
+      await updateWorkflowVisibility({
+        instanceId,
+        isPublic: !currentIsPublic,
+        userId: currentUserId,
+        isAdmin: isAdmin
+      });
+      
+      // Reload instances to reflect the change
+      await loadInstances();
+      alert(`Workflow ${!currentIsPublic ? 'made public' : 'made private'} successfully!`);
+    } catch (error) {
+      console.error('Error toggling workflow visibility:', error);
+      alert('Failed to update workflow visibility. Please try again.');
+    }
+  };
+
   const loadInstances = async () => {
     setLoading(true);
     try {
+      // For now, we'll use a mock user ID. In a real app, this would come from authentication
+      const mockUserId = 'user123';
+      const mockIsAdmin = false; // This would be determined by user role
+      
+      setCurrentUserId(mockUserId);
+      setIsAdmin(mockIsAdmin);
+      
       const data = await getWorkflowInstances({ 
         status: filters.status === 'all' ? undefined : filters.status,
-        limit: 500 // Get more for client-side filtering
+        limit: 500, // Get more for client-side filtering
+        userId: mockUserId,
+        viewMode: viewMode,
+        isAdmin: mockIsAdmin
       });
       
       if (data.success && data.instances) {
@@ -221,6 +254,57 @@ export default function WorkflowHistory() {
         >
           {loading ? 'Refreshing...' : <><img src="/share-icon.png" alt="Refresh" style={{ width: '16px', height: '16px', marginRight: '8px' }} />Refresh</>}
         </button>
+      </div>
+
+      {/* View Mode Toggle */}
+      <div style={{
+        marginBottom: '16px',
+        padding: '12px',
+        backgroundColor: '#f0f9ff',
+        border: '1px solid #bfdbfe',
+        borderRadius: '8px'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px',
+          flexWrap: 'wrap'
+        }}>
+          <span style={{
+            fontSize: '14px',
+            fontWeight: '500',
+            color: '#1e40af',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          }}>
+            View:
+          </span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {[
+              { value: 'my_workflows', label: 'My Workflows' },
+              { value: 'public', label: 'Public Workflows' },
+              ...(isAdmin ? [{ value: 'all', label: 'All Workflows' }] : [])
+            ].map(mode => (
+              <button
+                key={mode.value}
+                onClick={() => setViewMode(mode.value)}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: viewMode === mode.value ? '#1e40af' : '#ffffff',
+                  color: viewMode === mode.value ? '#ffffff' : '#1e40af',
+                  border: '1px solid #1e40af',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Filters */}
@@ -495,6 +579,19 @@ export default function WorkflowHistory() {
                            In Progress
                          </span> : '❌ Abandoned'}
                       </span>
+                      {instance.isPublic && (
+                        <span style={{
+                          padding: '2px 8px',
+                          backgroundColor: '#e0f2fe',
+                          color: '#0369a1',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: '500',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                        }}>
+                          🌐 Public
+                        </span>
+                      )}
                     </div>
                     <div style={{
                       fontSize: '12px',
@@ -502,7 +599,7 @@ export default function WorkflowHistory() {
                       marginBottom: '6px',
                       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                     }}>
-                      {formatDate(instance.completedAt || instance.createdAt)} • ID: {instance.id}
+                      {formatDate(instance.completedAt || instance.createdAt)} • ID: {instance.id} • Created by: {instance.createdByUserName || 'Unknown User'}
                     </div>
                     <div style={{
                       fontSize: '13px',
@@ -550,6 +647,26 @@ export default function WorkflowHistory() {
                     >
                       Download
                     </button>
+                    {/* Show visibility toggle only for workflow owners or admins */}
+                    {(instance.userId === currentUserId || isAdmin) && (
+                      <button
+                        onClick={() => handleToggleVisibility(instance.id, instance.isPublic)}
+                        style={{
+                          padding: '6px 12px',
+                          backgroundColor: instance.isPublic ? '#dc2626' : '#059669',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {instance.isPublic ? 'Make Private' : 'Make Public'}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

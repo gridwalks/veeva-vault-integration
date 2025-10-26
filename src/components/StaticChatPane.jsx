@@ -736,6 +736,10 @@ The documents will be automatically included in the comparison analysis.
 
   const startWorkflow = async (template, firstStep) => {
     try {
+      // Mock user information - in a real app, this would come from authentication
+      const mockUserId = 'user123';
+      const mockUserName = 'John Doe';
+      
       const response = await fetch('/api/workflow-execution/start-workflow', {
         method: 'POST',
         headers: {
@@ -743,8 +747,10 @@ The documents will be automatically included in the comparison analysis.
         },
         body: JSON.stringify({
           templateId: template.id,
-          userId: null, // Could be enhanced to capture user info
-          sessionId: Date.now().toString()
+          userId: mockUserId,
+          createdByUserName: mockUserName,
+          sessionId: Date.now().toString(),
+          isPublic: false // Default to private
         })
       });
 
