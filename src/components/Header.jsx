@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { Menu, User, Shield, LogOut, Home, Clock } from 'lucide-react';
+import { Menu, User, Shield, LogOut, Home, BookOpen } from 'lucide-react';
 import acceleraqaLogo from '../../assets/AceleraQA_logo.png';
-import WorkflowHistory from './WorkflowHistory.jsx';
+import MyNotebook from './MyNotebook.jsx';
 
-export default function Header({ user, currentScreen, onScreenChange, onLogout, isAdmin }) {
+export default function Header({ user, currentScreen, onScreenChange, onLogout, isAdmin, onMyNotebookOpen }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [showWorkflowHistory, setShowWorkflowHistory] = useState(false);
 
   return (
     <header style={{
@@ -254,10 +253,10 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout, 
                   </button>
                 )}
 
-                {/* Workflow History */}
+                {/* My Notebook */}
                 <button
                   onClick={() => {
-                    setShowWorkflowHistory(true);
+                    onMyNotebookOpen && onMyNotebookOpen();
                     setMenuOpen(false);
                   }}
                   style={{
@@ -283,8 +282,8 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout, 
                     e.target.style.backgroundColor = 'transparent';
                   }}
                 >
-                  <Clock style={{ width: '16px', height: '16px' }} />
-                  <span>Workflow History</span>
+                  <BookOpen style={{ width: '16px', height: '16px' }} />
+                  <span>My Notebook</span>
                 </button>
 
                 {/* Divider */}
@@ -331,86 +330,6 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout, 
           )}
         </div>
       )}
-
-      {/* Workflow History Modal */}
-      {showWorkflowHistory && (
-        <WorkflowHistoryModal onClose={() => setShowWorkflowHistory(false)} />
-      )}
     </header>
-  );
-}
-
-// Workflow History Modal Component
-function WorkflowHistoryModal({ onClose }) {
-  return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      padding: '20px'
-    }}>
-      <div style={{
-        backgroundColor: '#ffffff',
-        borderRadius: '12px',
-        maxWidth: '1200px',
-        width: '100%',
-        maxHeight: '90vh',
-        overflow: 'auto',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-        position: 'relative'
-      }}>
-        {/* Header */}
-        <div style={{
-          padding: '16px 24px',
-          borderBottom: '1px solid #e5e7eb',
-          position: 'sticky',
-          top: 0,
-          backgroundColor: '#ffffff',
-          borderTopLeftRadius: '12px',
-          borderTopRightRadius: '12px',
-          zIndex: 10,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <h3 style={{
-            margin: '0',
-            fontSize: '18px',
-            fontWeight: '600',
-            color: '#374151',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          }}>
-            Workflow History
-          </h3>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px',
-              backgroundColor: 'transparent',
-              color: '#6b7280',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '20px',
-              cursor: 'pointer',
-              lineHeight: 1
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Content */}
-        <div style={{ padding: '0' }}>
-          <WorkflowHistory />
-        </div>
-      </div>
-    </div>
   );
 }

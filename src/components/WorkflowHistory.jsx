@@ -234,7 +234,9 @@ export default function WorkflowHistory() {
 
   return (
     <div style={{
-      padding: '24px'
+      padding: '24px',
+      height: '100%',
+      overflow: 'auto'
     }}>
       <div style={{
         display: 'flex',

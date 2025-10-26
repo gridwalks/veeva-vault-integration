@@ -6,6 +6,7 @@ import AdminScreen from "./components/AdminScreen.jsx";
 import SelectedDocumentViewer from "./components/SelectedDocumentViewer.jsx";
 import AuthScreen from "./components/AuthScreen.jsx";
 import UserProfile from "./components/UserProfile.jsx";
+import MyNotebook from "./components/MyNotebook.jsx";
 import { useInactivityLogout } from "./hooks/useInactivityLogout.js";
 import { useAdminRole } from "./hooks/useAdminRole.js";
 // import StatusPanel from "./components/StatusPanel.jsx";
@@ -16,6 +17,7 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState("main");
   const [selectedDocuments, setSelectedDocuments] = useState([]);
   const [localUser, setLocalUser] = useState(null);
+  const [showMyNotebook, setShowMyNotebook] = useState(false);
   const documentViewerRef = useRef(null);
 
   // Set up inactivity logout for authenticated users
@@ -160,6 +162,7 @@ useEffect(() => {
         onScreenChange={setCurrentScreen}
         onLogout={handleLogout}
         isAdmin={isAdmin}
+        onMyNotebookOpen={() => setShowMyNotebook(true)}
       />
       
       {/* Main Content Area */}
