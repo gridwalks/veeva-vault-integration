@@ -27,45 +27,38 @@ export const handler = async (event) => {
 
     const uploadSourceTypes = ['upload', 'uploaded_document', 'uploaded', 'blob_upload'];
 
-    // Helper to execute document lookup with a specific condition
-    const executeDocumentLookup = async (condition, params) => {
-      return pool.query(`
-        SELECT
-          id,
-          document_name,
-          original_filename,
-          mime_type,
-          file_size,
-          blob_url,
-          content,
-          created_at,
-          source_type
-        FROM qms_chat_documents
-        WHERE ${condition}
-        ORDER BY created_at DESC
-        LIMIT 5
-      `, params);
-    };
-
+    // Safe parameterized queries - complete hardcoded SQL strings to prevent SQL injection
     // Try to find document by ID (both as integer and as string)
     let documentResult;
 
     if (/^\d+$/.test(documentId)) {
-      documentResult = await executeDocumentLookup('id = $1', [parseInt(documentId, 10)]);
+      documentResult = await pool.query(
+        'SELECT id, document_name, original_filename, mime_type, file_size, blob_url, content, created_at, source_type FROM qms_chat_documents WHERE id = $1 ORDER BY created_at DESC LIMIT 5',
+        [parseInt(documentId, 10)]
+      );
     }
 
     if (!documentResult || documentResult.rows.length === 0) {
-      documentResult = await executeDocumentLookup('id::text = $1', [documentId]);
+      documentResult = await pool.query(
+        'SELECT id, document_name, original_filename, mime_type, file_size, blob_url, content, created_at, source_type FROM qms_chat_documents WHERE id::text = $1 ORDER BY created_at DESC LIMIT 5',
+        [documentId]
+      );
     }
 
     // If not found, try matching by blob key
     if (documentResult.rows.length === 0) {
-      documentResult = await executeDocumentLookup('blob_url = $1', [documentId]);
+      documentResult = await pool.query(
+        'SELECT id, document_name, original_filename, mime_type, file_size, blob_url, content, created_at, source_type FROM qms_chat_documents WHERE blob_url = $1 ORDER BY created_at DESC LIMIT 5',
+        [documentId]
+      );
     }
 
     // If still not found, try searching by name or original filename (loose match)
     if (documentResult.rows.length === 0) {
-      documentResult = await executeDocumentLookup('document_name ILIKE $1 OR original_filename ILIKE $1', [`%${documentId}%`]);
+      documentResult = await pool.query(
+        'SELECT id, document_name, original_filename, mime_type, file_size, blob_url, content, created_at, source_type FROM qms_chat_documents WHERE document_name ILIKE $1 OR original_filename ILIKE $1 ORDER BY created_at DESC LIMIT 5',
+        [`%${documentId}%`]
+      );
     }
 
     // Filter results to only include upload-backed documents
