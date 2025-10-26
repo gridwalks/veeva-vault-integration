@@ -136,6 +136,10 @@ export const handler = async (event) => {
           return await repolishWorkflowDocument(pool, event.body);
         } else if (action === 'refine-document') {
           return await refineWorkflowDocument(pool, event.body);
+        } else if (action === 'pause-workflow') {
+          return await pauseWorkflow(pool, event.body);
+        } else if (action === 'resume-workflow') {
+          return await resumeWorkflow(pool, event.body);
         }
 
       case 'GET':
@@ -452,6 +456,206 @@ async function startWorkflow(pool, requestBody) {
 
   } catch (error) {
     console.error('Error starting workflow:', error);
+    throw error;
+  }
+}
+
+// Pause a workflow instance
+async function pauseWorkflow(pool, requestBody) {
+  try {
+    const { instanceId, userId } = JSON.parse(requestBody);
+    
+    if (!instanceId || !userId) {
+      return {
+        statusCode: 400,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'Instance ID and user ID are required'
+        })
+      };
+    }
+    
+    // Verify user owns this workflow
+    const instance = await pool.query(
+      'SELECT user_id FROM qms_chat_workflow_instances WHERE id = $1',
+      [instanceId]
+    );
+    
+    if (instance.rows.length === 0) {
+      return {
+        statusCode: 404,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'Workflow instance not found'
+        })
+      };
+    }
+    
+    if (instance.rows[0].user_id !== userId) {
+      return {
+        statusCode: 403,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'Unauthorized'
+        })
+      };
+    }
+    
+    // Update status to paused
+    await pool.query(
+      `UPDATE qms_chat_workflow_instances 
+       SET status = 'paused', paused_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [instanceId]
+    );
+    
+    console.log(`Workflow instance ${instanceId} paused by user ${userId}`);
+    
+    return {
+      statusCode: 200,
+      headers: setCorsHeaders(),
+      body: JSON.stringify({
+        success: true,
+        message: 'Workflow paused successfully'
+      })
+    };
+    
+  } catch (error) {
+    console.error('Error pausing workflow:', error);
+    throw error;
+  }
+}
+
+// Resume a paused workflow instance
+async function resumeWorkflow(pool, requestBody) {
+  try {
+    const { instanceId, userId } = JSON.parse(requestBody);
+    
+    if (!instanceId || !userId) {
+      return {
+        statusCode: 400,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'Instance ID and user ID are required'
+        })
+      };
+    }
+    
+    // Get workflow instance with all details
+    const result = await pool.query(`
+      SELECT wi.*, wt.name as workflow_name
+      FROM qms_chat_workflow_instances wi
+      JOIN qms_chat_workflow_templates wt ON wi.workflow_template_id = wt.id
+      WHERE wi.id = $1 AND wi.user_id = $2 AND wi.status = 'paused'
+    `, [instanceId, userId]);
+    
+    if (result.rows.length === 0) {
+      return {
+        statusCode: 404,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'Workflow not found or not paused'
+        })
+      };
+    }
+    
+    const instance = result.rows[0];
+    
+    // Check if workflow is expired (30 days)
+    const pausedDate = new Date(instance.paused_at);
+    const daysSincePaused = (Date.now() - pausedDate.getTime()) / (1000 * 60 * 60 * 24);
+    
+    if (daysSincePaused > 30) {
+      return {
+        statusCode: 410,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'Workflow has expired (paused for more than 30 days)'
+        })
+      };
+    }
+    
+    // Get current step details
+    const stepResult = await pool.query(`
+      SELECT * FROM qms_chat_workflow_steps 
+      WHERE workflow_template_id = $1 AND step_order = $2
+    `, [instance.workflow_template_id, instance.current_step]);
+    
+    if (stepResult.rows.length === 0) {
+      return {
+        statusCode: 500,
+        headers: setCorsHeaders(),
+        body: JSON.stringify({
+          success: false,
+          error: 'Current step not found'
+        })
+      };
+    }
+    
+    // Get all steps for summary
+    const allSteps = await pool.query(`
+      SELECT step_order, question_text 
+      FROM qms_chat_workflow_steps 
+      WHERE workflow_template_id = $1 AND step_order < $2
+      ORDER BY step_order
+    `, [instance.workflow_template_id, instance.current_step]);
+    
+    // Update status back to in_progress
+    await pool.query(
+      `UPDATE qms_chat_workflow_instances 
+       SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [instanceId]
+    );
+    
+    console.log(`Workflow instance ${instanceId} resumed by user ${userId}`);
+    
+    return {
+      statusCode: 200,
+      headers: setCorsHeaders(),
+      body: JSON.stringify({
+        success: true,
+        message: 'Workflow resumed successfully',
+        instance: {
+          id: instance.id,
+          workflowTemplateId: instance.workflow_template_id,
+          workflowName: instance.workflow_name,
+          userId: instance.user_id,
+          sessionId: instance.session_id,
+          status: 'in_progress',
+          currentStep: instance.current_step,
+          responses: instance.responses,
+          createdAt: instance.created_at,
+          updatedAt: instance.updated_at
+        },
+        currentStep: {
+          id: stepResult.rows[0].id,
+          stepOrder: stepResult.rows[0].step_order,
+          questionText: stepResult.rows[0].question_text,
+          inputType: stepResult.rows[0].input_type,
+          options: stepResult.rows[0].options,
+          validationRules: stepResult.rows[0].validation_rules,
+          conditionalLogic: stepResult.rows[0].conditional_logic,
+          isRequired: stepResult.rows[0].is_required,
+          placeholderText: stepResult.rows[0].placeholder_text,
+          helpText: stepResult.rows[0].help_text
+        },
+        completedSteps: allSteps.rows.map(step => ({
+          stepOrder: step.step_order,
+          questionText: step.question_text
+        })),
+        responses: instance.responses
+      })
+    };
+    
+  } catch (error) {
+    console.error('Error resuming workflow:', error);
     throw error;
   }
 }

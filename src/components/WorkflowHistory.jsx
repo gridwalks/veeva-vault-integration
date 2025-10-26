@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
-import { getWorkflowInstances, refineWorkflowDocument, updateWorkflowVisibility } from '../api';
+import { getWorkflowInstances, refineWorkflowDocument, updateWorkflowVisibility, resumeWorkflow } from '../api';
 import { useAdminRole } from '../hooks/useAdminRole';
 
 export default function WorkflowHistory() {
@@ -58,6 +58,40 @@ export default function WorkflowHistory() {
     } catch (error) {
       console.error('Error toggling workflow visibility:', error);
       alert('Failed to update workflow visibility. Please try again.');
+    }
+  };
+
+  const handleResumeWorkflow = async (instanceId) => {
+    try {
+      if (!user) {
+        alert('User not authenticated');
+        return;
+      }
+      
+      // Call the resume API
+      const data = await resumeWorkflow({
+        instanceId,
+        userId: user.sub
+      });
+      
+      // Navigate to main chat screen and trigger resume
+      // This will need to communicate with the parent component
+      if (window.parent && window.parent.postMessage) {
+        window.parent.postMessage({
+          type: 'RESUME_WORKFLOW',
+          instanceId: instanceId,
+          workflowData: data
+        }, '*');
+      }
+      
+      alert('Workflow resumed! Switching to chat...');
+      
+      // Reload instances to reflect the status change
+      await loadInstances();
+      
+    } catch (error) {
+      console.error('Error resuming workflow:', error);
+      alert(error.message || 'Failed to resume workflow. It may have expired.');
     }
   };
 
@@ -384,6 +418,7 @@ export default function WorkflowHistory() {
               <option value="all">All Status</option>
               <option value="completed">Completed</option>
               <option value="in_progress">In Progress</option>
+              <option value="paused">Paused</option>
               <option value="abandoned">Abandoned</option>
             </select>
           </div>
@@ -681,6 +716,26 @@ export default function WorkflowHistory() {
                         }}
                       >
                         {instance.isPublic ? 'Make Private' : 'Make Public'}
+                      </button>
+                    )}
+                    {/* Show Resume button for paused workflows */}
+                    {instance.status === 'paused' && (
+                      <button
+                        onClick={() => handleResumeWorkflow(instance.id)}
+                        style={{
+                          padding: '6px 12px',
+                          backgroundColor: '#2563eb',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Resume Workflow
                       </button>
                     )}
                   </div>

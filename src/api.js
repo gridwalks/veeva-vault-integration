@@ -1390,3 +1390,84 @@ export async function acceptRegeneratedSummary({ documentId, newSummary }) {
     throw error;
   }
 }
+
+// Pause a workflow instance
+export async function pauseWorkflow({ instanceId, userId }) {
+  const startTime = Date.now();
+  console.log('Pausing workflow...', { instanceId, userId });
+  
+  try {
+    const res = await fetch('/api/workflow-execution/pause-workflow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ instanceId, userId })
+    });
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to pause workflow:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText
+      });
+      throw new Error(`Failed to pause workflow: ${res.status} ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Workflow paused in ${duration}ms:`, {
+      instanceId,
+      success: data.success
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error pausing workflow after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
+// Resume a paused workflow instance
+export async function resumeWorkflow({ instanceId, userId }) {
+  const startTime = Date.now();
+  console.log('Resuming workflow...', { instanceId, userId });
+  
+  try {
+    const res = await fetch('/api/workflow-execution/resume-workflow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ instanceId, userId })
+    });
+    
+    if (!res.ok) {
+      const error = await res.json();
+      console.error('Failed to resume workflow:', {
+        status: res.status,
+        statusText: res.statusText,
+        error: error.error
+      });
+      throw new Error(error.error || 'Failed to resume workflow');
+    }
+    
+    const data = await res.json();
+    const duration = Date.now() - startTime;
+    console.log(`Workflow resumed in ${duration}ms:`, {
+      instanceId,
+      success: data.success,
+      workflowName: data.instance?.workflowName
+    });
+    
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error resuming workflow after ${duration}ms:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}

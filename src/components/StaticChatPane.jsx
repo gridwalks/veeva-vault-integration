@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { useAuth0 } from '@auth0/auth0-react';
 import DocumentViewer from './DocumentViewer.jsx';
 import ChatPromptBox from './ChatPromptBox.jsx';
-import { createQAInteraction, getUploadedDocuments, downloadUploadedDocumentUrl, updateQAFeedback } from '../api';
+import { createQAInteraction, getUploadedDocuments, downloadUploadedDocumentUrl, updateQAFeedback, pauseWorkflow, resumeWorkflow } from '../api';
 
 // Helper function to estimate token count (rough approximation)
 const estimateTokens = (text) => {
@@ -21,7 +21,7 @@ const estimateConversationTokens = (conversationHistory) => {
   }, 0);
 };
 
-export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane, userId }) {
+export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane, userId, resumeWorkflowId, onResumeWorkflowComplete }) {
   const { user } = useAuth0();
   const [conversationHistory, setConversationHistory] = useState([]);
   const [attachedDocuments, setAttachedDocuments] = useState([]);
@@ -102,6 +102,18 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     }
     prevLoadingRef.current = isLoading;
   }, [conversationHistory, isLoading]);
+
+  // Handle resume workflow from WorkflowHistory
+  useEffect(() => {
+    if (resumeWorkflowId && user) {
+      console.log('Resuming workflow:', resumeWorkflowId);
+      handleResumeWorkflow(resumeWorkflowId);
+      // Clear the resumeWorkflowId to prevent re-triggering
+      if (onResumeWorkflowComplete) {
+        onResumeWorkflowComplete();
+      }
+    }
+  }, [resumeWorkflowId, user, onResumeWorkflowComplete]);
 
 
   const uploadFileToBlob = async (file) => {
@@ -286,6 +298,12 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     // Check for exit workflow command
     if (userMessage.toLowerCase().includes('exit workflow')) {
       exitWorkflow();
+      return;
+    }
+
+    // Check for save and exit workflow command
+    if (userMessage.toLowerCase().includes('save and exit')) {
+      await saveAndExitWorkflow();
       return;
     }
 
@@ -771,7 +789,7 @@ The documents will be automatically included in the comparison analysis.
 
         // Build workflow start message (no SOP search during workflow)
         let startMessage = `🚀 **${template.name}** workflow started!\n\n`;
-        startMessage += `**${data.currentStep.questionText}**\n\n${data.currentStep.helpText ? `*${data.currentStep.helpText}*` : ''}\n\nType "exit workflow" at any time to cancel.`;
+        startMessage += `**${data.currentStep.questionText}**\n\n${data.currentStep.helpText ? `*${data.currentStep.helpText}*` : ''}\n\nType "save and exit" to pause, or "exit workflow" to cancel.`;
 
         // Add workflow start message to conversation
         setConversationHistory(prev => [
@@ -1059,6 +1077,87 @@ The documents will be automatically included in the comparison analysis.
       }
     ]);
     setIsLoading(false);
+  };
+
+  const saveAndExitWorkflow = async () => {
+    try {
+      if (!user) {
+        alert('User not authenticated');
+        return;
+      }
+      
+      await pauseWorkflow({
+        instanceId: workflowState.instanceId,
+        userId: user.sub
+      });
+      
+      setWorkflowState({
+        isActive: false,
+        instanceId: null,
+        currentStep: null,
+        template: null,
+        responses: {}
+      });
+      
+      setConversationHistory(prev => [
+        ...prev,
+        { 
+          role: 'assistant', 
+          content: 'Workflow saved! You can resume it later from the Workflow History page.' 
+        }
+      ]);
+    } catch (error) {
+      console.error('Error saving workflow:', error);
+      alert('Failed to save workflow. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResumeWorkflow = async (instanceId) => {
+    try {
+      if (!user) {
+        alert('User not authenticated');
+        return;
+      }
+      
+      const data = await resumeWorkflow({
+        instanceId,
+        userId: user.sub
+      });
+      
+      // Build summary of completed steps
+      let summaryMessage = `Resuming **${data.instance.workflowName}** workflow...\n\n`;
+      summaryMessage += `**Progress Summary:**\n`;
+      
+      data.completedSteps.forEach((step, idx) => {
+        const response = data.responses[step.stepOrder];
+        summaryMessage += `${idx + 1}. ${step.questionText}\n   ✓ ${response || 'Answered'}\n\n`;
+      });
+      
+      summaryMessage += `---\n\n**${data.currentStep.questionText}**\n\n`;
+      summaryMessage += data.currentStep.helpText ? `*${data.currentStep.helpText}*\n\n` : '';
+      summaryMessage += `Type your answer or "save and exit" to pause again.`;
+      
+      // Update workflow state
+      setWorkflowState({
+        isActive: true,
+        instanceId: data.instance.id,
+        currentStep: data.currentStep,
+        template: { id: data.instance.workflowTemplateId, name: data.instance.workflowName },
+        responses: data.responses
+      });
+      
+      // Add resume message to conversation
+      setConversationHistory(prev => [
+        ...prev,
+        { role: 'assistant', content: summaryMessage }
+      ]);
+      
+    } catch (error) {
+      console.error('Error resuming workflow:', error);
+      alert(error.message || 'Failed to resume workflow. It may have expired.');
+    }
   };
 
   const renderMessage = (message, index) => {

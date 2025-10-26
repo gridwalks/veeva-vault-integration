@@ -18,6 +18,7 @@ export default function App() {
   const [selectedDocuments, setSelectedDocuments] = useState([]);
   const [localUser, setLocalUser] = useState(null);
   const [showMyNotebook, setShowMyNotebook] = useState(false);
+  const [resumeWorkflowId, setResumeWorkflowId] = useState(null);
   const documentViewerRef = useRef(null);
 
   // Set up inactivity logout for authenticated users
@@ -71,6 +72,20 @@ useEffect(() => {
   console.log('Client ID:', import.meta.env.VITE_AUTH0_CLIENT_ID);
   console.log('User object:', user);
 }, [user]);
+
+// Listen for resume workflow messages from WorkflowHistory
+useEffect(() => {
+  const handleMessage = (event) => {
+    if (event.data && event.data.type === 'RESUME_WORKFLOW') {
+      console.log('Received resume workflow message:', event.data);
+      setResumeWorkflowId(event.data.instanceId);
+      setCurrentScreen('main'); // Switch to main chat screen
+    }
+  };
+
+  window.addEventListener('message', handleMessage);
+  return () => window.removeEventListener('message', handleMessage);
+}, []);
 
   if (!isAuthenticated) {
     return <AuthScreen onLogin={() => loginWithRedirect()} />;
@@ -187,6 +202,8 @@ useEffect(() => {
               selectedDocuments={selectedDocuments} 
               onOpenDocumentInPane={handleOpenDocumentInPane}
               userId={(localUser || user)?.sub}
+              resumeWorkflowId={resumeWorkflowId}
+              onResumeWorkflowComplete={() => setResumeWorkflowId(null)}
             />
           </div>
 
