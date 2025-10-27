@@ -504,7 +504,6 @@ export default function WorkflowManagement() {
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
-,
                   minHeight: '80px',
                   resize: 'vertical'
                 }}
@@ -607,7 +606,6 @@ export default function WorkflowManagement() {
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
-,
                   minHeight: '120px',
                   resize: 'vertical'
                 }}
@@ -745,7 +743,6 @@ export default function WorkflowManagement() {
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
-,
                   minHeight: '80px',
                   resize: 'vertical'
                 }}
@@ -877,9 +874,8 @@ export default function WorkflowManagement() {
                   padding: '8px 12px',
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
-                  fontSize: '14px',
-,
-                  minHeight: '60px',
+                    fontSize: '14px',
+                    minHeight: '60px',
                   resize: 'vertical'
                 }}
                 placeholder="Optional help text to guide the user"
@@ -985,7 +981,6 @@ export default function WorkflowManagement() {
                   fontSize: '13px',
                   fontWeight: '500',
                   color: '#374151',
-,
                   cursor: stepForm.groupId ? 'pointer' : 'not-allowed',
                   opacity: stepForm.groupId ? 1 : 0.5
                 }}>
@@ -1026,9 +1021,8 @@ export default function WorkflowManagement() {
                         padding: '8px 10px',
                         border: '1px solid #d1d5db',
                         borderRadius: '4px',
-                        fontSize: '13px',
-,
-                        minHeight: '80px',
+                    fontSize: '13px',
+                    minHeight: '80px',
                         resize: 'vertical'
                       }}
                       placeholder="e.g., Synthesize these answers into a cohesive root cause analysis paragraph, maintaining technical accuracy and professional tone."
