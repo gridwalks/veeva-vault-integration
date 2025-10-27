@@ -1378,7 +1378,6 @@ export default function WorkflowManagement() {
                             borderRadius: '4px',
                             fontSize: '12px',
                             fontWeight: '500',
-,
                             border: '1px solid #bae6fd'
                           }}>
                             🔗 {step.groupId}
@@ -1541,7 +1540,6 @@ export default function WorkflowManagement() {
                               border: '1px solid #d1d5db',
                               borderRadius: '4px',
                               fontSize: '13px',
-,
                               minHeight: '60px',
                               resize: 'vertical'
                             }}
@@ -1644,7 +1642,6 @@ export default function WorkflowManagement() {
                               fontSize: '13px',
                               fontWeight: '500',
                               color: '#374151',
-,
                               marginTop: '20px'
                             }}>
                               <input
@@ -1676,7 +1673,6 @@ export default function WorkflowManagement() {
                               border: '1px solid #d1d5db',
                               borderRadius: '4px',
                               fontSize: '13px',
-,
                               minHeight: '50px',
                               resize: 'vertical'
                             }}
@@ -1770,7 +1766,6 @@ export default function WorkflowManagement() {
                               fontSize: '12px',
                               fontWeight: '500',
                               color: '#374151',
-,
                               cursor: stepForm.groupId ? 'pointer' : 'not-allowed',
                               opacity: stepForm.groupId ? 1 : 0.5
                             }}>
@@ -1804,9 +1799,8 @@ export default function WorkflowManagement() {
                                     padding: '6px 8px',
                                     border: '1px solid #d1d5db',
                                     borderRadius: '4px',
-                                    fontSize: '12px',
-,
-                                    minHeight: '60px',
+                                  fontSize: '12px',
+                                  minHeight: '60px',
                                     resize: 'vertical'
                                   }}
                                   placeholder="e.g., Synthesize these answers into a cohesive root cause analysis paragraph..."
