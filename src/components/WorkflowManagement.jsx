@@ -409,97 +409,37 @@ export default function WorkflowManagement() {
   };
 
   return (
-    <div style={{
-      padding: '24px',
-      backgroundColor: '#ffffff',
-      border: '1px solid #e5e7eb',
-      borderRadius: '8px'
-    }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '24px'
-      }}>
-        <h3 style={{
-          margin: '0',
-          fontSize: '18px',
-          fontWeight: '600',
-          color: '#374151',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-        }}>
+    <div className="p-6 bg-white border border-gray-200 rounded-lg">
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="m-0 text-lg font-semibold text-gray-700">
           Workflow Management
         </h3>
         <button
           onClick={() => setShowTemplateForm(true)}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#4338ca',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '14px',
-            fontWeight: '500',
-            cursor: 'pointer',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            transition: 'all 0.2s ease'
-          }}
+          className="px-4 py-2 bg-indigo-700 text-white border-none rounded-md text-sm font-medium cursor-pointer transition-all hover:bg-indigo-800"
         >
           + New Workflow
         </button>
       </div>
 
       {/* Tab Navigation */}
-      <div style={{display: 'flex', gap: '8px', marginBottom: '20px', justifyContent: 'center', flexWrap: 'wrap'}}>
+      <div className="flex gap-2 mb-5 justify-center flex-wrap">
         <button
           onClick={() => setActiveTab('templates')}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: activeTab === 'templates' ? '#4338ca' : '#f3f4f6',
-            color: activeTab === 'templates' ? 'white' : '#374151',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            transition: 'all 0.2s ease'
-          }}
+          className={`px-4 py-2 ${activeTab === 'templates' ? 'bg-indigo-700 text-white' : 'bg-gray-100 text-gray-700'} border-none rounded-md cursor-pointer text-sm font-medium transition-all`}
         >
           Workflow Templates
         </button>
         <button
           onClick={() => setActiveTab('import')}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: activeTab === 'import' ? '#4338ca' : '#f3f4f6',
-            color: activeTab === 'import' ? 'white' : '#374151',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            transition: 'all 0.2s ease'
-          }}
+          className={`px-4 py-2 ${activeTab === 'import' ? 'bg-indigo-700 text-white' : 'bg-gray-100 text-gray-700'} border-none rounded-md cursor-pointer text-sm font-medium transition-all`}
         >
           Import from Spreadsheet
         </button>
         {selectedTemplate && (
           <button
             onClick={() => setActiveTab('steps')}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: activeTab === 'steps' ? '#4338ca' : '#f3f4f6',
-              color: activeTab === 'steps' ? 'white' : '#374151',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '500',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              transition: 'all 0.2s ease'
-            }}
+            className={`px-4 py-2 ${activeTab === 'steps' ? 'bg-indigo-700 text-white' : 'bg-gray-100 text-gray-700'} border-none rounded-md cursor-pointer text-sm font-medium transition-all`}
           >
             Steps: {selectedTemplate.name}
           </button>
@@ -508,75 +448,35 @@ export default function WorkflowManagement() {
 
       {/* Template Form */}
       {showTemplateForm && (
-        <div style={{
-          marginBottom: '24px',
-          padding: '20px',
-          backgroundColor: '#f8fafc',
-          border: '1px solid #e5e7eb',
-          borderRadius: '8px'
-        }}>
-          <h4 style={{
-            margin: '0 0 16px 0',
-            fontSize: '16px',
-            fontWeight: '600',
-            color: '#374151',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          }}>
+        <div className="mb-6 p-5 bg-slate-50 border border-gray-200 rounded-lg">
+          <h4 className="m-0 mb-4 text-base font-semibold text-gray-700">
             {editingTemplate ? 'Edit Workflow Template' : 'Create New Workflow Template'}
           </h4>
           
           <form onSubmit={handleTemplateSubmit}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '4px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
+                <label className="block mb-1 text-sm font-medium text-gray-700">
                   Template Name *
                 </label>
                 <input
                   type="text"
                   value={templateForm.name}
                   onChange={(e) => setTemplateForm(prev => ({ ...prev, name: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                  }}
+                  className="w-full py-2 px-3 border border-gray-300 rounded-md text-sm"
                   placeholder="e.g., CAPA Workflow"
                   required
                 />
               </div>
               
               <div>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '4px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
+                <label className="block mb-1 text-sm font-medium text-gray-700">
                   Category
                 </label>
                 <select
                   value={templateForm.category}
                   onChange={(e) => setTemplateForm(prev => ({ ...prev, category: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                  }}
+                  className="w-full py-2 px-3 border border-gray-300 rounded-md text-sm"
                 >
                   {categories.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
@@ -585,14 +485,13 @@ export default function WorkflowManagement() {
               </div>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
+            <div className="mb-4">
               <label style={{
                 display: 'block',
                 marginBottom: '4px',
                 fontSize: '14px',
                 fontWeight: '500',
                 color: '#374151',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
                 Description
               </label>
@@ -605,7 +504,7 @@ export default function WorkflowManagement() {
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+,
                   minHeight: '80px',
                   resize: 'vertical'
                 }}
@@ -613,14 +512,13 @@ export default function WorkflowManagement() {
               />
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
+            <div className="mb-4">
               <label style={{
                 display: 'block',
                 marginBottom: '8px',
                 fontSize: '14px',
                 fontWeight: '500',
                 color: '#374151',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
                 Trigger Keywords
               </label>
@@ -666,14 +564,13 @@ export default function WorkflowManagement() {
                   borderRadius: '4px',
                   fontSize: '12px',
                   cursor: 'pointer',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}
               >
                 + Add Keyword
               </button>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
+            <div className="mb-4">
               <label style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -681,7 +578,6 @@ export default function WorkflowManagement() {
                 fontSize: '14px',
                 fontWeight: '500',
                 color: '#374151',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
                 <input
                   type="checkbox"
@@ -692,14 +588,13 @@ export default function WorkflowManagement() {
               </label>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
+            <div className="mb-4">
               <label style={{
                 display: 'block',
                 marginBottom: '4px',
                 fontSize: '14px',
                 fontWeight: '500',
                 color: '#374151',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
                 Document Template
               </label>
@@ -712,7 +607,7 @@ export default function WorkflowManagement() {
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+,
                   minHeight: '120px',
                   resize: 'vertical'
                 }}
@@ -732,7 +627,6 @@ export default function WorkflowManagement() {
                   fontSize: '14px',
                   fontWeight: '500',
                   cursor: 'pointer',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}
               >
                 {editingTemplate ? 'Update Template' : 'Create Template'}
@@ -749,7 +643,6 @@ export default function WorkflowManagement() {
                   fontSize: '14px',
                   fontWeight: '500',
                   cursor: 'pointer',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}
               >
                 Cancel
@@ -773,13 +666,12 @@ export default function WorkflowManagement() {
             fontSize: '16px',
             fontWeight: '600',
             color: '#374151',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}>
             Add New Workflow Step
           </h4>
           
           <form onSubmit={handleStepSubmit}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label style={{
                   display: 'block',
@@ -787,7 +679,6 @@ export default function WorkflowManagement() {
                   fontSize: '14px',
                   fontWeight: '500',
                   color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
                   Step Order
                 </label>
@@ -801,7 +692,6 @@ export default function WorkflowManagement() {
                     border: '1px solid #d1d5db',
                     borderRadius: '6px',
                     fontSize: '14px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                   }}
                   min="1"
                 />
@@ -814,7 +704,6 @@ export default function WorkflowManagement() {
                   fontSize: '14px',
                   fontWeight: '500',
                   color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
                   Input Type *
                 </label>
@@ -827,7 +716,6 @@ export default function WorkflowManagement() {
                     border: '1px solid #d1d5db',
                     borderRadius: '6px',
                     fontSize: '14px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                   }}
                   required
                 >
@@ -838,14 +726,13 @@ export default function WorkflowManagement() {
               </div>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
+            <div className="mb-4">
               <label style={{
                 display: 'block',
                 marginBottom: '4px',
                 fontSize: '14px',
                 fontWeight: '500',
                 color: '#374151',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
                 Question Text *
               </label>
@@ -858,7 +745,7 @@ export default function WorkflowManagement() {
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+,
                   minHeight: '80px',
                   resize: 'vertical'
                 }}
@@ -868,14 +755,13 @@ export default function WorkflowManagement() {
             </div>
 
             {(stepForm.inputType === 'select' || stepForm.inputType === 'radio' || stepForm.inputType === 'checkbox') && (
-              <div style={{ marginBottom: '16px' }}>
+              <div className="mb-4">
                 <label style={{
                   display: 'block',
                   marginBottom: '8px',
                   fontSize: '14px',
                   fontWeight: '500',
                   color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
                   Options
                 </label>
@@ -921,7 +807,6 @@ export default function WorkflowManagement() {
                     borderRadius: '4px',
                     fontSize: '12px',
                     cursor: 'pointer',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                   }}
                 >
                   + Add Option
@@ -929,7 +814,7 @@ export default function WorkflowManagement() {
               </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label style={{
                   display: 'block',
@@ -937,7 +822,6 @@ export default function WorkflowManagement() {
                   fontSize: '14px',
                   fontWeight: '500',
                   color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
                   Placeholder Text
                 </label>
@@ -951,7 +835,6 @@ export default function WorkflowManagement() {
                     border: '1px solid #d1d5db',
                     borderRadius: '6px',
                     fontSize: '14px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                   }}
                   placeholder="Optional placeholder text"
                 />
@@ -965,7 +848,6 @@ export default function WorkflowManagement() {
                   fontSize: '14px',
                   fontWeight: '500',
                   color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
                   <input
                     type="checkbox"
@@ -977,14 +859,13 @@ export default function WorkflowManagement() {
               </div>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
+            <div className="mb-4">
               <label style={{
                 display: 'block',
                 marginBottom: '4px',
                 fontSize: '14px',
                 fontWeight: '500',
                 color: '#374151',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
                 Help Text
               </label>
@@ -997,7 +878,7 @@ export default function WorkflowManagement() {
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+,
                   minHeight: '60px',
                   resize: 'vertical'
                 }}
@@ -1024,14 +905,12 @@ export default function WorkflowManagement() {
                   fontSize: '14px',
                   fontWeight: '600',
                   color: '#1e40af',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
                   🔗 Question Grouping (Advanced)
                 </h5>
                 <div style={{
                   fontSize: '11px',
                   color: '#6b7280',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
                   Group questions for AI synthesis
                 </div>
@@ -1045,7 +924,6 @@ export default function WorkflowManagement() {
                     fontSize: '13px',
                     fontWeight: '500',
                     color: '#374151',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                   }}>
                     Group ID
                   </label>
@@ -1059,7 +937,6 @@ export default function WorkflowManagement() {
                       border: '1px solid #d1d5db',
                       borderRadius: '4px',
                       fontSize: '13px',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                     }}
                     placeholder="e.g., root_cause_group"
                   />
@@ -1067,7 +944,6 @@ export default function WorkflowManagement() {
                     fontSize: '11px',
                     color: '#6b7280',
                     marginTop: '2px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                   }}>
                     Leave empty for ungrouped questions
                   </div>
@@ -1080,7 +956,6 @@ export default function WorkflowManagement() {
                     fontSize: '13px',
                     fontWeight: '500',
                     color: '#374151',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                   }}>
                     Order in Group
                   </label>
@@ -1094,7 +969,6 @@ export default function WorkflowManagement() {
                       border: '1px solid #d1d5db',
                       borderRadius: '4px',
                       fontSize: '13px',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                     }}
                     placeholder="1, 2, 3..."
                     min="1"
@@ -1111,7 +985,7 @@ export default function WorkflowManagement() {
                   fontSize: '13px',
                   fontWeight: '500',
                   color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+,
                   cursor: stepForm.groupId ? 'pointer' : 'not-allowed',
                   opacity: stepForm.groupId ? 1 : 0.5
                 }}>
@@ -1127,7 +1001,6 @@ export default function WorkflowManagement() {
                   fontSize: '11px',
                   color: '#6b7280',
                   marginLeft: '24px',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
                   When checked, AI will synthesize all group responses
                 </div>
@@ -1142,7 +1015,6 @@ export default function WorkflowManagement() {
                       fontSize: '13px',
                       fontWeight: '500',
                       color: '#374151',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                     }}>
                       AI Synthesis Prompt *
                     </label>
@@ -1155,7 +1027,7 @@ export default function WorkflowManagement() {
                         border: '1px solid #d1d5db',
                         borderRadius: '4px',
                         fontSize: '13px',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+,
                         minHeight: '80px',
                         resize: 'vertical'
                       }}
@@ -1166,7 +1038,6 @@ export default function WorkflowManagement() {
                       fontSize: '11px',
                       color: '#6b7280',
                       marginTop: '2px',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                     }}>
                       Instructions for AI on how to combine the grouped answers
                     </div>
@@ -1179,7 +1050,6 @@ export default function WorkflowManagement() {
                       fontSize: '13px',
                       fontWeight: '500',
                       color: '#374151',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                     }}>
                       Template Variable Name *
                     </label>
@@ -1202,7 +1072,6 @@ export default function WorkflowManagement() {
                       fontSize: '11px',
                       color: '#6b7280',
                       marginTop: '2px',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                     }}>
                       Use in template as: {stepForm.groupOutputVariable ? `{{${stepForm.groupOutputVariable}}}` : '{{variable_name}}'}
                     </div>
@@ -1223,7 +1092,6 @@ export default function WorkflowManagement() {
                   fontSize: '14px',
                   fontWeight: '500',
                   cursor: 'pointer',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}
               >
                 {editingStep ? 'Update Step' : 'Add Step'}
@@ -1240,7 +1108,6 @@ export default function WorkflowManagement() {
                   fontSize: '14px',
                   fontWeight: '500',
                   cursor: 'pointer',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}
               >
                 Cancel
@@ -1258,7 +1125,6 @@ export default function WorkflowManagement() {
               textAlign: 'center',
               padding: '40px',
               color: '#6b7280',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}>
               Loading workflow templates...
             </div>
@@ -1267,7 +1133,6 @@ export default function WorkflowManagement() {
               textAlign: 'center',
               padding: '40px',
               color: '#6b7280',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}>
               <div style={{ marginBottom: '12px' }}>
                 <img src="/copy-icon.png" alt="Copy" style={{ width: '32px', height: '32px' }} />
@@ -1299,7 +1164,6 @@ export default function WorkflowManagement() {
                         fontSize: '16px',
                         fontWeight: '600',
                         color: '#374151',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                       }}>
                         {template.name}
                       </h4>
@@ -1308,7 +1172,6 @@ export default function WorkflowManagement() {
                           margin: '0 0 8px 0',
                           fontSize: '14px',
                           color: '#6b7280',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}>
                           {template.description}
                         </p>
@@ -1321,7 +1184,6 @@ export default function WorkflowManagement() {
                           borderRadius: '12px',
                           fontSize: '12px',
                           fontWeight: '500',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}>
                           {template.isActive ? 'Active' : 'Inactive'}
                         </span>
@@ -1332,7 +1194,6 @@ export default function WorkflowManagement() {
                           borderRadius: '12px',
                           fontSize: '12px',
                           fontWeight: '500',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}>
                           {template.category}
                         </span>
@@ -1352,7 +1213,6 @@ export default function WorkflowManagement() {
                           borderRadius: '4px',
                           fontSize: '12px',
                           cursor: 'pointer',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}
                       >
                         View Steps
@@ -1367,7 +1227,6 @@ export default function WorkflowManagement() {
                           borderRadius: '4px',
                           fontSize: '12px',
                           cursor: 'pointer',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}
                       >
                         Edit
@@ -1382,7 +1241,6 @@ export default function WorkflowManagement() {
                           borderRadius: '4px',
                           fontSize: '12px',
                           cursor: 'pointer',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}
                       >
                         Delete
@@ -1403,7 +1261,6 @@ export default function WorkflowManagement() {
                           color: '#6b7280',
                           borderRadius: '4px',
                           fontSize: '12px',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}>
                           {keyword}
                         </span>
@@ -1444,7 +1301,6 @@ export default function WorkflowManagement() {
               fontSize: '16px',
               fontWeight: '600',
               color: '#374151',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}>
               Workflow Steps: {selectedTemplate.name}
             </h4>
@@ -1459,7 +1315,6 @@ export default function WorkflowManagement() {
                 fontSize: '12px',
                 fontWeight: '500',
                 cursor: 'pointer',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}
             >
               + Add Step
@@ -1471,7 +1326,6 @@ export default function WorkflowManagement() {
               textAlign: 'center',
               padding: '40px',
               color: '#6b7280',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}>
               <div style={{ fontSize: '32px', marginBottom: '12px' }}>📝</div>
               <p style={{ margin: '0', fontSize: '14px' }}>No steps configured for this workflow</p>
@@ -1509,7 +1363,6 @@ export default function WorkflowManagement() {
                           borderRadius: '4px',
                           fontSize: '12px',
                           fontWeight: '500',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}>
                           Step {step.stepOrder}
                         </span>
@@ -1520,7 +1373,6 @@ export default function WorkflowManagement() {
                           borderRadius: '4px',
                           fontSize: '12px',
                           fontWeight: '500',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}>
                           {step.inputType}
                         </span>
@@ -1532,7 +1384,7 @@ export default function WorkflowManagement() {
                             borderRadius: '4px',
                             fontSize: '12px',
                             fontWeight: '500',
-                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+,
                             border: '1px solid #bae6fd'
                           }}>
                             🔗 {step.groupId}
@@ -1547,7 +1399,6 @@ export default function WorkflowManagement() {
                             borderRadius: '4px',
                             fontSize: '12px',
                             fontWeight: '500',
-                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                           }}>
                             Required
                           </span>
@@ -1558,7 +1409,6 @@ export default function WorkflowManagement() {
                         fontSize: '14px',
                         fontWeight: '600',
                         color: '#374151',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                       }}>
                         {step.questionText}
                       </h5>
@@ -1567,7 +1417,6 @@ export default function WorkflowManagement() {
                           margin: '0',
                           fontSize: '12px',
                           color: '#6b7280',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}>
                           {step.helpText}
                         </p>
@@ -1584,7 +1433,6 @@ export default function WorkflowManagement() {
                           borderRadius: '4px',
                           fontSize: '12px',
                           cursor: 'pointer',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}
                       >
                         Edit
@@ -1599,7 +1447,6 @@ export default function WorkflowManagement() {
                           borderRadius: '4px',
                           fontSize: '12px',
                           cursor: 'pointer',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}
                       >
                         Delete
@@ -1621,7 +1468,6 @@ export default function WorkflowManagement() {
                         fontSize: '14px',
                         fontWeight: '600',
                         color: '#92400e',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                       }}>
                         ✏️ Edit Workflow Step
                       </h4>
@@ -1635,7 +1481,6 @@ export default function WorkflowManagement() {
                               fontSize: '13px',
                               fontWeight: '500',
                               color: '#374151',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                             }}>
                               Step Order
                             </label>
@@ -1649,7 +1494,6 @@ export default function WorkflowManagement() {
                                 border: '1px solid #d1d5db',
                                 borderRadius: '4px',
                                 fontSize: '13px',
-                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                               }}
                               min="1"
                             />
@@ -1662,7 +1506,6 @@ export default function WorkflowManagement() {
                               fontSize: '13px',
                               fontWeight: '500',
                               color: '#374151',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                             }}>
                               Input Type *
                             </label>
@@ -1675,7 +1518,6 @@ export default function WorkflowManagement() {
                                 border: '1px solid #d1d5db',
                                 borderRadius: '4px',
                                 fontSize: '13px',
-                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                               }}
                               required
                             >
@@ -1693,7 +1535,6 @@ export default function WorkflowManagement() {
                             fontSize: '13px',
                             fontWeight: '500',
                             color: '#374151',
-                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                           }}>
                             Question Text *
                           </label>
@@ -1706,7 +1547,7 @@ export default function WorkflowManagement() {
                               border: '1px solid #d1d5db',
                               borderRadius: '4px',
                               fontSize: '13px',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+,
                               minHeight: '60px',
                               resize: 'vertical'
                             }}
@@ -1723,7 +1564,6 @@ export default function WorkflowManagement() {
                               fontSize: '13px',
                               fontWeight: '500',
                               color: '#374151',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                             }}>
                               Options
                             </label>
@@ -1769,7 +1609,6 @@ export default function WorkflowManagement() {
                                 borderRadius: '4px',
                                 fontSize: '11px',
                                 cursor: 'pointer',
-                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                               }}
                             >
                               + Add Option
@@ -1785,7 +1624,6 @@ export default function WorkflowManagement() {
                               fontSize: '13px',
                               fontWeight: '500',
                               color: '#374151',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                             }}>
                               Placeholder Text
                             </label>
@@ -1799,7 +1637,6 @@ export default function WorkflowManagement() {
                                 border: '1px solid #d1d5db',
                                 borderRadius: '4px',
                                 fontSize: '13px',
-                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                               }}
                               placeholder="Optional placeholder text"
                             />
@@ -1813,7 +1650,7 @@ export default function WorkflowManagement() {
                               fontSize: '13px',
                               fontWeight: '500',
                               color: '#374151',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+,
                               marginTop: '20px'
                             }}>
                               <input
@@ -1833,7 +1670,6 @@ export default function WorkflowManagement() {
                             fontSize: '13px',
                             fontWeight: '500',
                             color: '#374151',
-                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                           }}>
                             Help Text
                           </label>
@@ -1846,7 +1682,7 @@ export default function WorkflowManagement() {
                               border: '1px solid #d1d5db',
                               borderRadius: '4px',
                               fontSize: '13px',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+,
                               minHeight: '50px',
                               resize: 'vertical'
                             }}
@@ -1873,7 +1709,6 @@ export default function WorkflowManagement() {
                               fontSize: '13px',
                               fontWeight: '600',
                               color: '#1e40af',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                             }}>
                               🔗 Question Grouping (Advanced)
                             </h5>
@@ -1887,7 +1722,6 @@ export default function WorkflowManagement() {
                                 fontSize: '12px',
                                 fontWeight: '500',
                                 color: '#374151',
-                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                               }}>
                                 Group ID
                               </label>
@@ -1901,7 +1735,6 @@ export default function WorkflowManagement() {
                                   border: '1px solid #d1d5db',
                                   borderRadius: '4px',
                                   fontSize: '12px',
-                                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                                 }}
                                 placeholder="e.g., root_cause_group"
                               />
@@ -1914,7 +1747,6 @@ export default function WorkflowManagement() {
                                 fontSize: '12px',
                                 fontWeight: '500',
                                 color: '#374151',
-                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                               }}>
                                 Order in Group
                               </label>
@@ -1928,7 +1760,6 @@ export default function WorkflowManagement() {
                                   border: '1px solid #d1d5db',
                                   borderRadius: '4px',
                                   fontSize: '12px',
-                                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                                 }}
                                 placeholder="1, 2, 3..."
                                 min="1"
@@ -1945,7 +1776,7 @@ export default function WorkflowManagement() {
                               fontSize: '12px',
                               fontWeight: '500',
                               color: '#374151',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+,
                               cursor: stepForm.groupId ? 'pointer' : 'not-allowed',
                               opacity: stepForm.groupId ? 1 : 0.5
                             }}>
@@ -1968,7 +1799,6 @@ export default function WorkflowManagement() {
                                   fontSize: '12px',
                                   fontWeight: '500',
                                   color: '#374151',
-                                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                                 }}>
                                   AI Synthesis Prompt *
                                 </label>
@@ -1981,7 +1811,7 @@ export default function WorkflowManagement() {
                                     border: '1px solid #d1d5db',
                                     borderRadius: '4px',
                                     fontSize: '12px',
-                                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+,
                                     minHeight: '60px',
                                     resize: 'vertical'
                                   }}
@@ -1997,7 +1827,6 @@ export default function WorkflowManagement() {
                                   fontSize: '12px',
                                   fontWeight: '500',
                                   color: '#374151',
-                                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                                 }}>
                                   Template Variable Name *
                                 </label>
@@ -2034,7 +1863,6 @@ export default function WorkflowManagement() {
                               fontSize: '13px',
                               fontWeight: '500',
                               cursor: 'pointer',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                             }}
                           >
                             Cancel
@@ -2050,7 +1878,6 @@ export default function WorkflowManagement() {
                               fontSize: '13px',
                               fontWeight: '500',
                               cursor: 'pointer',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                             }}
                           >
                             Update Step

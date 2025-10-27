@@ -307,59 +307,24 @@ export default function WorkflowHistory() {
   );
 
   return (
-    <div style={{
-      padding: '24px',
-      height: '100%',
-      overflow: 'auto'
-    }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'flex-end',
-        alignItems: 'center',
-        marginBottom: '24px'
-      }}>
+    <div className="p-6 h-full overflow-auto">
+      <div className="flex justify-end items-center mb-6">
         <button
           onClick={loadInstances}
           disabled={loading}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: loading ? '#9ca3af' : '#4338ca',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '14px',
-            fontWeight: '500',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          }}
+          className={`px-4 py-2 ${loading ? 'bg-gray-400' : 'bg-indigo-700'} text-white border-none rounded-md text-sm font-medium ${loading ? 'cursor-not-allowed' : 'cursor-pointer'}`}
         >
-          {loading ? 'Refreshing...' : <><img src="/share-icon.png" alt="Refresh" style={{ width: '16px', height: '16px', marginRight: '8px' }} />Refresh</>}
+          {loading ? 'Refreshing...' : <><img src="/share-icon.png" alt="Refresh" className="w-4 h-4 mr-2 inline" />Refresh</>}
         </button>
       </div>
 
       {/* View Mode Toggle */}
-      <div style={{
-        marginBottom: '16px',
-        padding: '12px',
-        backgroundColor: '#f0f9ff',
-        border: '1px solid #bfdbfe',
-        borderRadius: '8px'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px',
-          flexWrap: 'wrap'
-        }}>
-          <span style={{
-            fontSize: '14px',
-            fontWeight: '500',
-            color: '#1e40af',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          }}>
+      <div className="mb-4 py-3 px-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex items-center gap-4 flex-wrap">
+          <span className="text-sm font-medium text-blue-800">
             View:
           </span>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="flex gap-2">
             {[
               { value: 'my_workflows', label: 'My Workflows' },
               { value: 'public', label: 'Public Workflows' },
@@ -368,18 +333,7 @@ export default function WorkflowHistory() {
               <button
                 key={mode.value}
                 onClick={() => setViewMode(mode.value)}
-                style={{
-                  padding: '6px 12px',
-                  backgroundColor: viewMode === mode.value ? '#1e40af' : '#ffffff',
-                  color: viewMode === mode.value ? '#ffffff' : '#1e40af',
-                  border: '1px solid #1e40af',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  transition: 'all 0.2s ease'
-                }}
+                className={`py-1.5 px-3 ${viewMode === mode.value ? 'bg-blue-900 text-white' : 'bg-white text-blue-900'} border border-blue-900 rounded-md text-xs font-medium cursor-pointer transition-all`}
               >
                 {mode.label}
               </button>
@@ -389,41 +343,16 @@ export default function WorkflowHistory() {
       </div>
 
       {/* Filters */}
-      <div style={{
-        marginBottom: '24px',
-        padding: '16px',
-        backgroundColor: '#f8fafc',
-        border: '1px solid #e5e7eb',
-        borderRadius: '8px'
-      }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '12px',
-          marginBottom: '12px'
-        }}>
+      <div className="mb-6 p-4 bg-slate-50 border border-gray-200 rounded-lg">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 mb-3">
           <div>
-            <label style={{
-              display: 'block',
-              marginBottom: '4px',
-              fontSize: '13px',
-              fontWeight: '500',
-              color: '#374151',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-            }}>
+            <label className="block mb-1 text-xs font-medium text-gray-700">
               Workflow Type
             </label>
             <select
               value={filters.workflowType}
               onChange={(e) => setFilters(prev => ({ ...prev, workflowType: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '6px 10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}
+              className="w-full py-1.5 px-2.5 border border-gray-300 rounded text-xs"
             >
               <option value="all">All Types</option>
               {getUniqueWorkflowTypes().map(type => (
@@ -433,27 +362,13 @@ export default function WorkflowHistory() {
           </div>
 
           <div>
-            <label style={{
-              display: 'block',
-              marginBottom: '4px',
-              fontSize: '13px',
-              fontWeight: '500',
-              color: '#374151',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-            }}>
+            <label className="block mb-1 text-xs font-medium text-gray-700">
               Status
             </label>
             <select
               value={filters.status}
               onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '6px 10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}
+              className="w-full py-1.5 px-2.5 border border-gray-300 rounded text-xs"
             >
               <option value="all">All Status</option>
               <option value="completed">Completed</option>
@@ -464,151 +379,71 @@ export default function WorkflowHistory() {
           </div>
 
           <div>
-            <label style={{
-              display: 'block',
-              marginBottom: '4px',
-              fontSize: '13px',
-              fontWeight: '500',
-              color: '#374151',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-            }}>
+            <label className="block mb-1 text-xs font-medium text-gray-700">
               From Date
             </label>
             <input
               type="date"
               value={filters.startDate}
               onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '6px 10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}
+              className="w-full py-1.5 px-2.5 border border-gray-300 rounded text-xs"
             />
           </div>
 
           <div>
-            <label style={{
-              display: 'block',
-              marginBottom: '4px',
-              fontSize: '13px',
-              fontWeight: '500',
-              color: '#374151',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-            }}>
+            <label className="block mb-1 text-xs font-medium text-gray-700">
               To Date
             </label>
             <input
               type="date"
               value={filters.endDate}
               onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '6px 10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}
+              className="w-full py-1.5 px-2.5 border border-gray-300 rounded text-xs"
             />
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div className="flex gap-3">
           <input
             type="text"
             value={filters.searchText}
             onChange={(e) => setFilters(prev => ({ ...prev, searchText: e.target.value }))}
             placeholder="Search in responses and documents..."
-            style={{
-              flex: 1,
-              padding: '8px 12px',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              fontSize: '13px',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-            }}
+            className="flex-1 py-2 px-3 border border-gray-300 rounded text-xs"
           />
           <button
             onClick={clearFilters}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#6b7280',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '13px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-            }}
+            className="px-4 py-2 bg-gray-500 text-white border-none rounded text-xs font-medium cursor-pointer"
           >
             Clear Filters
           </button>
         </div>
 
-        <div style={{
-          marginTop: '8px',
-          fontSize: '12px',
-          color: '#6b7280',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-        }}>
+        <div className="mt-2 text-xs text-gray-500">
           Showing {filteredInstances.length} of {instances.length} workflow{instances.length !== 1 ? 's' : ''}
         </div>
       </div>
 
       {/* Instances List */}
       {loading ? (
-        <div style={{
-          textAlign: 'center',
-          padding: '60px',
-          color: '#6b7280',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-        }}>
-          <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <img src="/loading-icon.png" alt="Loading" style={{ width: '48px', height: '48px' }} />
+        <div className="text-center py-15 text-gray-500">
+          <div className="mb-4 flex justify-center items-center">
+            <img src="/loading-icon.png" alt="Loading" className="w-12 h-12" />
           </div>
-          <div style={{ fontSize: '14px' }}>Loading workflow history...</div>
+          <div className="text-sm">Loading workflow history...</div>
         </div>
       ) : filteredInstances.length === 0 ? (
-        <div style={{
-          textAlign: 'center',
-          padding: '60px',
-          color: '#6b7280',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <div style={{ 
-            marginBottom: '16px',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center'
-          }}>
-            <img src="/copy-icon.png" alt="Copy" style={{ width: '48px', height: '48px' }} />
+        <div className="text-center py-15 text-gray-500 flex flex-col items-center justify-center">
+          <div className="mb-4 flex justify-center items-center">
+            <img src="/copy-icon.png" alt="Copy" className="w-12 h-12" />
           </div>
-          <div style={{ fontSize: '14px', marginBottom: '8px' }}>
+          <div className="text-sm mb-2">
             {instances.length === 0 ? 'No workflow history yet' : 'No workflows match your filters'}
           </div>
           {instances.length > 0 && (
             <button
               onClick={clearFilters}
-              style={{
-                marginTop: '12px',
-                padding: '8px 16px',
-                backgroundColor: '#4338ca',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '13px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}
+              className="mt-3 px-4 py-2 bg-indigo-700 text-white border-none rounded-md text-xs font-medium cursor-pointer"
             >
               Clear Filters
             </button>
@@ -616,40 +451,13 @@ export default function WorkflowHistory() {
         </div>
       ) : (
         <>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}>
+          <div className="flex flex-col gap-3">
             {paginatedInstances.map((instance) => (
-              <div key={instance.id} style={{
-                padding: '16px',
-                backgroundColor: '#f8fafc',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                transition: 'all 0.2s ease'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  gap: '16px'
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      marginBottom: '6px',
-                      flexWrap: 'wrap'
-                    }}>
-                      <h4 style={{
-                        margin: 0,
-                        fontSize: '15px',
-                        fontWeight: '600',
-                        color: '#374151',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                      }}>
+              <div key={instance.id} className="p-4 bg-slate-50 border border-gray-200 rounded-lg transition-all">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <h4 className="m-0 text-[15px] font-semibold text-gray-700">
                         {instance.workflowName || 'Unknown Workflow'}
                       </h4>
                       <span style={{
@@ -661,7 +469,6 @@ export default function WorkflowHistory() {
                         borderRadius: '12px',
                         fontSize: '11px',
                         fontWeight: '500',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                       }}>
                         {instance.status === 'completed' ? '✅ Completed' : 
                          instance.status === 'in_progress' ? 
@@ -678,7 +485,6 @@ export default function WorkflowHistory() {
                           borderRadius: '12px',
                           fontSize: '11px',
                           fontWeight: '500',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}>
                           🌐 Public
                         </span>
@@ -688,18 +494,10 @@ export default function WorkflowHistory() {
                       fontSize: '12px',
                       color: '#6b7280',
                       marginBottom: '6px',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                     }}>
                       {formatDate(instance.completedAt || instance.createdAt)} • ID: {instance.id} • Created by: {instance.createdByUserName || 'Unknown User'}
                     </div>
-                    <div style={{
-                      fontSize: '13px',
-                      color: '#4b5563',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
+                    <div className="text-sm text-gray-600 overflow-hidden text-ellipsis whitespace-nowrap">
                       {getPreviewText(instance)}
                     </div>
                   </div>
@@ -715,7 +513,6 @@ export default function WorkflowHistory() {
                         fontSize: '12px',
                         fontWeight: '500',
                         cursor: 'pointer',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                         whiteSpace: 'nowrap'
                       }}
                     >
@@ -732,7 +529,6 @@ export default function WorkflowHistory() {
                         fontSize: '12px',
                         fontWeight: '500',
                         cursor: 'pointer',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                         whiteSpace: 'nowrap'
                       }}
                     >
@@ -751,7 +547,6 @@ export default function WorkflowHistory() {
                           fontSize: '12px',
                           fontWeight: '500',
                           cursor: 'pointer',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                           whiteSpace: 'nowrap'
                         }}
                       >
@@ -771,7 +566,6 @@ export default function WorkflowHistory() {
                           fontSize: '12px',
                           fontWeight: '500',
                           cursor: 'pointer',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                           whiteSpace: 'nowrap'
                         }}
                       >
@@ -791,7 +585,6 @@ export default function WorkflowHistory() {
                           fontSize: '12px',
                           fontWeight: '500',
                           cursor: 'pointer',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                           whiteSpace: 'nowrap'
                         }}
                       >
@@ -825,7 +618,6 @@ export default function WorkflowHistory() {
                   fontSize: '12px',
                   fontWeight: '500',
                   cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}
               >
                 Previous
@@ -833,7 +625,6 @@ export default function WorkflowHistory() {
               <span style={{
                 fontSize: '13px',
                 color: '#374151',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
                 Page {currentPage} of {totalPages}
               </span>
@@ -849,7 +640,6 @@ export default function WorkflowHistory() {
                   fontSize: '12px',
                   fontWeight: '500',
                   cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}
               >
                 Next
@@ -1055,14 +845,12 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                 fontSize: '18px',
                 fontWeight: '600',
                 color: '#374151',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
                 {instance.workflowName || 'Workflow Document Editor'}
               </h3>
               <div style={{
                 fontSize: '13px',
                 color: '#6b7280',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
                 Completed: {new Date(instance.completedAt || instance.createdAt).toLocaleString('en-US', {
                   month: 'short',
@@ -1122,8 +910,7 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                   borderBottom: activeTab === tab.id ? '2px solid #4338ca' : '2px solid transparent',
                   cursor: 'pointer',
                   fontSize: '14px',
-                  fontWeight: '500',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    fontWeight: '500',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
@@ -1152,7 +939,6 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                   fontSize: '16px',
                   fontWeight: '600',
                   color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
                   Document Editor
                 </h4>
@@ -1169,7 +955,6 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                       fontSize: '12px',
                       fontWeight: '500',
                       cursor: currentVersion ? 'pointer' : 'not-allowed',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                       opacity: currentVersion ? 1 : 0.5
                     }}
                   >
@@ -1186,7 +971,6 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                       fontSize: '12px',
                       fontWeight: '500',
                       cursor: 'pointer',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                     }}
                   >
                     💾 Download
@@ -1251,7 +1035,6 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                     fontSize: '14px',
                     fontWeight: '500',
                     cursor: 'pointer',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                   }}
                 >
                   Save Changes
@@ -1267,7 +1050,6 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                 fontSize: '16px',
                 fontWeight: '600',
                 color: '#374151',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
                 AI Document Refinement
               </h4>
@@ -1282,7 +1064,6 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                 <div style={{
                   fontSize: '13px',
                   color: '#1e40af',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
                   <strong>Current Document:</strong> {editedDocument.length} characters
                   {editedDocument.length === 0 && (
@@ -1300,7 +1081,6 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                   fontSize: '14px',
                   fontWeight: '500',
                   color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
                   Instructions for AI Refinement:
                 </label>
@@ -1314,9 +1094,8 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                     padding: '12px',
                     border: '1px solid #d1d5db',
                     borderRadius: '6px',
-                    fontSize: '13px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    resize: 'vertical'
+                  fontSize: '13px',
+                  resize: 'vertical',
                   }}
                 />
               </div>
@@ -1338,7 +1117,6 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                     fontSize: '14px',
                     fontWeight: '500',
                     cursor: (isSubmitting || !editInstructions.trim()) ? 'not-allowed' : 'pointer',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                   }}
                 >
                   {isSubmitting ? 
@@ -1358,7 +1136,6 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                 fontSize: '16px',
                 fontWeight: '600',
                 color: '#374151',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
                 Document Version History
               </h4>
@@ -1368,7 +1145,6 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                   padding: '40px',
                   textAlign: 'center',
                   color: '#6b7280',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
                   No version history available
                 </div>
@@ -1406,14 +1182,12 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                           fontSize: '14px',
                           fontWeight: '600',
                           color: '#374151',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}>
                           Version {version.version} - {version.type.replace('_', ' ').toUpperCase()}
                         </div>
                         <div style={{
                           fontSize: '12px',
                           color: '#6b7280',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}>
                           {new Date(version.timestamp).toLocaleString()}
                         </div>
@@ -1424,7 +1198,6 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                           color: '#1e40af',
                           fontStyle: 'italic',
                           marginBottom: '8px',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                         }}>
                           Instructions: {version.instructions}
                         </div>
@@ -1432,7 +1205,6 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
                       <div style={{
                         fontSize: '12px',
                         color: '#6b7280',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap'
@@ -1471,7 +1243,6 @@ function WorkflowDetailModal({ instance, onClose, onDownload, onCopyToClipboard 
               fontSize: '14px',
               fontWeight: '500',
               cursor: 'pointer',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}
           >
             Close

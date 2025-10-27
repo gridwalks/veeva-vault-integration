@@ -214,57 +214,19 @@ export default function UserProfile({ user, onUpdateUser }) {
   const userRoles = getUserRoles();
 
   return (
-    <div style={{
-      backgroundColor: '#f8fafc',
-      minHeight: 'calc(100vh - 60px)',
-      padding: '24px'
-    }}>
-      <div style={{
-        maxWidth: '800px',
-        margin: '0 auto'
-      }}>
+    <div className="bg-slate-50 min-h-[calc(100vh-60px)] p-6">
+      <div className="max-w-3xl mx-auto">
         {/* Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '32px'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-          }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '50%',
-              backgroundColor: '#4338ca',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              fontSize: '20px',
-              fontWeight: '600'
-            }}>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-indigo-700 flex items-center justify-center text-white text-xl font-semibold">
               <User style={{ width: '24px', height: '24px' }} />
             </div>
             <div>
-              <h1 style={{
-                margin: '0',
-                fontSize: '24px',
-                fontWeight: '600',
-                color: '#374151',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
+              <h1 className="m-0 text-2xl font-semibold text-gray-700">
                 User Profile
               </h1>
-              <p style={{
-                margin: '0',
-                fontSize: '14px',
-                color: '#6b7280',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
+              <p className="m-0 text-sm text-gray-500">
                 Manage your account information
               </p>
             </div>
@@ -273,54 +235,17 @@ export default function UserProfile({ user, onUpdateUser }) {
           {!isEditing ? (
             <button
               onClick={() => setIsEditing(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px',
-                backgroundColor: '#4338ca',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                transition: 'background-color 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#312e81';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = '#4338ca';
-              }}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-700 text-white border-none rounded-md text-sm font-medium cursor-pointer transition-colors hover:bg-indigo-800"
             >
               <Edit3 style={{ width: '16px', height: '16px' }} />
               Edit Profile
             </button>
           ) : (
-            <div style={{
-              display: 'flex',
-              gap: '8px'
-            }}>
+            <div className="flex gap-2">
               <button
                 onClick={handleSave}
                 disabled={loading}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 16px',
-                  backgroundColor: loading ? '#9ca3af' : '#10b981',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  transition: 'background-color 0.2s ease'
-                }}
+                className={`flex items-center gap-2 px-4 py-2 ${loading ? 'bg-gray-400' : 'bg-green-600'} text-white border-none rounded-md text-sm font-medium ${loading ? 'cursor-not-allowed' : 'cursor-pointer'} transition-colors`}
               >
                 <Save style={{ width: '16px', height: '16px' }} />
                 {loading ? 'Saving...' : 'Save'}
@@ -328,21 +253,7 @@ export default function UserProfile({ user, onUpdateUser }) {
               <button
                 onClick={handleCancel}
                 disabled={loading}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 16px',
-                  backgroundColor: '#6b7280',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  transition: 'background-color 0.2s ease'
-                }}
+                className={`flex items-center gap-2 px-4 py-2 bg-gray-500 text-white border-none rounded-md text-sm font-medium ${loading ? 'cursor-not-allowed' : 'cursor-pointer'} transition-colors`}
               >
                 <X style={{ width: '16px', height: '16px' }} />
                 Cancel
@@ -353,38 +264,14 @@ export default function UserProfile({ user, onUpdateUser }) {
 
         {/* Success/Error Messages */}
         {success && (
-          <div style={{
-            backgroundColor: '#d1fae5',
-            border: '1px solid #10b981',
-            borderRadius: '6px',
-            padding: '12px 16px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: '#065f46',
-            fontSize: '14px',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          }}>
+          <div className="bg-green-100 border border-green-600 rounded-md py-3 px-4 mb-6 flex items-center gap-2 text-green-800 text-sm">
             <CheckCircle style={{ width: '16px', height: '16px' }} />
             {success}
           </div>
         )}
 
         {error && (
-          <div style={{
-            backgroundColor: '#fee2e2',
-            border: '1px solid #ef4444',
-            borderRadius: '6px',
-            padding: '12px 16px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: '#991b1b',
-            fontSize: '14px',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          }}>
+          <div className="bg-red-100 border border-red-600 rounded-md py-3 px-4 mb-6 flex items-center gap-2 text-red-800 text-sm">
             <XCircle style={{ width: '16px', height: '16px' }} />
             {error}
           </div>
@@ -392,113 +279,46 @@ export default function UserProfile({ user, onUpdateUser }) {
 
         {/* Password Success/Error Messages */}
         {passwordSuccess && (
-          <div style={{
-            backgroundColor: '#d1fae5',
-            border: '1px solid #10b981',
-            borderRadius: '6px',
-            padding: '12px 16px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: '#065f46',
-            fontSize: '14px',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          }}>
+          <div className="bg-green-100 border border-green-600 rounded-md py-3 px-4 mb-6 flex items-center gap-2 text-green-800 text-sm">
             <CheckCircle style={{ width: '16px', height: '16px' }} />
             {passwordSuccess}
           </div>
         )}
 
         {passwordError && (
-          <div style={{
-            backgroundColor: '#fee2e2',
-            border: '1px solid #ef4444',
-            borderRadius: '6px',
-            padding: '12px 16px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: '#991b1b',
-            fontSize: '14px',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          }}>
+          <div className="bg-red-100 border border-red-600 rounded-md py-3 px-4 mb-6 flex items-center gap-2 text-red-800 text-sm">
             <XCircle style={{ width: '16px', height: '16px' }} />
             {passwordError}
           </div>
         )}
 
         {/* Profile Information */}
-        <div style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #e5e7eb',
-          borderRadius: '8px',
-          padding: '24px',
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-        }}>
+        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
           {/* Profile Picture */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '16px',
-            marginBottom: '24px',
-            paddingBottom: '24px',
-            borderBottom: '1px solid #e5e7eb'
-          }}>
-            <div style={{
-              width: '80px',
-              height: '80px',
-              borderRadius: '50%',
-              backgroundColor: '#4338ca',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              fontSize: '32px',
-              fontWeight: '600',
-              backgroundImage: user.picture ? `url(${user.picture})` : 'none',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center'
-            }}>
+          <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-200">
+            <div 
+              className="w-20 h-20 rounded-full bg-indigo-700 flex items-center justify-center text-white text-3xl font-semibold bg-cover bg-center"
+              style={{
+                backgroundImage: user.picture ? `url(${user.picture})` : 'none',
+              }}
+            >
               {!user.picture && (user.name ? user.name.charAt(0).toUpperCase() : 'U')}
             </div>
             <div>
-              <h3 style={{
-                margin: '0 0 4px 0',
-                fontSize: '18px',
-                fontWeight: '600',
-                color: '#374151',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
+              <h3 className="m-0 mb-1 text-lg font-semibold text-gray-700">
                 Profile Picture
               </h3>
-              <p style={{
-                margin: '0',
-                fontSize: '14px',
-                color: '#6b7280',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
+              <p className="m-0 text-sm text-gray-500">
                 {isEditing ? 'Enter a URL for your profile picture' : 'Your profile picture'}
               </p>
             </div>
           </div>
 
           {/* Editable Fields */}
-          <div style={{
-            display: 'grid',
-            gap: '24px'
-          }}>
+          <div className="grid gap-6">
             {/* Name Field */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '8px',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Full Name
               </label>
               {isEditing ? (
@@ -506,30 +326,10 @@ export default function UserProfile({ user, onUpdateUser }) {
                   type="text"
                   value={formData.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    outline: 'none',
-                    transition: 'border-color 0.2s ease'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#4338ca';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#d1d5db';
-                  }}
+                  className="w-full py-3 px-3 border border-gray-300 rounded-md text-sm outline-none transition-colors focus:border-indigo-700"
                 />
               ) : (
-                <p style={{
-                  margin: '0',
-                  fontSize: '16px',
-                  color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
+                <p className="m-0 text-base text-gray-700">
                   {user.name || 'Not provided'}
                 </p>
               )}
@@ -538,14 +338,7 @@ export default function UserProfile({ user, onUpdateUser }) {
             {/* Profile Picture URL Field */}
             {isEditing && (
               <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#374151',
-                  marginBottom: '8px',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Profile Picture URL
                 </label>
                 <input
@@ -553,22 +346,7 @@ export default function UserProfile({ user, onUpdateUser }) {
                   value={formData.picture}
                   onChange={(e) => handleInputChange('picture', e.target.value)}
                   placeholder="https://example.com/your-picture.jpg"
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    outline: 'none',
-                    transition: 'border-color 0.2s ease'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#4338ca';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#d1d5db';
-                  }}
+                  className="w-full py-3 px-3 border border-gray-300 rounded-md text-sm outline-none transition-colors focus:border-indigo-700"
                 />
               </div>
             )}
@@ -576,106 +354,39 @@ export default function UserProfile({ user, onUpdateUser }) {
         </div>
 
         {/* Password Change Section */}
-        <div style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #e5e7eb',
-          borderRadius: '8px',
-          padding: '24px',
-          marginTop: '24px',
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            marginBottom: '20px'
-          }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              backgroundColor: '#f3f4f6',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#6b7280'
-            }}>
+        <div className="bg-white border border-gray-200 rounded-lg p-6 mt-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
               <Lock style={{ width: '20px', height: '20px' }} />
             </div>
             <div>
-              <h3 style={{
-                margin: '0 0 4px 0',
-                fontSize: '18px',
-                fontWeight: '600',
-                color: '#374151',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
+              <h3 className="m-0 mb-1 text-lg font-semibold text-gray-700">
                 Change Password
               </h3>
-              <p style={{
-                margin: '0',
-                fontSize: '14px',
-                color: '#6b7280',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
+              <p className="m-0 text-sm text-gray-500">
                 Update your account password
               </p>
             </div>
           </div>
 
-          <div style={{
-            display: 'grid',
-            gap: '20px'
-          }}>
+          <div className="grid gap-5">
 
             {/* New Password */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '8px',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 New Password
               </label>
-              <div style={{ position: 'relative' }}>
+              <div className="relative">
                 <input
                   type={showPasswords.new ? 'text' : 'password'}
                   value={passwordData.newPassword}
                   onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px 40px 12px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    outline: 'none',
-                    transition: 'border-color 0.2s ease'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#4338ca';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#d1d5db';
-                  }}
+                  className="w-full py-3 px-3 pr-10 border border-gray-300 rounded-md text-sm outline-none transition-colors focus:border-indigo-700"
                 />
                 <button
                   type="button"
                   onClick={() => togglePasswordVisibility('new')}
-                  style={{
-                    position: 'absolute',
-                    right: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#6b7280',
-                    padding: '4px'
-                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-gray-500 p-1"
                 >
                   {showPasswords.new ? (
                     <EyeOff style={{ width: '16px', height: '16px' }} />
@@ -684,64 +395,27 @@ export default function UserProfile({ user, onUpdateUser }) {
                   )}
                 </button>
               </div>
-              <p style={{
-                margin: '4px 0 0 0',
-                fontSize: '12px',
-                color: '#6b7280',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
+              <p className="mt-1 text-xs text-gray-500">
                 Must be at least 8 characters with uppercase, lowercase, and number
               </p>
             </div>
 
             {/* Confirm New Password */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '8px',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Confirm New Password
               </label>
-              <div style={{ position: 'relative' }}>
+              <div className="relative">
                 <input
                   type={showPasswords.confirm ? 'text' : 'password'}
                   value={passwordData.confirmPassword}
                   onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px 40px 12px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    outline: 'none',
-                    transition: 'border-color 0.2s ease'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#4338ca';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#d1d5db';
-                  }}
+                  className="w-full py-3 px-3 pr-10 border border-gray-300 rounded-md text-sm outline-none transition-colors focus:border-indigo-700"
                 />
                 <button
                   type="button"
                   onClick={() => togglePasswordVisibility('confirm')}
-                  style={{
-                    position: 'absolute',
-                    right: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#6b7280',
-                    padding: '4px'
-                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-gray-500 p-1"
                 >
                   {showPasswords.confirm ? (
                     <EyeOff style={{ width: '16px', height: '16px' }} />
@@ -753,48 +427,18 @@ export default function UserProfile({ user, onUpdateUser }) {
             </div>
 
             {/* Password Change Buttons */}
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              justifyContent: 'flex-end'
-            }}>
+            <div className="flex gap-3 justify-end">
               <button
                 onClick={handlePasswordCancel}
                 disabled={isChangingPassword}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#6b7280',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: isChangingPassword ? 'not-allowed' : 'pointer',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  transition: 'background-color 0.2s ease',
-                  opacity: isChangingPassword ? 0.6 : 1
-                }}
+                className={`px-4 py-2 bg-gray-500 text-white border-none rounded-md text-sm font-medium transition-colors ${isChangingPassword ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
               >
                 Cancel
               </button>
               <button
                 onClick={handlePasswordSave}
                 disabled={isChangingPassword || !passwordData.newPassword || !passwordData.confirmPassword}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: isChangingPassword || !passwordData.newPassword || !passwordData.confirmPassword ? '#9ca3af' : '#10b981',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: isChangingPassword || !passwordData.newPassword || !passwordData.confirmPassword ? 'not-allowed' : 'pointer',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  transition: 'background-color 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
+                className={`flex items-center gap-2 px-4 py-2 ${isChangingPassword || !passwordData.newPassword || !passwordData.confirmPassword ? 'bg-gray-400' : 'bg-green-600'} text-white border-none rounded-md text-sm font-medium transition-colors ${isChangingPassword || !passwordData.newPassword || !passwordData.confirmPassword ? 'cursor-not-allowed' : 'cursor-pointer'}`}
               >
                 <Lock style={{ width: '16px', height: '16px' }} />
                 {isChangingPassword ? 'Changing...' : 'Change Password'}
@@ -804,83 +448,37 @@ export default function UserProfile({ user, onUpdateUser }) {
         </div>
 
         {/* Read-only Information */}
-        <div style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #e5e7eb',
-          borderRadius: '8px',
-          padding: '24px',
-          marginTop: '24px',
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-        }}>
-          <h3 style={{
-            margin: '0 0 20px 0',
-            fontSize: '18px',
-            fontWeight: '600',
-            color: '#374151',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          }}>
+        <div className="bg-white border border-gray-200 rounded-lg p-6 mt-6 shadow-sm">
+          <h3 className="m-0 mb-5 text-lg font-semibold text-gray-700">
             Account Information
           </h3>
 
-          <div style={{
-            display: 'grid',
-            gap: '20px'
-          }}>
+          <div className="grid gap-5">
             {/* Email */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px'
-            }}>
+            <div className="flex items-center gap-3">
               <Mail style={{ width: '20px', height: '20px', color: '#6b7280' }} />
               <div>
-                <p style={{
-                  margin: '0 0 4px 0',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
+                <p className="m-0 mb-1 text-sm font-medium text-gray-700">
                   Email Address
                 </p>
-                <p style={{
-                  margin: '0',
-                  fontSize: '16px',
-                  color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
+                <p className="m-0 text-base text-gray-700">
                   {user.email}
                 </p>
               </div>
             </div>
 
             {/* Email Verified Status */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px'
-            }}>
+            <div className="flex items-center gap-3">
               {user.email_verified ? (
                 <CheckCircle style={{ width: '20px', height: '20px', color: '#10b981' }} />
               ) : (
                 <XCircle style={{ width: '20px', height: '20px', color: '#ef4444' }} />
               )}
               <div>
-                <p style={{
-                  margin: '0 0 4px 0',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
+                <p className="m-0 mb-1 text-sm font-medium text-gray-700">
                   Email Verification
                 </p>
-                <p style={{
-                  margin: '0',
-                  fontSize: '16px',
-                  color: user.email_verified ? '#10b981' : '#ef4444',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
+                <p className={`m-0 text-base ${user.email_verified ? 'text-green-600' : 'text-red-600'}`}>
                   {user.email_verified ? 'Verified' : 'Not verified'}
                 </p>
               </div>
@@ -888,39 +486,17 @@ export default function UserProfile({ user, onUpdateUser }) {
 
             {/* Roles */}
             {userRoles.length > 0 && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px'
-              }}>
+              <div className="flex items-center gap-3">
                 <Shield style={{ width: '20px', height: '20px', color: '#6b7280' }} />
                 <div>
-                  <p style={{
-                    margin: '0 0 4px 0',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: '#374151',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                  }}>
+                  <p className="m-0 mb-1 text-sm font-medium text-gray-700">
                     Roles
                   </p>
-                  <div style={{
-                    display: 'flex',
-                    gap: '8px',
-                    flexWrap: 'wrap'
-                  }}>
+                  <div className="flex gap-2 flex-wrap">
                     {userRoles.map((role, index) => (
                       <span
                         key={index}
-                        style={{
-                          padding: '4px 8px',
-                          backgroundColor: role === 'admin' ? '#4338ca' : '#6b7280',
-                          color: '#ffffff',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          fontWeight: '500',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                        }}
+                        className={`py-1 px-2 text-white rounded text-xs font-medium ${role === 'admin' ? 'bg-indigo-700' : 'bg-gray-500'}`}
                       >
                         {role}
                       </span>
@@ -931,56 +507,26 @@ export default function UserProfile({ user, onUpdateUser }) {
             )}
 
             {/* Account Created */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px'
-            }}>
+            <div className="flex items-center gap-3">
               <Calendar style={{ width: '20px', height: '20px', color: '#6b7280' }} />
               <div>
-                <p style={{
-                  margin: '0 0 4px 0',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
+                <p className="m-0 mb-1 text-sm font-medium text-gray-700">
                   Account Created
                 </p>
-                <p style={{
-                  margin: '0',
-                  fontSize: '16px',
-                  color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
+                <p className="m-0 text-base text-gray-700">
                   {formatDate(user.created_at)}
                 </p>
               </div>
             </div>
 
             {/* Last Updated */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px'
-            }}>
+            <div className="flex items-center gap-3">
               <Calendar style={{ width: '20px', height: '20px', color: '#6b7280' }} />
               <div>
-                <p style={{
-                  margin: '0 0 4px 0',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
+                <p className="m-0 mb-1 text-sm font-medium text-gray-700">
                   Last Updated
                 </p>
-                <p style={{
-                  margin: '0',
-                  fontSize: '16px',
-                  color: '#374151',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
+                <p className="m-0 text-base text-gray-700">
                   {formatDate(user.updated_at)}
                 </p>
               </div>

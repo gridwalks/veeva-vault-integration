@@ -7,91 +7,38 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout, 
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '0 16px',
-      backgroundColor: '#f8fafc',
-      borderBottom: '1px solid #e5e7eb',
-      height: '48px'
-    }}>
+    <header className="flex items-center justify-between px-4 bg-slate-50 border-b border-gray-200 h-12">
       {/* Left Section - Logo and App Name */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px'
-      }}>
+      <div className="flex items-center gap-3">
         {/* Logo */}
         <img 
           src={acceleraqaLogo} 
           alt="AcceleraQA Logo" 
-          style={{ 
-            height: '24px', 
-            width: 'auto',
-            objectFit: 'contain'
-          }} 
+          className="h-6 w-auto object-contain"
         />
         
         {/* Beta badge */}
-        <span style={{
-          fontSize: '10px',
-          fontWeight: '600',
-          color: '#6b7280',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-          marginLeft: '8px',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em'
-        }}>
+        <span className="text-[10px] font-semibold text-gray-500 ml-2 uppercase tracking-wide">
           | Beta
         </span>
       </div>
 
       {/* Right Section - User Information and Menu */}
       {user && (
-        <div style={{
-          position: 'relative',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px'
-        }}>
+        <div className="relative flex items-center gap-4">
           {/* User Info */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
+          <div className="flex items-center gap-2">
             {/* User Icon */}
-            <div style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '50%',
-              backgroundColor: '#4338ca',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '12px',
-              color: '#ffffff',
-              fontWeight: '600'
-            }}>
+            <div className="w-7 h-7 rounded-full bg-indigo-700 flex items-center justify-center text-xs text-white font-semibold">
               {user.email ? user.email.charAt(0).toUpperCase() : 'U'}
             </div>
             
             {/* User Details */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-              <span style={{
-                fontSize: '12px',
-                color: '#374151',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                fontWeight: '500'
-              }}>
+            <div className="flex flex-col items-end">
+              <span className="text-xs text-gray-700 font-medium">
                 {user.email}
               </span>
-              <span style={{
-                fontSize: '10px',
-                color: '#6b7280',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
+              <span className="text-[10px] text-gray-500">
                 {isAdmin ? 'admin' : 'user'}
               </span>
             </div>
@@ -100,23 +47,7 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout, 
           {/* Hamburger Menu Toggle */}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            style={{
-              padding: '8px',
-              borderRadius: '6px',
-              border: 'none',
-              backgroundColor: menuOpen ? '#f3f4f6' : 'transparent',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s ease'
-            }}
-            onMouseEnter={(e) => {
-              if (!menuOpen) e.target.style.backgroundColor = '#f3f4f6';
-            }}
-            onMouseLeave={(e) => {
-              if (!menuOpen) e.target.style.backgroundColor = 'transparent';
-            }}
+            className={`p-2 rounded-md border-none ${menuOpen ? 'bg-gray-100' : 'bg-transparent'} cursor-pointer flex items-center justify-center transition-all hover:bg-gray-100`}
             aria-label="Toggle menu"
           >
             <Menu style={{ width: '20px', height: '20px', color: '#374151' }} />
@@ -127,59 +58,21 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout, 
             <>
               {/* Backdrop to close menu when clicking outside */}
               <div
-                style={{
-                  position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  zIndex: 40
-                }}
+                className="fixed inset-0 z-40"
                 onClick={() => setMenuOpen(false)}
               />
               
               {/* Menu Dropdown */}
-              <div style={{
-                position: 'absolute',
-                right: 0,
-                top: '100%',
-                marginTop: '8px',
-                width: '224px',
-                backgroundColor: '#ffffff',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                padding: '4px 0',
-                zIndex: 50
-              }}>
+              <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
                 {/* Main App */}
                 <button
                   onClick={() => {
                     onScreenChange('main');
                     setMenuOpen(false);
                   }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '12px 16px',
-                    border: 'none',
-                    backgroundColor: currentScreen === 'main' ? '#f3f4f6' : 'transparent',
-                    color: currentScreen === 'main' ? '#4338ca' : '#374151',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    textAlign: 'left',
-                    transition: 'background-color 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (currentScreen !== 'main') e.target.style.backgroundColor = '#f9fafb';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (currentScreen !== 'main') e.target.style.backgroundColor = 'transparent';
-                  }}
+                  className={`w-full flex items-center gap-3 py-3 px-4 border-none text-left text-sm font-medium cursor-pointer transition-colors hover:bg-gray-50 ${
+                    currentScreen === 'main' ? 'bg-gray-100 text-indigo-700' : 'bg-transparent text-gray-700'
+                  }`}
                 >
                   <Home style={{ width: '16px', height: '16px' }} />
                   <span>Main App</span>
@@ -191,28 +84,9 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout, 
                     onScreenChange('profile');
                     setMenuOpen(false);
                   }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '12px 16px',
-                    border: 'none',
-                    backgroundColor: currentScreen === 'profile' ? '#f3f4f6' : 'transparent',
-                    color: currentScreen === 'profile' ? '#4338ca' : '#374151',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    textAlign: 'left',
-                    transition: 'background-color 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (currentScreen !== 'profile') e.target.style.backgroundColor = '#f9fafb';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (currentScreen !== 'profile') e.target.style.backgroundColor = 'transparent';
-                  }}
+                  className={`w-full flex items-center gap-3 py-3 px-4 border-none text-left text-sm font-medium cursor-pointer transition-colors hover:bg-gray-50 ${
+                    currentScreen === 'profile' ? 'bg-gray-100 text-indigo-700' : 'bg-transparent text-gray-700'
+                  }`}
                 >
                   <User style={{ width: '16px', height: '16px' }} />
                   <span>Profile</span>
@@ -225,28 +99,9 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout, 
                       onScreenChange('admin');
                       setMenuOpen(false);
                     }}
-                    style={{
-                      width: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      padding: '12px 16px',
-                      border: 'none',
-                      backgroundColor: currentScreen === 'admin' ? '#f3f4f6' : 'transparent',
-                      color: currentScreen === 'admin' ? '#4338ca' : '#374151',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      cursor: 'pointer',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                      textAlign: 'left',
-                      transition: 'background-color 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (currentScreen !== 'admin') e.target.style.backgroundColor = '#f9fafb';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (currentScreen !== 'admin') e.target.style.backgroundColor = 'transparent';
-                    }}
+                    className={`w-full flex items-center gap-3 py-3 px-4 border-none text-left text-sm font-medium cursor-pointer transition-colors hover:bg-gray-50 ${
+                      currentScreen === 'admin' ? 'bg-gray-100 text-indigo-700' : 'bg-transparent text-gray-700'
+                    }`}
                   >
                     <Shield style={{ width: '16px', height: '16px' }} />
                     <span>Admin Panel</span>
@@ -259,39 +114,14 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout, 
                     onMyNotebookOpen && onMyNotebookOpen();
                     setMenuOpen(false);
                   }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '12px 16px',
-                    border: 'none',
-                    backgroundColor: 'transparent',
-                    color: '#374151',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    textAlign: 'left',
-                    transition: 'background-color 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#f9fafb';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'transparent';
-                  }}
+                  className="w-full flex items-center gap-3 py-3 px-4 border-none text-left text-sm font-medium text-gray-700 cursor-pointer transition-colors hover:bg-gray-50 bg-transparent"
                 >
                   <BookOpen style={{ width: '16px', height: '16px' }} />
                   <span>My Notebook</span>
                 </button>
 
                 {/* Divider */}
-                <div style={{
-                  margin: '4px 0',
-                  height: '1px',
-                  backgroundColor: '#e5e7eb'
-                }} />
+                <div className="my-1 h-px bg-gray-200" />
 
                 {/* Log out */}
                 <button
@@ -299,28 +129,7 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout, 
                     onLogout();
                     setMenuOpen(false);
                   }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '12px 16px',
-                    border: 'none',
-                    backgroundColor: 'transparent',
-                    color: '#dc2626',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    textAlign: 'left',
-                    transition: 'background-color 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#fef2f2';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'transparent';
-                  }}
+                  className="w-full flex items-center gap-3 py-3 px-4 border-none text-left text-sm font-medium text-red-600 cursor-pointer transition-colors hover:bg-red-50 bg-transparent"
                 >
                   <LogOut style={{ width: '16px', height: '16px' }} />
                   <span>Log out</span>
