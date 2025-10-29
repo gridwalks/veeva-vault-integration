@@ -1,27 +1,27 @@
 # System Requirements Specification — Veeva Vault Integration
 
 ## 1. Purpose
-This document defines the functional and non-functional requirements for the Veeva Vault Integration system. It is derived from the existing React + Netlify codebase and associated infrastructure, and is intended to guide stakeholders, developers, and operators in understanding the system capabilities and constraints.【F:README.md†L1-L138】
+This document defines the functional and non-functional requirements for the Veeva Vault Integration system. It is derived from the existing React + Netlify codebase and associated infrastructure and is intended to guide stakeholders, developers, and operators in understanding the system's capabilities and constraints.
 
 ## 2. System Overview
-- **Architecture**: A React single-page application served via Netlify with supporting serverless functions that proxy Veeva Vault APIs, orchestrate document indexing, and facilitate AI-assisted workflows.【F:README.md†L1-L138】
-- **Core Integrations**: Auth0 for authentication, Veeva Vault for authoritative document content, Neon PostgreSQL for indexed metadata storage, Netlify Blob storage for chat uploads, and OpenAI for summarization and Q&A.【F:README.md†L7-L137】
-- **Primary Experience**: An authenticated chat workspace with document-aware assistance, an administrative console for knowledge-base curation, and personal productivity utilities (My Notebook) that surface past workflows and chat sessions.【F:src/App.jsx†L14-L252】【F:src/components/MyNotebook.jsx†L1-L189】
+- **Architecture**: A React single-page application served via Netlify with supporting serverless functions that proxy Veeva Vault APIs, orchestrate document indexing, and facilitate AI-assisted workflows.
+- **Core Integrations**: Auth0 for authentication, Veeva Vault for authoritative document content, Neon PostgreSQL for indexed metadata storage, Netlify Blob storage for chat uploads, and OpenAI through Groq inference cloud platform for summarization and Q&A.
+- **Primary Experience**: An authenticated chat workspace with document-aware assistance, an administrative console for knowledge-base curation, and personal productivity utilities (My Notebook) that surface past workflows and chat sessions.
 
 ## 3. User Roles & Permissions
-- **Authenticated User**: Must sign in via Auth0 before any application features are accessible.【F:src/App.jsx†L14-L107】
-- **Administrator**: Determined via Auth0 role claims; gains access to the admin console and management tabs. Non-admin users are blocked from admin views.【F:src/hooks/useAdminRole.js†L1-L71】【F:src/App.jsx†L138-L183】
-- **Workflow Owners**: Authenticated users who create workflow instances. Admins can view broader history; users can toggle visibility of their own workflows.【F:src/components/WorkflowHistory.jsx†L1-L200】
+- **Authenticated User**: Must sign in via Auth0 before any application features are accessible.
+- **Administrator**: Determined via Auth0 role claims; gains access to the admin console and management tabs. Non-admin users are blocked from admin views.
+- **Workflow Owners**: Authenticated users who create workflow instances. Admins can view broader history; users can toggle visibility of their own workflows.
 
 ## 4. Functional Requirements
 ### 4.1 Authentication & Session Management
-- FR-1: The system shall require Auth0 login before rendering application content.【F:src/App.jsx†L14-L107】
-- FR-2: The system shall enforce inactivity logout by invoking a shared logout handler for authenticated users.【F:src/App.jsx†L25-L27】
-- FR-3: Users shall be able to update their profile metadata, which is reflected within the active session state.【F:src/App.jsx†L29-L48】
+- FR-1: The system shall require Auth0 login before rendering application content.
+- FR-2: The system shall enforce inactivity logout by invoking a shared logout handler for authenticated users.
+- FR-3: Users shall be able to update their profile metadata, which is reflected within the active session state.
 
 ### 4.2 Document Discovery & Viewing
-- FR-4: The system shall display an indexed document list with search, pagination, and download capabilities driven by serverless APIs.【F:README.md†L45-L93】【F:src/components/AdminScreen.jsx†L12-L198】
-- FR-5: Users shall open documents in a dedicated viewer pane capable of handling Veeva-hosted files, uploaded content, and workflow-generated artifacts with PDF conversion when required.【F:src/App.jsx†L200-L235】【F:src/components/SelectedDocumentViewer.jsx†L1-L120】
+- FR-4: The system shall display an indexed document list with search, pagination, and download capabilities driven by serverless APIs.
+- FR-5: Users shall open documents in a dedicated viewer pane capable of handling Veeva-hosted files, uploaded content, and workflow-generated artifacts with PDF conversion when required.
 
 ### 4.3 Conversational Assistance
 - FR-6: The chat pane shall maintain a conversation history, support markdown rendering, and track token usage for interactions.【F:src/components/StaticChatPane.jsx†L1-L104】
