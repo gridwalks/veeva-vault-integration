@@ -17,7 +17,8 @@ export const handler = async (event) => {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS'
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'X-Frame-Options': 'DENY'
       },
       body: ''
     };
@@ -29,7 +30,8 @@ export const handler = async (event) => {
       statusCode: 405,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': '*',
+        'X-Frame-Options': 'DENY'
       },
       body: JSON.stringify({
         error: 'Method not allowed',
@@ -190,7 +192,8 @@ export const handler = async (event) => {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS'
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'X-Frame-Options': 'DENY'
       },
       body: JSON.stringify({
         success: true,
@@ -218,7 +221,8 @@ export const handler = async (event) => {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS'
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'X-Frame-Options': 'DENY'
       },
       body: JSON.stringify({
         success: false,

@@ -105,7 +105,8 @@ export const handler = async (event) => {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `inline; filename="${fileName}"`,
           'Content-Length': fileBuffer.length.toString(),
-          'Cache-Control': 'no-cache, no-store, must-revalidate'
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'X-Frame-Options': 'DENY'
         },
         body: fileBuffer.toString('base64'),
         isBase64Encoded: true
@@ -120,7 +121,8 @@ export const handler = async (event) => {
         headers: {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `inline; filename="${fileName.replace(/\.[^/.]+$/, '')}.pdf"`,
-          'Content-Length': pdfContent.length.toString()
+          'Content-Length': pdfContent.length.toString(),
+          'X-Frame-Options': 'DENY'
         },
         body: pdfContent.toString('base64'),
         isBase64Encoded: true
@@ -145,7 +147,8 @@ export const handler = async (event) => {
           headers: {
             'Content-Type': 'text/html; charset=utf-8',
             'Content-Disposition': `inline; filename="${fileName.replace(/\.[^/.]+$/, '')}.html"`,
-            'Content-Length': htmlBuffer.length.toString()
+            'Content-Length': htmlBuffer.length.toString(),
+            'X-Frame-Options': 'DENY'
           },
           body: htmlBuffer.toString('base64'),
           isBase64Encoded: true
@@ -160,7 +163,10 @@ export const handler = async (event) => {
       
       return {
         statusCode: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "X-Frame-Options": "DENY"
+        },
         body: JSON.stringify({
           error: 'Document conversion failed',
           message: `Unable to convert file: unsupported or unrecognized file type`,
@@ -182,7 +188,10 @@ export const handler = async (event) => {
 
     return {
       statusCode: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "X-Frame-Options": "DENY"
+      },
       body: JSON.stringify({
         error: 'Document conversion failed',
         message: error.message,

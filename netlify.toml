@@ -37,6 +37,12 @@
   to   = "/.netlify/functions/:splat"
   status = 200
 
+# Security headers to prevent clickjacking
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+
 # Scheduled cleanup: daily at 02:00 UTC
 [[scheduled]]
   cron = "0 2 * * *"

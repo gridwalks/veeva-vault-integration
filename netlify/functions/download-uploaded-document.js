@@ -17,7 +17,8 @@ export const handler = async (event) => {
         statusCode: 400,
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
+          'Access-Control-Allow-Origin': '*',
+          'X-Frame-Options': 'DENY'
         },
         body: JSON.stringify({
           error: 'Document ID is required'
@@ -69,7 +70,8 @@ export const handler = async (event) => {
         statusCode: 404,
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
+          'Access-Control-Allow-Origin': '*',
+          'X-Frame-Options': 'DENY'
         },
         body: JSON.stringify({
           error: 'Document not found'
@@ -104,7 +106,8 @@ export const handler = async (event) => {
             'Content-Type': mimeType,
             'Content-Disposition': `attachment; filename="${downloadFilename}"`,
             'Access-Control-Allow-Origin': '*',
-            'Cache-Control': 'public, max-age=3600'
+            'Cache-Control': 'public, max-age=3600',
+            'X-Frame-Options': 'DENY'
           },
           body: document.content
         };
@@ -114,7 +117,8 @@ export const handler = async (event) => {
           statusCode: 404,
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            'Access-Control-Allow-Origin': '*',
+            'X-Frame-Options': 'DENY'
           },
           body: JSON.stringify({
             error: 'File not available in blob storage and no content in database',
@@ -135,7 +139,8 @@ export const handler = async (event) => {
         statusCode: 200,
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
+          'Access-Control-Allow-Origin': '*',
+          'X-Frame-Options': 'DENY'
         },
         body: JSON.stringify({
           message: 'Blob storage not configured',
@@ -278,7 +283,8 @@ export const handler = async (event) => {
         statusCode: 404,
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
+          'Access-Control-Allow-Origin': '*',
+          'X-Frame-Options': 'DENY'
         },
         body: JSON.stringify({
           error: 'File not found in blob storage',
@@ -304,7 +310,8 @@ export const handler = async (event) => {
         'Content-Disposition': `attachment; filename="${downloadFilename}"`,
         'Content-Length': buffer.length,
         'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'public, max-age=3600'
+        'Cache-Control': 'public, max-age=3600',
+        'X-Frame-Options': 'DENY'
       },
       body: buffer.toString('base64'),
       isBase64Encoded: true
@@ -317,7 +324,8 @@ export const handler = async (event) => {
       statusCode: 500,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': '*',
+        'X-Frame-Options': 'DENY'
       },
       body: JSON.stringify({
         error: 'Internal server error'

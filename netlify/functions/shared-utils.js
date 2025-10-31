@@ -13,7 +13,8 @@ export function getCorsHeaders(allowedMethods = ['GET', 'POST', 'PUT', 'DELETE',
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': allowedMethods.join(', ') + ', OPTIONS'
+    'Access-Control-Allow-Methods': allowedMethods.join(', ') + ', OPTIONS',
+    'X-Frame-Options': 'DENY'
   };
 }
 

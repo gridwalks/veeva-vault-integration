@@ -34,7 +34,10 @@ export const handler = async () => {
 
     return {
       statusCode: ok ? 200 : 503,
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "X-Frame-Options": "DENY"
+      },
       body: JSON.stringify({
         ok,
         checks: {
@@ -49,7 +52,10 @@ export const handler = async () => {
   } catch (err) {
     return {
       statusCode: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "X-Frame-Options": "DENY"
+      },
       body: JSON.stringify({
         ok: false,
         error: err.message,

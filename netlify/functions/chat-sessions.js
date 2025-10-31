@@ -14,7 +14,8 @@ export const handler = async (event, context) => {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'Content-Type',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'X-Frame-Options': 'DENY'
     };
 
     if (method === 'OPTIONS') {
@@ -67,7 +68,8 @@ export const handler = async (event, context) => {
       statusCode: 500,
       headers: {
         'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'X-Frame-Options': 'DENY'
       },
       body: JSON.stringify({ 
         error: 'Internal server error',

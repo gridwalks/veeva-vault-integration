@@ -9,7 +9,11 @@ export const handler = async (event) => {
       new URL(event.rawUrl).searchParams
     );
 
-    if (!docId) return { statusCode: 400, body: "docId is required" };
+    if (!docId) return { 
+      statusCode: 400, 
+      headers: { "Content-Type": "application/json", "X-Frame-Options": "DENY" },
+      body: JSON.stringify({ error: "docId is required" })
+    };
 
     const sessionId = await getSessionId();
 
@@ -23,13 +27,18 @@ export const handler = async (event) => {
 
     if (!res.ok) {
       const t = await res.text();
-      return { statusCode: res.status, body: t };
+      return { 
+        statusCode: res.status, 
+        headers: { "Content-Type": "application/json", "X-Frame-Options": "DENY" },
+        body: t 
+      };
     }
 
     const headers = {
       "Content-Type": res.headers.get("content-type") || "application/octet-stream",
       "Content-Disposition": res.headers.get("content-disposition") || `attachment; filename="download"`,
       "Cache-Control": "private, max-age=0, must-revalidate",
+      "X-Frame-Options": "DENY"
     };
 
     const arrayBuffer = await res.arrayBuffer();
@@ -40,6 +49,10 @@ export const handler = async (event) => {
       isBase64Encoded: true,
     };
   } catch (e) {
-    return { statusCode: 500, body: e.message };
+    return { 
+      statusCode: 500, 
+      headers: { "Content-Type": "application/json", "X-Frame-Options": "DENY" },
+      body: JSON.stringify({ error: e.message })
+    };
   }
 };

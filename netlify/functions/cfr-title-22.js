@@ -5,7 +5,8 @@ const GRANULE_PAGE_SIZE = 200;
 
 const RESPONSE_HEADERS = {
   'Content-Type': 'application/json',
-  'Cache-Control': 'public, max-age=300'
+  'Cache-Control': 'public, max-age=300',
+  'X-Frame-Options': 'DENY'
 };
 
 function getApiKey() {

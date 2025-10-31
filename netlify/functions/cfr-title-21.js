@@ -10,7 +10,8 @@ const RESPONSE_HEADERS = {
   'Cache-Control': 'public, max-age=300',
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type'
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'X-Frame-Options': 'DENY'
 };
 
 // The collections endpoint requires a lastModifiedStart filter in ISO 8601 format.

@@ -8,7 +8,10 @@ export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
-      headers: { 'Allow': 'POST' },
+      headers: { 
+        'Allow': 'POST',
+        'X-Frame-Options': 'DENY'
+      },
       body: JSON.stringify({ error: 'Method Not Allowed' })
     };
   }
@@ -16,7 +19,10 @@ export const handler = async (event) => {
   if (!event.body) {
     return {
       statusCode: 400,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Frame-Options': 'DENY'
+      },
       body: JSON.stringify({ error: 'Request body is required' })
     };
   }
@@ -28,7 +34,10 @@ export const handler = async (event) => {
   } catch (error) {
     return {
       statusCode: 400,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Frame-Options': 'DENY'
+      },
       body: JSON.stringify({ error: 'Invalid JSON body' })
     };
   }
@@ -36,7 +45,10 @@ export const handler = async (event) => {
   if (!key || typeof key !== 'string') {
     return {
       statusCode: 400,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Frame-Options': 'DENY'
+      },
       body: JSON.stringify({ error: 'Blob key is required' })
     };
   }
@@ -68,7 +80,10 @@ export const handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Frame-Options': 'DENY'
+      },
       body: JSON.stringify({ deleted: true })
     };
   } catch (error) {
@@ -82,7 +97,10 @@ export const handler = async (event) => {
 
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Frame-Options': 'DENY'
+      },
       body: JSON.stringify({ error: 'Failed to delete blob' })
     };
   }

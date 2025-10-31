@@ -15,7 +15,10 @@ export const handler = async () => {
 
     return {
       statusCode: ok ? 200 : res.status || 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "X-Frame-Options": "DENY"
+      },
       body: JSON.stringify({
         ok,
         message: ok ? "Vault reachable and session valid" : data?.responseMessage || "Failed",
@@ -23,6 +26,13 @@ export const handler = async () => {
       }),
     };
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ ok: false, error: err.message }) };
+    return { 
+      statusCode: 500, 
+      headers: { 
+        "Content-Type": "application/json",
+        "X-Frame-Options": "DENY"
+      },
+      body: JSON.stringify({ ok: false, error: err.message }) 
+    };
   }
 };
