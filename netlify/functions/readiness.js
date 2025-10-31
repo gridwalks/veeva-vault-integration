@@ -36,7 +36,8 @@ export const handler = async () => {
       statusCode: ok ? 200 : 503,
       headers: { 
         "Content-Type": "application/json",
-        "X-Frame-Options": "DENY"
+        "X-Frame-Options": "DENY",
+        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
       },
       body: JSON.stringify({
         ok,
@@ -54,7 +55,8 @@ export const handler = async () => {
       statusCode: 500,
       headers: { 
         "Content-Type": "application/json",
-        "X-Frame-Options": "DENY"
+        "X-Frame-Options": "DENY",
+        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
       },
       body: JSON.stringify({
         ok: false,

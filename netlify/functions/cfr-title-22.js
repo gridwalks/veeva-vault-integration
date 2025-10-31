@@ -6,7 +6,8 @@ const GRANULE_PAGE_SIZE = 200;
 const RESPONSE_HEADERS = {
   'Content-Type': 'application/json',
   'Cache-Control': 'public, max-age=300',
-  'X-Frame-Options': 'DENY'
+  'X-Frame-Options': 'DENY',
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
 };
 
 function getApiKey() {

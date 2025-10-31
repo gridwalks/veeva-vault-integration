@@ -311,7 +311,8 @@ export const handler = async (event) => {
         'Content-Length': buffer.length,
         'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'public, max-age=3600',
-        'X-Frame-Options': 'DENY'
+        'X-Frame-Options': 'DENY',
+        'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
       },
       body: buffer.toString('base64'),
       isBase64Encoded: true
@@ -325,7 +326,8 @@ export const handler = async (event) => {
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
-        'X-Frame-Options': 'DENY'
+        'X-Frame-Options': 'DENY',
+        'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
       },
       body: JSON.stringify({
         error: 'Internal server error'

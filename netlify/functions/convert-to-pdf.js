@@ -106,7 +106,8 @@ export const handler = async (event) => {
           'Content-Disposition': `inline; filename="${fileName}"`,
           'Content-Length': fileBuffer.length.toString(),
           'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'X-Frame-Options': 'DENY'
+          'X-Frame-Options': 'DENY',
+          'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
         },
         body: fileBuffer.toString('base64'),
         isBase64Encoded: true
@@ -122,7 +123,8 @@ export const handler = async (event) => {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `inline; filename="${fileName.replace(/\.[^/.]+$/, '')}.pdf"`,
           'Content-Length': pdfContent.length.toString(),
-          'X-Frame-Options': 'DENY'
+          'X-Frame-Options': 'DENY',
+          'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
         },
         body: pdfContent.toString('base64'),
         isBase64Encoded: true
@@ -165,7 +167,8 @@ export const handler = async (event) => {
         statusCode: 400,
         headers: { 
           "Content-Type": "application/json",
-          "X-Frame-Options": "DENY"
+          "X-Frame-Options": "DENY",
+          "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
         },
         body: JSON.stringify({
           error: 'Document conversion failed',

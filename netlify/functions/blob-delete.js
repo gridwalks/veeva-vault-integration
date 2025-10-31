@@ -10,7 +10,8 @@ export const handler = async (event) => {
       statusCode: 405,
       headers: { 
         'Allow': 'POST',
-        'X-Frame-Options': 'DENY'
+        'X-Frame-Options': 'DENY',
+        'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
       },
       body: JSON.stringify({ error: 'Method Not Allowed' })
     };
@@ -21,7 +22,8 @@ export const handler = async (event) => {
       statusCode: 400,
       headers: { 
         'Content-Type': 'application/json',
-        'X-Frame-Options': 'DENY'
+        'X-Frame-Options': 'DENY',
+        'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
       },
       body: JSON.stringify({ error: 'Request body is required' })
     };
@@ -36,7 +38,8 @@ export const handler = async (event) => {
       statusCode: 400,
       headers: { 
         'Content-Type': 'application/json',
-        'X-Frame-Options': 'DENY'
+        'X-Frame-Options': 'DENY',
+        'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
       },
       body: JSON.stringify({ error: 'Invalid JSON body' })
     };
@@ -47,7 +50,8 @@ export const handler = async (event) => {
       statusCode: 400,
       headers: { 
         'Content-Type': 'application/json',
-        'X-Frame-Options': 'DENY'
+        'X-Frame-Options': 'DENY',
+        'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
       },
       body: JSON.stringify({ error: 'Blob key is required' })
     };
@@ -82,7 +86,8 @@ export const handler = async (event) => {
       statusCode: 200,
       headers: { 
         'Content-Type': 'application/json',
-        'X-Frame-Options': 'DENY'
+        'X-Frame-Options': 'DENY',
+        'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
       },
       body: JSON.stringify({ deleted: true })
     };
@@ -99,7 +104,8 @@ export const handler = async (event) => {
       statusCode: 500,
       headers: { 
         'Content-Type': 'application/json',
-        'X-Frame-Options': 'DENY'
+        'X-Frame-Options': 'DENY',
+        'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
       },
       body: JSON.stringify({ error: 'Failed to delete blob' })
     };

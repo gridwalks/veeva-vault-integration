@@ -37,11 +37,12 @@
   to   = "/.netlify/functions/:splat"
   status = 200
 
-# Security headers to prevent clickjacking
+# Security headers to prevent clickjacking and XSS
 [[headers]]
   for = "/*"
   [headers.values]
     X-Frame-Options = "DENY"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
 
 # Scheduled cleanup: daily at 02:00 UTC
 [[scheduled]]
