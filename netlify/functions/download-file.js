@@ -14,7 +14,8 @@ export const handler = async (event) => {
       headers: { 
         "Content-Type": "application/json", 
         "X-Frame-Options": "DENY",
-        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
+        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests",
+        "X-Content-Type-Options": "nosniff"
       },
       body: JSON.stringify({ error: "docId is required" })
     };
@@ -36,7 +37,8 @@ export const handler = async (event) => {
         headers: { 
         "Content-Type": "application/json", 
         "X-Frame-Options": "DENY",
-        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
+        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests",
+        "X-Content-Type-Options": "nosniff"
       },
         body: t 
       };
@@ -47,7 +49,8 @@ export const handler = async (event) => {
       "Content-Disposition": res.headers.get("content-disposition") || `attachment; filename="download"`,
       "Cache-Control": "private, max-age=0, must-revalidate",
       "X-Frame-Options": "DENY",
-      "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
+      "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests",
+      "X-Content-Type-Options": "nosniff"
     };
 
     const arrayBuffer = await res.arrayBuffer();
@@ -63,7 +66,8 @@ export const handler = async (event) => {
       headers: { 
         "Content-Type": "application/json", 
         "X-Frame-Options": "DENY",
-        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
+        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests",
+        "X-Content-Type-Options": "nosniff"
       },
       body: JSON.stringify({ error: e.message })
     };

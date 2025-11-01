@@ -16,7 +16,8 @@ export const handler = async (event, context) => {
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Content-Type': 'application/json',
       'X-Frame-Options': 'DENY',
-      'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
+      'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests",
+      'X-Content-Type-Options': 'nosniff'
     };
 
     if (method === 'OPTIONS') {
@@ -71,7 +72,8 @@ export const handler = async (event, context) => {
         'Access-Control-Allow-Origin': '*',
         'Content-Type': 'application/json',
         'X-Frame-Options': 'DENY',
-        'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
+        'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests",
+        'X-Content-Type-Options': 'nosniff'
       },
       body: JSON.stringify({ 
         error: 'Internal server error',

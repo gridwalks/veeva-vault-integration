@@ -12,7 +12,8 @@ const RESPONSE_HEADERS = {
   'Access-Control-Allow-Methods': 'GET,OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
   'X-Frame-Options': 'DENY',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests"
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests",
+  'X-Content-Type-Options': 'nosniff'
 };
 
 // The collections endpoint requires a lastModifiedStart filter in ISO 8601 format.
