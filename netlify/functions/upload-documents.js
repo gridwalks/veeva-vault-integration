@@ -164,7 +164,7 @@ async function generateSummary(text, fileName) {
 }
 
 // Helper function to create documents table if it doesn't exist
-async function createDocumentsTable() {
+async function createDocumentsTable(pool) {
   try {
     console.log('Creating qms_chat_documents table...');
     
@@ -229,10 +229,10 @@ async function createDocumentsTable() {
 // Helper function to store document in database
 // Note: generateSafeFileName is now imported from utils.js
 
-async function storeDocument(fileName, extractedText, summary, fileSize, extractionMethod, blobUrl, originalFileName, mimeType, userId) {
+async function storeDocument(pool, fileName, extractedText, summary, fileSize, extractionMethod, blobUrl, originalFileName, mimeType, userId) {
   try {
     // Ensure table structure is up to date
-    await createDocumentsTable();
+    await createDocumentsTable(pool);
 
     const { safeFileName: hasSafeFileName, manualSummary: hasManualSummary } =
       await ensureUploadedDocumentColumnSupport(pool);
@@ -284,7 +284,7 @@ async function storeDocument(fileName, extractedText, summary, fileSize, extract
 }
 
 // Helper function to create chunks table if it doesn't exist
-async function createChunksTable() {
+async function createChunksTable(pool) {
   try {
     console.log('Creating Veeva_Doc_Chat_document_chunks table...');
     
@@ -338,6 +338,7 @@ async function createChunksTable() {
 
 // Helper function to chunk and embed document
 async function chunkAndEmbedDocument(
+  pool,
   documentText,
   documentId,
   fileName,
@@ -349,7 +350,7 @@ async function chunkAndEmbedDocument(
     console.log(`Chunking and embedding document ${fileName}...`);
 
     // Ensure chunks table exists
-    await createChunksTable();
+    await createChunksTable(pool);
     
         // Chunk the text
         console.log(`=== CHUNKING DEBUG ===`);
@@ -836,6 +837,7 @@ export const handler = async (event) => {
         
         const storeStartTime = Date.now();
         const documentId = await storeDocument(
+          pool,
           file.fileName,
           extractedText,
           summary,
@@ -865,6 +867,7 @@ export const handler = async (event) => {
           chunkError = 'No text extracted from document';
         } else {
           const chunkResult = await chunkAndEmbedDocument(
+            pool,
             extractedText,
             documentId,
             file.fileName,
