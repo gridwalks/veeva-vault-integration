@@ -226,6 +226,10 @@ useEffect(() => {
                 setReferencedDocuments(docs);
                 setReferencedExternalResources(resources);
               }}
+              onClearWorkspace={() => {
+                setReferencedDocuments([]);
+                setReferencedExternalResources([]);
+              }}
             />
           </div>
 

@@ -21,7 +21,7 @@ const estimateConversationTokens = (conversationHistory) => {
   }, 0);
 };
 
-export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane, userId, resumeWorkflowId, onResumeWorkflowComplete, loadChatSessionId, onLoadChatSessionComplete, onReferencedDocumentsUpdate }) {
+export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane, userId, resumeWorkflowId, onResumeWorkflowComplete, loadChatSessionId, onLoadChatSessionComplete, onReferencedDocumentsUpdate, onClearWorkspace }) {
   const { user } = useAuth0();
   const [conversationHistory, setConversationHistory] = useState([]);
   const [attachedDocuments, setAttachedDocuments] = useState([]);
@@ -736,6 +736,7 @@ The documents will be automatically included in the comparison analysis.
     // Now clear the conversation
     setConversationHistory([]);
     setUsedDocuments([]);
+    setUsedExternalResources([]);
     setError(null);
     setAttachedDocuments([]);
     if (purgeUploadsOnClear && uploadedBlobKeysRef.current.length > 0) {
@@ -745,6 +746,11 @@ The documents will be automatically included in the comparison analysis.
     // Clear files from ChatPromptBox
     if (chatPromptBoxRef.current) {
       chatPromptBoxRef.current();
+    }
+    
+    // Clear workspace (referenced documents and external resources)
+    if (onClearWorkspace) {
+      onClearWorkspace();
     }
   };
 
@@ -1823,7 +1829,7 @@ The documents will be automatically included in the comparison analysis.
                   onClick={clearConversation}
                   style={{
                     padding: '4px 10px',
-                    backgroundColor: '#6b7280',
+                    backgroundColor: '#4338ca',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '4px',
@@ -1833,8 +1839,8 @@ The documents will be automatically included in the comparison analysis.
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                     transition: 'background-color 0.2s ease'
                   }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#4b5563'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#6b7280'}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#312e81'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#4338ca'}
                   title="Clear conversation"
                 >
                   Clear
