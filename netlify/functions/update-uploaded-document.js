@@ -1,6 +1,5 @@
 import { getPool } from './db.js';
 import { ensureUploadedDocumentColumnSupport } from './uploaded-document-columns.js';
-import { generateSafeFileName } from './utils.js';
 
 const ALLOWED_METHODS = ['PUT', 'PATCH'];
 
@@ -141,9 +140,10 @@ export const handler = async (event) => {
 
     if (typeof trimmedSafeName !== 'undefined') {
       if (hasSafeFileName) {
-        const sanitizedSafeName = generateSafeFileName(trimmedSafeName).substring(0, 120) || null;
+        // Allow users to name files whatever they want - no sanitization
+        const fileNameValue = trimmedSafeName || null;
         setClauses.push(`safe_file_name = $${values.length + 1}`);
-        values.push(sanitizedSafeName);
+        values.push(fileNameValue);
       } else {
         warnings.push('safe_file_name column unavailable');
       }

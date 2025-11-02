@@ -664,7 +664,7 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             }}>
               <div>Document Name</div>
-              <div>Safe File Name</div>
+              <div>File Name</div>
               <div>Version</div>
               <div>Type</div>
               <div>Uploaded</div>
@@ -733,7 +733,7 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                           type="text"
                           value={metadataForm.safeFileName}
                           onChange={(e) => handleMetadataFieldChange('safeFileName', e.target.value)}
-                          placeholder="Safe file name"
+                          placeholder="File name"
                           style={{
                             padding: '8px',
                             border: '1px solid #cbd5f5',
