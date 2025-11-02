@@ -21,9 +21,10 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected, o
 
   const handleViewDocument = (doc) => {
     let url;
-    if (doc.source_type === 'upload' && doc.blob_url) {
-      // For uploaded documents, use the blob URL directly
-      url = doc.blob_url;
+    if (doc.source_type === 'upload') {
+      // For uploaded documents, use the download API to get a proper URL
+      // blob_url is a key, not a direct URL, so we need to fetch via the API
+      url = downloadUploadedDocumentUrl({ documentId: doc.id });
     } else {
       // For Veeva documents, use the download API
       url = downloadUrl({ id: doc.veeva_document_id, major: doc.major_version, minor: doc.minor_version });
