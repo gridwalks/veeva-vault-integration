@@ -586,3 +586,60 @@ export async function deleteChatSession({ sessionId }) {
     errorMessage: 'Failed to delete chat session'
   });
 }
+
+// User Management API functions
+export async function listUsers({ limit = 50, page = 0, search = '', accessToken } = {}) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  
+  const params = { limit, page };
+  if (search) params.search = search;
+  
+  const data = await apiRequest({
+    url: '/api/list-users',
+    params,
+    headers,
+    successMessage: 'Fetching users...',
+    errorMessage: 'Failed to load users'
+  });
+  
+  return data;
+}
+
+export async function updateUserStatus({ userId, blocked, accessToken }) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  
+  return apiRequest({
+    url: '/api/update-user-status',
+    method: 'PUT',
+    body: { userId, blocked },
+    headers,
+    successMessage: `${blocked ? 'Disabling' : 'Enabling'} user...`,
+    errorMessage: `Failed to ${blocked ? 'disable' : 'enable'} user`
+  });
+}
+
+export async function updateUserRoles({ userId, role, action, accessToken }) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  
+  return apiRequest({
+    url: '/api/update-user-roles',
+    method: 'PUT',
+    body: { userId, role, action },
+    headers,
+    successMessage: `Updating user role...`,
+    errorMessage: 'Failed to update user role'
+  });
+}
+
+export async function sendPasswordReset({ userId, email, connection, accessToken }) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  
+  return apiRequest({
+    url: '/api/send-password-reset',
+    method: 'POST',
+    body: { userId, email, connection },
+    headers,
+    successMessage: 'Sending password reset email...',
+    errorMessage: 'Failed to send password reset email'
+  });
+}
