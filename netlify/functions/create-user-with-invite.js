@@ -197,25 +197,52 @@ export const handler = async (event) => {
         status: auth0Error.status,
         statusCode: auth0Error.statusCode,
         error: auth0Error.error,
-        error_description: auth0Error.error_description
+        error_description: auth0Error.error_description,
+        errorCode: auth0Error.errorCode
       });
       
       let errorMessage = 'Failed to create user';
       let helpfulMessage = null;
       
-      if (auth0Error.message?.includes('already exists') || auth0Error.error === 'user_exists') {
+      // Try to parse error details from message if available (Auth0 SDK sometimes puts JSON in message)
+      let parsedErrorBody = null;
+      if (auth0Error.message) {
+        // Check if message contains JSON body
+        const bodyMatch = auth0Error.message.match(/Body:\s*(\{[\s\S]*\})/);
+        if (bodyMatch) {
+          try {
+            parsedErrorBody = JSON.parse(bodyMatch[1]);
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+      }
+      
+      // Extract error information from various sources
+      const actualError = auth0Error.error || parsedErrorBody?.error;
+      const actualErrorCode = auth0Error.errorCode || parsedErrorBody?.errorCode;
+      const actualErrorMessage = parsedErrorBody?.message || auth0Error.error_description || auth0Error.message;
+      const actualStatusCode = auth0Error.statusCode || auth0Error.status || parsedErrorBody?.statusCode;
+      
+      if (auth0Error.message?.includes('already exists') || actualError === 'user_exists' || actualErrorCode === 'user_exists') {
         errorMessage = 'A user with this email already exists';
-      } else if (auth0Error.status === 401 || auth0Error.statusCode === 401) {
+      } else if (actualStatusCode === 401) {
         errorMessage = 'Authentication failed with Auth0 Management API';
         helpfulMessage = 'Please check that AUTH0_MGMT_CLIENT_ID and AUTH0_MGMT_CLIENT_SECRET are correctly configured.';
-      } else if (auth0Error.status === 403 || auth0Error.statusCode === 403) {
+      } else if (actualStatusCode === 403 || actualErrorCode === 'insufficient_scope') {
         errorMessage = 'Insufficient permissions to create user';
-        helpfulMessage = 'The Auth0 Management API client needs the "create:users" permission. Go to Auth0 Dashboard > Applications > APIs > Auth0 Management API > Machine to Machine Applications, and grant the "create:users" scope to your Management API client.';
+        if (actualErrorMessage?.includes('create:users')) {
+          helpfulMessage = 'The Auth0 Management API client needs the "create:users" permission. Go to Auth0 Dashboard > Applications > APIs > Auth0 Management API > Machine to Machine Applications, select your Management API client, and grant the "create:users" scope.';
+        } else {
+          helpfulMessage = 'The Auth0 Management API client needs the "create:users" scope. Go to Auth0 Dashboard > Applications > APIs > Auth0 Management API > Machine to Machine Applications, select your Management API client, and grant the required scopes.';
+        }
+      } else if (actualErrorMessage) {
+        errorMessage = actualErrorMessage;
       } else if (auth0Error.message) {
         errorMessage = auth0Error.message;
       }
       
-      const responseStatus = auth0Error.statusCode || auth0Error.status || 500;
+      const responseStatus = auth0Error.statusCode || auth0Error.status || parsedErrorBody?.statusCode || 500;
       return {
         statusCode: responseStatus === 409 ? 409 : responseStatus,
         headers,
@@ -225,8 +252,10 @@ export const handler = async (event) => {
           helpfulMessage: helpfulMessage,
           details: {
             status: responseStatus,
-            error: auth0Error.error,
-            error_description: auth0Error.error_description
+            error: actualError || auth0Error.error,
+            errorCode: actualErrorCode || auth0Error.errorCode,
+            error_description: parsedErrorBody?.message || auth0Error.error_description,
+            message: actualErrorMessage
           }
         })
       };
