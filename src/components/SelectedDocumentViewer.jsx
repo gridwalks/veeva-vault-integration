@@ -216,11 +216,18 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
       const major = versionParts[0] || 1;
       const minor = versionParts[1] || 0;
       
-      console.log('Loading document for viewing...', { docId: document.veeva_document_id, major, minor });
+      // Get document ID - handle both veeva_document_id and id fields
+      const docId = document.veeva_document_id || document.id || document.document_id;
+      
+      console.log('Loading document for viewing...', { docId, major, minor });
+      
+      if (!docId) {
+        throw new Error('Document ID is missing. Cannot load document.');
+      }
       
       try {
         // First, download the original document
-        const originalUrl = `/api/download-file?docId=${document.veeva_document_id}&major=${major}&minor=${minor}`;
+        const originalUrl = `/api/download-file?docId=${docId}&major=${major}&minor=${minor}`;
         console.log('Downloading original document from URL:', originalUrl);
         
         const originalResponse = await fetch(originalUrl);
@@ -718,7 +725,8 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                   {!activeDocument.isWorkflowDocument && (
                     <button
                       onClick={() => {
-                        const url = `/api/download-file?docId=${activeDocument.veeva_document_id}&major=${activeDocument.version?.split('.')[0] || 1}&minor=${activeDocument.version?.split('.')[1] || 0}`;
+                        const docId = activeDocument.veeva_document_id || activeDocument.id || activeDocument.document_id;
+                        const url = `/api/download-file?docId=${docId}&major=${activeDocument.version?.split('.')[0] || 1}&minor=${activeDocument.version?.split('.')[1] || 0}`;
                         const link = document.createElement('a');
                         link.href = url;
                         link.download = activeDocument.document_name;
