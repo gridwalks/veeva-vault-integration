@@ -1,6 +1,6 @@
 import React from 'react';
 
-const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocumentsSelected }, ref) => {
+const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocumentsSelected, referencedDocuments = [], referencedExternalResources = [] }, ref) => {
   const [activeDocument, setActiveDocument] = React.useState(null);
   const [documentContent, setDocumentContent] = React.useState('');
   const [htmlContent, setHtmlContent] = React.useState(null);
@@ -14,6 +14,15 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
   const [currentVersionIndex, setCurrentVersionIndex] = React.useState(0);
   const [workflowInstanceId, setWorkflowInstanceId] = React.useState(null);
   const [isRepolishing, setIsRepolishing] = React.useState(false);
+
+  // Helper functions for document display
+  const getDocumentDisplayName = (doc) => {
+    return doc?.document_name || doc?.name || doc?.safeFileName || doc?.safe_file_name || 'Unknown Document';
+  };
+
+  const getDocumentDisplayNumber = (doc) => {
+    return doc?.document_number || doc?.documentNumber || doc?.number || '';
+  };
 
   const handleOpenDocument = React.useCallback(async (document) => {
     console.log('handleOpenDocument called with:', document);
@@ -934,6 +943,209 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                   </div>
                 )}
               </div>
+            </div>
+          ) : (referencedDocuments.length > 0 || referencedExternalResources.length > 0) ? (
+            /* Referenced Documents and External Resources */
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              {/* Referenced Documents Section */}
+              {referencedDocuments.length > 0 && (
+                <div>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: '#374151',
+                    marginBottom: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    📄 Documents referenced in response:
+                    {referencedDocuments.length > 5 && (
+                      <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: '4px', fontWeight: '400' }}>
+                        (showing {referencedDocuments.length} total)
+                      </span>
+                    )}
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    {referencedDocuments.map((doc, index) => {
+                      const displayName = getDocumentDisplayName(doc);
+                      const displayNumber = getDocumentDisplayNumber(doc);
+
+                      return (
+                        <div key={doc.veeva_document_id || doc.id || index} style={{
+                          padding: '16px',
+                          backgroundColor: '#f8fafc',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          transition: 'all 0.2s ease'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            marginBottom: '8px'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <h4 style={{
+                                margin: '0 0 3px 0',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                color: '#374151',
+                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                              }}>
+                                {displayName}
+                              </h4>
+                              <div style={{
+                                fontSize: '11px',
+                                color: '#6b7280',
+                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                marginBottom: '6px'
+                              }}>
+                                {displayNumber ? `${displayNumber} • ` : ''}Version {doc.version || '1.0'} • {doc.type || doc.document_type || 'Unknown'}
+                              </div>
+                              {doc.summary && (
+                                <p style={{
+                                  margin: 0,
+                                  fontSize: '12px',
+                                  color: '#6b7280',
+                                  lineHeight: '1.3',
+                                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                                }}>
+                                  {doc.summary.length > 150 ? `${doc.summary.substring(0, 150)}...` : doc.summary}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div style={{
+                            display: 'flex',
+                            gap: '8px'
+                          }}>
+                            <button
+                              onClick={() => handleOpenDocument(doc)}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#4338ca',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                transition: 'background-color 0.2s ease'
+                              }}
+                              onMouseEnter={(e) => e.target.style.backgroundColor = '#312e81'}
+                              onMouseLeave={(e) => e.target.style.backgroundColor = '#4338ca'}
+                            >
+                              📖 View Document
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* External Resources Section */}
+              {referencedExternalResources.length > 0 && (
+                <div style={{ marginTop: referencedDocuments.length > 0 ? '8px' : '0' }}>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: '#374151',
+                    marginBottom: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    🔗 Related external resources:
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    {referencedExternalResources.map((resource, resIndex) => (
+                      <div key={resource.id || resIndex} style={{
+                        padding: '16px',
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        transition: 'all 0.2s ease'
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          marginBottom: '8px'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <h4 style={{
+                              margin: '0 0 3px 0',
+                              fontSize: '13px',
+                              fontWeight: '600',
+                              color: '#374151',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                            }}>
+                              {resource.title}
+                            </h4>
+                            {resource.description && (
+                              <p style={{
+                                margin: '4px 0 0 0',
+                                fontSize: '12px',
+                                color: '#6b7280',
+                                lineHeight: '1.3',
+                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                              }}>
+                                {resource.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div style={{
+                          display: 'flex',
+                          gap: '8px'
+                        }}>
+                          <a
+                            href={resource.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: '#4338ca',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                              transition: 'background-color 0.2s ease',
+                              textDecoration: 'none',
+                              display: 'inline-block'
+                            }}
+                            onMouseEnter={(e) => e.target.style.backgroundColor = '#312e81'}
+                            onMouseLeave={(e) => e.target.style.backgroundColor = '#4338ca'}
+                          >
+                            🔗 Open Resource
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : selectedDocuments.length === 0 ? (
             /* No Documents Selected */

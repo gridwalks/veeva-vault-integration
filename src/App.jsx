@@ -16,6 +16,8 @@ export default function App() {
   const { isAdmin, isLoading: isRoleLoading } = useAdminRole();
   const [currentScreen, setCurrentScreen] = useState("main");
   const [selectedDocuments, setSelectedDocuments] = useState([]);
+  const [referencedDocuments, setReferencedDocuments] = useState([]);
+  const [referencedExternalResources, setReferencedExternalResources] = useState([]);
   const [localUser, setLocalUser] = useState(null);
   const [showMyNotebook, setShowMyNotebook] = useState(false);
   const [resumeWorkflowId, setResumeWorkflowId] = useState(null);
@@ -220,6 +222,10 @@ useEffect(() => {
               onResumeWorkflowComplete={() => setResumeWorkflowId(null)}
               loadChatSessionId={loadChatSessionId}
               onLoadChatSessionComplete={() => setLoadChatSessionId(null)}
+              onReferencedDocumentsUpdate={(docs, resources) => {
+                setReferencedDocuments(docs);
+                setReferencedExternalResources(resources);
+              }}
             />
           </div>
 
@@ -231,6 +237,8 @@ useEffect(() => {
                     ref={documentViewerRef}
                     selectedDocuments={selectedDocuments}
                     onDocumentsSelected={setSelectedDocuments}
+                    referencedDocuments={referencedDocuments}
+                    referencedExternalResources={referencedExternalResources}
                   />
                 </div>
         </div>
