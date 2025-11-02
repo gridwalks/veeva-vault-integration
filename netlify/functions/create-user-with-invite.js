@@ -122,95 +122,51 @@ export const handler = async (event) => {
       };
     }
 
-    // Initialize Auth0 Management Client
-    console.log('Initializing Auth0 Management Client with domain:', domain);
-    
-    const managementConfig = {
-      domain: domain,
-      clientId: clientId,
-      clientSecret: clientSecret,
-      scope: 'read:users create:users'
-    };
-    
-    // Add token configuration to help the SDK authenticate properly
-    if (!managementConfig.domain.startsWith('https://')) {
-      managementConfig.audience = `https://${domain}/api/v2/`;
-      // Disable caching temporarily to ensure we get a fresh token with the correct scopes
-      // After confirming it works, you can re-enable caching for performance
-      managementConfig.tokenProvider = {
-        enableCache: false  // Set to false to force fresh token, or set to true with cacheTTLInSeconds for caching
+    // Step 1: Get access token directly (bypassing SDK to ensure correct scopes)
+    console.log('Requesting access token with create:users scope...');
+    const tokenResponse = await fetch(`https://${domain}/oauth/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        audience: `https://${domain}/api/v2/`,
+        grant_type: 'client_credentials',
+        scope: 'read:users create:users'
+      })
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText };
+      }
+      
+      console.error('Failed to get access token:', errorData);
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: 'Failed to get access token with create:users scope',
+          helpfulMessage: errorData.error_description || errorData.error || 'Token request failed',
+          details: errorData
+        })
       };
     }
+
+    const tokenData = await tokenResponse.json();
+    const accessToken = tokenData.access_token;
     
-    console.log('Management config:', {
-      domain: managementConfig.domain,
-      audience: managementConfig.audience,
-      clientId: managementConfig.clientId ? 'present' : 'missing',
-      scope: managementConfig.scope,
-      tokenCacheEnabled: managementConfig.tokenProvider?.enableCache || false
-    });
-    
-    const management = new ManagementClient(managementConfig);
+    console.log('Access token obtained successfully');
 
-    // Debug: Try to get access token and check scopes
-    // Note: This might not be available in all SDK versions, but worth trying
-    try {
-      // For Auth0 SDK v5, we can try to get the token manually to verify scopes
-      // The ManagementClient should handle this automatically, but let's add logging
-      console.log('ManagementClient initialized. Attempting to get access token...');
-      
-      // Try to manually request token to see what we get
-      const tokenResponse = await fetch(`https://${domain}/oauth/token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          client_id: clientId,
-          client_secret: clientSecret,
-          audience: `https://${domain}/api/v2/`,
-          grant_type: 'client_credentials',
-          scope: 'read:users create:users'
-        })
-      });
-
-      if (tokenResponse.ok) {
-        const tokenData = await tokenResponse.json();
-        console.log('Token obtained successfully. Token preview:', {
-          access_token: tokenData.access_token ? `${tokenData.access_token.substring(0, 20)}...` : 'missing',
-          scope: tokenData.scope || 'not provided in response',
-          token_type: tokenData.token_type || 'unknown',
-          expires_in: tokenData.expires_in || 'unknown'
-        });
-        
-        // Decode JWT to check scopes (if possible)
-        if (tokenData.access_token) {
-          try {
-            const tokenParts = tokenData.access_token.split('.');
-            if (tokenParts.length >= 2) {
-              const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString('utf8'));
-              console.log('Decoded token payload:', {
-                aud: payload.aud,
-                scopes: payload.scope || payload.scp || 'not found in token',
-                permissions: payload.permissions || 'not found',
-                iat: payload.iat,
-                exp: payload.exp
-              });
-            }
-          } catch (decodeError) {
-            console.log('Could not decode token (this is normal for opaque tokens)');
-          }
-        }
-      } else {
-        const errorText = await tokenResponse.text();
-        console.error('Failed to get token manually:', errorText);
-      }
-    } catch (tokenError) {
-      console.log('Could not manually get token (this is okay, ManagementClient will handle it):', tokenError.message);
-    }
-
-    // Step 1: Create user via Management API
-    console.log('Creating user in Auth0...');
+    // Step 2: Create user via Management API directly (not using SDK)
+    console.log('Creating user in Auth0 via Management API v2...');
     let newUser;
     try {
       const userData = {
@@ -233,17 +189,36 @@ export const handler = async (event) => {
         userData.verify_email = false;
       }
 
-      // Create user using Management API
-      if (management.users && typeof management.users.create === 'function') {
-        console.log('Using management.users.create()');
-        newUser = await management.users.create(userData);
-      } else if (typeof management.createUser === 'function') {
-        console.log('Using management.createUser()');
-        const result = await management.createUser(userData);
-        newUser = result.data || result;
-      } else {
-        throw new Error('Unable to find createUser method on management client');
+      // Make direct API call to Auth0 Management API v2
+      const createUserResponse = await fetch(`https://${domain}/api/v2/users`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(userData)
+      });
+
+      if (!createUserResponse.ok) {
+        const errorText = await createUserResponse.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
+
+        throw {
+          statusCode: createUserResponse.status,
+          status: createUserResponse.status,
+          error: errorData.error || 'Unknown error',
+          message: errorData.message || errorData.error_description || errorText,
+          errorCode: errorData.errorCode,
+          error_description: errorData.error_description
+        };
       }
+
+      newUser = await createUserResponse.json();
 
       console.log('User created successfully:', {
         user_id: newUser.user_id,
