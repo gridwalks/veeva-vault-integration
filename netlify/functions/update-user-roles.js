@@ -113,7 +113,7 @@ export const handler = async (event) => {
       domain: domain,
       clientId: clientId,
       clientSecret: clientSecret,
-      scope: 'read:users update:users read:roles'
+      scope: 'read:users update:users read:roles create:roles'
     };
     
     // Add token configuration to help the SDK authenticate properly
@@ -137,7 +137,7 @@ export const handler = async (event) => {
           client_secret: clientSecret,
           audience: `https://${domain}/api/v2/`,
           grant_type: 'client_credentials',
-          scope: 'read:users update:users read:roles'
+          scope: 'read:users update:users read:roles create:roles'
         })
       });
 
@@ -152,42 +152,100 @@ export const handler = async (event) => {
     try {
       // First, get all roles to find the role ID
       let allRoles;
-      if (management.roles && typeof management.roles.getAll === 'function') {
-        allRoles = await management.roles.getAll();
-      } else if (management.roles && typeof management.roles.list === 'function') {
-        allRoles = await management.roles.list();
-      } else {
-        // Direct API call
-        const accessToken = await getAccessToken();
-        const rolesResponse = await fetch(`https://${domain}/api/v2/roles`, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
+      try {
+        if (management.roles && typeof management.roles.getAll === 'function') {
+          allRoles = await management.roles.getAll();
+        } else if (management.roles && typeof management.roles.list === 'function') {
+          allRoles = await management.roles.list();
+        } else {
+          // Direct API call
+          const accessToken = await getAccessToken();
+          const rolesResponse = await fetch(`https://${domain}/api/v2/roles`, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (!rolesResponse.ok) {
+            const errorText = await rolesResponse.text();
+            console.error('Failed to fetch roles:', { status: rolesResponse.status, error: errorText });
+            throw new Error(`Failed to fetch roles: ${rolesResponse.status}`);
           }
-        });
-        
-        if (!rolesResponse.ok) {
-          throw new Error(`Failed to fetch roles: ${rolesResponse.status}`);
+          
+          allRoles = await rolesResponse.json();
         }
-        
-        allRoles = await rolesResponse.json();
-      }
-
-      const rolesList = Array.isArray(allRoles) ? allRoles : (allRoles.roles || []);
-      const targetRole = rolesList.find(r => (r.name || r) === role);
-
-      if (!targetRole) {
+      } catch (roleFetchError) {
+        console.error('Error fetching roles:', roleFetchError);
         return {
-          statusCode: 404,
+          statusCode: 500,
           headers,
           body: JSON.stringify({ 
             success: false, 
-            error: `Role "${role}" not found. Available roles: ${rolesList.map(r => r.name || r).join(', ')}` 
+            error: `Failed to fetch roles from Auth0: ${roleFetchError.message}. Please ensure roles are configured in your Auth0 dashboard.` 
           })
         };
       }
 
-      const roleId = targetRole.id || targetRole.role_id || targetRole;
+      const rolesList = Array.isArray(allRoles) ? allRoles : (allRoles.roles || []);
+      console.log(`Found ${rolesList.length} roles in Auth0:`, rolesList.map(r => r.name || r.id || r));
+      
+      const targetRole = rolesList.find(r => {
+        const roleName = r.name || r;
+        return roleName.toLowerCase() === role.toLowerCase() || roleName === role;
+      });
+
+      // If role doesn't exist, try to create it
+      let roleId;
+      if (!targetRole) {
+        console.log(`Role "${role}" not found. Attempting to create it...`);
+        
+        try {
+          const accessToken = await getAccessToken();
+          const createRoleResponse = await fetch(`https://${domain}/api/v2/roles`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              name: role,
+              description: `Role for ${role} users`
+            })
+          });
+          
+          if (!createRoleResponse.ok) {
+            const errorText = await createRoleResponse.text();
+            console.error('Failed to create role:', { status: createRoleResponse.status, error: errorText });
+            
+            // If role creation fails, return helpful error
+            return {
+              statusCode: 404,
+              headers,
+              body: JSON.stringify({ 
+                success: false, 
+                error: `Role "${role}" not found and could not be created. Please create the role "${role}" in your Auth0 dashboard first. Available roles: ${rolesList.length > 0 ? rolesList.map(r => r.name || r).join(', ') : 'none'}` 
+              })
+            };
+          }
+          
+          const newRole = await createRoleResponse.json();
+          roleId = newRole.id || newRole.role_id;
+          console.log(`Successfully created role "${role}" with ID: ${roleId}`);
+        } catch (createError) {
+          console.error('Error creating role:', createError);
+          return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ 
+              success: false, 
+              error: `Role "${role}" not found and creation failed: ${createError.message}. Please create the role "${role}" in your Auth0 dashboard. Available roles: ${rolesList.length > 0 ? rolesList.map(r => r.name || r).join(', ') : 'none'}` 
+            })
+          };
+        }
+      } else {
+        roleId = targetRole.id || targetRole.role_id || targetRole;
+      }
 
       // Get current user roles
       let currentUserRoles = [];
