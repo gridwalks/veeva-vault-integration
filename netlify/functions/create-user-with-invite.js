@@ -135,16 +135,19 @@ export const handler = async (event) => {
     // Add token configuration to help the SDK authenticate properly
     if (!managementConfig.domain.startsWith('https://')) {
       managementConfig.audience = `https://${domain}/api/v2/`;
+      // Disable caching temporarily to ensure we get a fresh token with the correct scopes
+      // After confirming it works, you can re-enable caching for performance
       managementConfig.tokenProvider = {
-        enableCache: true,
-        cacheTTLInSeconds: 3600
+        enableCache: false  // Set to false to force fresh token, or set to true with cacheTTLInSeconds for caching
       };
     }
     
     console.log('Management config:', {
       domain: managementConfig.domain,
       audience: managementConfig.audience,
-      clientId: managementConfig.clientId ? 'present' : 'missing'
+      clientId: managementConfig.clientId ? 'present' : 'missing',
+      scope: managementConfig.scope,
+      tokenCacheEnabled: managementConfig.tokenProvider?.enableCache || false
     });
     
     const management = new ManagementClient(managementConfig);
