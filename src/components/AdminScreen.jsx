@@ -8,6 +8,7 @@ import QAManagement from "./QAManagement.jsx";
 import WorkflowManagement from "./WorkflowManagement.jsx";
 import IndexingLogs from "./IndexingLogs.jsx";
 import CfrTitle21 from "./CfrTitle21.jsx";
+import UserManagement from "./UserManagement.jsx";
 
 export default function AdminScreen({ userId }) {
   const [q, setQ] = useState("");
@@ -336,6 +337,26 @@ export default function AdminScreen({ userId }) {
         >
           Indexing Logs
         </button>
+        <button
+          onClick={() => {
+            console.log('Switching to user management tab');
+            setActiveTab("users");
+          }}
+          style={{
+            padding: '6px 12px',
+            backgroundColor: activeTab === "users" ? '#4338ca' : '#f3f4f6',
+            color: activeTab === "users" ? 'white' : '#374151',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: '500',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          User Management
+        </button>
       </div>
 
       {/* Search form - only show for indexed tab */}
@@ -512,6 +533,8 @@ export default function AdminScreen({ userId }) {
         <WorkflowManagement />
       ) : activeTab === "logs" ? (
         <IndexingLogs />
+      ) : activeTab === "users" ? (
+        <UserManagement />
       ) : null}
     </div>
   );

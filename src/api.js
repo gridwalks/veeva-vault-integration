@@ -333,6 +333,19 @@ export async function changeUserPassword({ currentPassword, newPassword, userId,
   });
 }
 
+export async function createUserWithInvite({ email, name, password, connection, accessToken }) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  
+  return apiRequest({
+    url: '/api/create-user-with-invite',
+    method: 'POST',
+    body: { email, name, password, connection },
+    headers,
+    successMessage: 'Creating user and sending invitation...',
+    errorMessage: 'Failed to create user'
+  });
+}
+
 // Q&A Interactions API functions
 export async function getQAInteractions({ page = 1, limit = 50, search = '', user_id, session_id } = {}) {
   const params = { page, limit };
