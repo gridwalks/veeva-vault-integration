@@ -152,6 +152,63 @@ export const handler = async (event) => {
     
     const management = new ManagementClient(managementConfig);
 
+    // Debug: Try to get access token and check scopes
+    // Note: This might not be available in all SDK versions, but worth trying
+    try {
+      // For Auth0 SDK v5, we can try to get the token manually to verify scopes
+      // The ManagementClient should handle this automatically, but let's add logging
+      console.log('ManagementClient initialized. Attempting to get access token...');
+      
+      // Try to manually request token to see what we get
+      const tokenResponse = await fetch(`https://${domain}/oauth/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          audience: `https://${domain}/api/v2/`,
+          grant_type: 'client_credentials',
+          scope: 'read:users create:users'
+        })
+      });
+
+      if (tokenResponse.ok) {
+        const tokenData = await tokenResponse.json();
+        console.log('Token obtained successfully. Token preview:', {
+          access_token: tokenData.access_token ? `${tokenData.access_token.substring(0, 20)}...` : 'missing',
+          scope: tokenData.scope || 'not provided in response',
+          token_type: tokenData.token_type || 'unknown',
+          expires_in: tokenData.expires_in || 'unknown'
+        });
+        
+        // Decode JWT to check scopes (if possible)
+        if (tokenData.access_token) {
+          try {
+            const tokenParts = tokenData.access_token.split('.');
+            if (tokenParts.length >= 2) {
+              const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString('utf8'));
+              console.log('Decoded token payload:', {
+                aud: payload.aud,
+                scopes: payload.scope || payload.scp || 'not found in token',
+                permissions: payload.permissions || 'not found',
+                iat: payload.iat,
+                exp: payload.exp
+              });
+            }
+          } catch (decodeError) {
+            console.log('Could not decode token (this is normal for opaque tokens)');
+          }
+        }
+      } else {
+        const errorText = await tokenResponse.text();
+        console.error('Failed to get token manually:', errorText);
+      }
+    } catch (tokenError) {
+      console.log('Could not manually get token (this is okay, ManagementClient will handle it):', tokenError.message);
+    }
+
     // Step 1: Create user via Management API
     console.log('Creating user in Auth0...');
     let newUser;
