@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { createUserWithInvite, listUsers, updateUserStatus, updateUserRoles, sendPasswordReset } from '../api.js';
-import { UserPlus, Mail, User, CheckCircle, XCircle, Shield, ShieldOff, Lock, Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { UserPlus, Mail, User, CheckCircle, XCircle, Shield, ShieldOff, Lock, Search, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
 
 export default function UserManagement() {
   const { getAccessTokenSilently } = useAuth0();
@@ -428,6 +428,47 @@ export default function UserManagement() {
               {loadingUsers ? <Loader2 size={16} className="animate-spin" /> : 'Refresh'}
             </button>
           </form>
+
+          {/* Refresh Button */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            marginBottom: '12px'
+          }}>
+            <button
+              type="button"
+              onClick={loadUsers}
+              disabled={loadingUsers}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#4338ca',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: loadingUsers ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                opacity: loadingUsers ? 0.6 : 1
+              }}
+              title="Refresh user list"
+            >
+              {loadingUsers ? (
+                <>
+                  <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                  <span>Refreshing...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw size={16} />
+                  <span>Refresh</span>
+                </>
+              )}
+            </button>
+          </div>
 
           {/* User Table */}
           {loadingUsers ? (
