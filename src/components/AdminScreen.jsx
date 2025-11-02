@@ -152,214 +152,143 @@ export default function AdminScreen({ userId }) {
     loadIndexed(0);
   }, []);
 
+  const menuGroups = [
+    {
+      header: "Knowledge Management",
+      items: [
+        { id: "indexed", label: "Indexed Documents" },
+        { id: "upload", label: "Upload Documents" },
+        { id: "blob", label: "Blob Documents" },
+        { id: "external", label: "External Resources" },
+        { id: "cfr", label: "CFR Title 21" },
+        { id: "qa", label: "Q&A Management" }
+      ]
+    },
+    {
+      header: "Workflow Management",
+      items: [
+        { id: "workflow", label: "Workflow Management" }
+      ]
+    },
+    {
+      header: "User Management",
+      items: [
+        { id: "users", label: "User Management" }
+      ]
+    },
+    {
+      header: "Logs",
+      items: [
+        { id: "logs", label: "Indexing Logs" }
+      ]
+    }
+  ];
+
   return (
     <div style={{
       height: 'calc(100vh - 60px)',
       margin: '0 40px 0 40px',
-      padding: '16px',
+      display: 'flex',
       backgroundColor: '#ffffff',
       border: '1px solid #e5e7eb',
       borderRadius: '8px',
-      overflow: 'auto',
-      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+      overflow: 'hidden'
     }}>
-      <h1 style={{ 
-        margin: '0 0 12px 0', 
-        textAlign: 'center', 
-        color: '#374151',
-        fontSize: '18px',
-        fontWeight: '600',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      {/* Left Sidebar Menu */}
+      <div style={{
+        width: '240px',
+        backgroundColor: '#f9fafb',
+        borderRight: '1px solid #e5e7eb',
+        overflowY: 'auto',
+        padding: '16px 0'
       }}>
-        Document Administration
-      </h1>
-
-      {/* Tab Navigation */}
-      <div style={{display: 'flex', gap: '6px', marginBottom: '12px', justifyContent: 'center', flexWrap: 'wrap'}}>
-        <button
-          onClick={() => {
-            console.log('Switching to indexed documents tab');
-            setActiveTab("indexed");
-          }}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: activeTab === "indexed" ? '#4338ca' : '#f3f4f6',
-            color: activeTab === "indexed" ? 'white' : '#374151',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: '500',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          Indexed Documents
-        </button>
-        <button
-          onClick={() => {
-            console.log('Switching to upload tab');
-            setActiveTab("upload");
-          }}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: activeTab === "upload" ? '#4338ca' : '#f3f4f6',
-            color: activeTab === "upload" ? 'white' : '#374151',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: '500',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          Upload Documents
-        </button>
-        <button
-          onClick={() => {
-            console.log('Switching to blob documents tab');
-            setActiveTab("blob");
-          }}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: activeTab === "blob" ? '#4338ca' : '#f3f4f6',
-            color: activeTab === "blob" ? 'white' : '#374151',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: '500',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          Blob Documents
-        </button>
-        <button
-          onClick={() => {
-            console.log('Switching to external resources tab');
-            setActiveTab("external");
-          }}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: activeTab === "external" ? '#4338ca' : '#f3f4f6',
-            color: activeTab === "external" ? 'white' : '#374151',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: '500',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          External Resources
-        </button>
-        <button
-          onClick={() => {
-            console.log('Switching to CFR Title 21 tab');
-            setActiveTab("cfr");
-          }}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: activeTab === "cfr" ? '#4338ca' : '#f3f4f6',
-            color: activeTab === "cfr" ? 'white' : '#374151',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: '500',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          CFR Title 21
-        </button>
-        <button
-          onClick={() => {
-            console.log('Switching to Q&A management tab');
-            setActiveTab("qa");
-          }}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: activeTab === "qa" ? '#4338ca' : '#f3f4f6',
-            color: activeTab === "qa" ? 'white' : '#374151',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: '500',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          Q&A Management
-        </button>
-        <button
-          onClick={() => {
-            console.log('Switching to workflow management tab');
-            setActiveTab("workflow");
-          }}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: activeTab === "workflow" ? '#4338ca' : '#f3f4f6',
-            color: activeTab === "workflow" ? 'white' : '#374151',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: '500',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          Workflow Management
-        </button>
+        <h2 style={{
+          margin: '0 16px 20px 16px',
+          paddingBottom: '12px',
+          borderBottom: '2px solid #e5e7eb',
+          color: '#374151',
+          fontSize: '16px',
+          fontWeight: '600',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        }}>
+          Administration
+        </h2>
         
-        <button
-          onClick={() => {
-            console.log('Switching to indexing logs tab');
-            setActiveTab("logs");
-          }}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: activeTab === "logs" ? '#4338ca' : '#f3f4f6',
-            color: activeTab === "logs" ? 'white' : '#374151',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: '500',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          Indexing Logs
-        </button>
-        <button
-          onClick={() => {
-            console.log('Switching to user management tab');
-            setActiveTab("users");
-          }}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: activeTab === "users" ? '#4338ca' : '#f3f4f6',
-            color: activeTab === "users" ? 'white' : '#374151',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: '500',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          User Management
-        </button>
+        {menuGroups.map((group, groupIndex) => (
+          <div key={groupIndex} style={{ marginBottom: '24px' }}>
+            <div style={{
+              padding: '8px 16px',
+              color: '#6b7280',
+              fontSize: '11px',
+              fontWeight: '600',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            }}>
+              {group.header}
+            </div>
+            {group.items.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  console.log(`Switching to ${item.label}`);
+                  setActiveTab(item.id);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  backgroundColor: activeTab === item.id ? '#4338ca' : 'transparent',
+                  color: activeTab === item.id ? 'white' : '#374151',
+                  border: 'none',
+                  borderLeft: activeTab === item.id ? '3px solid #4338ca' : '3px solid transparent',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: activeTab === item.id ? '500' : '400',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  transition: 'all 0.2s ease',
+                  textAlign: 'left',
+                  display: 'block',
+                  marginLeft: activeTab === item.id ? '0' : '3px'
+                }}
+                onMouseEnter={(e) => {
+                  if (activeTab !== item.id) {
+                    e.target.style.backgroundColor = '#f3f4f6';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (activeTab !== item.id) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        ))}
       </div>
 
-      {/* Search form - only show for indexed tab */}
+      {/* Main Content Area */}
+      <div style={{
+        flex: 1,
+        overflow: 'auto',
+        padding: '16px'
+      }}>
+        {/* Page Title */}
+        <h1 style={{ 
+          margin: '0 0 20px 0', 
+          color: '#374151',
+          fontSize: '20px',
+          fontWeight: '600',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        }}>
+          {menuGroups
+            .flatMap(group => group.items)
+            .find(item => item.id === activeTab)?.label || 'Administration'}
+        </h1>
+
+        {/* Search form - only show for indexed tab */}
       {activeTab === "indexed" && (
         <form onSubmit={(e) => { 
           e.preventDefault(); 
@@ -536,6 +465,7 @@ export default function AdminScreen({ userId }) {
       ) : activeTab === "users" ? (
         <UserManagement />
       ) : null}
+      </div>
     </div>
   );
 }
