@@ -3,7 +3,7 @@ import { writeBlobAudit } from './blob-audit.js';
 import { STORE_NAMES } from './blob-storage-config.js';
 
 const STORE_NAME = STORE_NAMES.UPLOADS;
-const MAX_BLOB_AGE_MS = 48 * 60 * 60 * 1000; // 48 hours
+const MAX_BLOB_AGE_MS = 36 * 60 * 60 * 1000; // 36 hours
 
 function parseTimestamp(value) {
   if (!value) return null;
