@@ -76,11 +76,16 @@ export default function UserManagement() {
           connection: 'Username-Password-Authentication'
         });
       } else {
-        setError(result.error || 'Failed to create user');
+        // Show error with helpful message if available
+        const errorMsg = result.error || 'Failed to create user';
+        const helpfulMsg = result.helpfulMessage;
+        setError(helpfulMsg ? `${errorMsg}. ${helpfulMsg}` : errorMsg);
       }
     } catch (err) {
       console.error('Error creating user:', err);
-      setError(err.message || 'Failed to create user');
+      const errorMsg = err.message || 'Failed to create user';
+      const helpfulMsg = err.helpfulMessage || (err.response && err.response.helpfulMessage);
+      setError(helpfulMsg ? `${errorMsg}. ${helpfulMsg}` : errorMsg);
     } finally {
       setLoading(false);
     }

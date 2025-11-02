@@ -44,10 +44,20 @@ async function apiRequest({ url, params = {}, method = 'GET', body = null, succe
           statusText: res.statusText,
           error: parsedError.error,
           details: parsedError.details,
+          helpfulMessage: parsedError.helpfulMessage,
           url: res.url,
           params
         });
-        throw new Error(parsedError.error || errorMessage || `Request failed: ${res.status} ${res.statusText}`);
+        const error = new Error(parsedError.error || errorMessage || `Request failed: ${res.status} ${res.statusText}`);
+        // Preserve helpful message and other details
+        if (parsedError.helpfulMessage) {
+          error.helpfulMessage = parsedError.helpfulMessage;
+        }
+        if (parsedError.details) {
+          error.details = parsedError.details;
+        }
+        error.response = parsedError;
+        throw error;
       } catch (parseError) {
         console.error(errorMessage || 'Request failed:', {
           status: res.status,

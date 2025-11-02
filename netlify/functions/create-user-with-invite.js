@@ -201,13 +201,16 @@ export const handler = async (event) => {
       });
       
       let errorMessage = 'Failed to create user';
+      let helpfulMessage = null;
       
       if (auth0Error.message?.includes('already exists') || auth0Error.error === 'user_exists') {
         errorMessage = 'A user with this email already exists';
       } else if (auth0Error.status === 401 || auth0Error.statusCode === 401) {
         errorMessage = 'Authentication failed with Auth0 Management API';
+        helpfulMessage = 'Please check that AUTH0_MGMT_CLIENT_ID and AUTH0_MGMT_CLIENT_SECRET are correctly configured.';
       } else if (auth0Error.status === 403 || auth0Error.statusCode === 403) {
         errorMessage = 'Insufficient permissions to create user';
+        helpfulMessage = 'The Auth0 Management API client needs the "create:users" permission. Go to Auth0 Dashboard > Applications > APIs > Auth0 Management API > Machine to Machine Applications, and grant the "create:users" scope to your Management API client.';
       } else if (auth0Error.message) {
         errorMessage = auth0Error.message;
       }
@@ -219,6 +222,7 @@ export const handler = async (event) => {
         body: JSON.stringify({
           success: false,
           error: errorMessage,
+          helpfulMessage: helpfulMessage,
           details: {
             status: responseStatus,
             error: auth0Error.error,
