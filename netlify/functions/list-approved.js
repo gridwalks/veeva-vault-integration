@@ -61,6 +61,7 @@ export const handler = async (event) => {
           major: d.major_version_number__v,
           minor: d.minor_version_number__v,
           type: d.type__v,
+          subtype: d.subtype__v,
         })),
       }),
     };

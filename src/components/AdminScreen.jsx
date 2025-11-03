@@ -9,6 +9,7 @@ import WorkflowManagement from "./WorkflowManagement.jsx";
 import IndexingLogs from "./IndexingLogs.jsx";
 import CfrTitle21 from "./CfrTitle21.jsx";
 import UserManagement from "./UserManagement.jsx";
+import VeevaDocumentList from "./VeevaDocumentList.jsx";
 
 export default function AdminScreen({ userId }) {
   const [q, setQ] = useState("");
@@ -157,6 +158,7 @@ export default function AdminScreen({ userId }) {
       header: "Knowledge Management",
       items: [
         { id: "indexed", label: "Indexed Documents" },
+        { id: "veeva-documents", label: "Available Documents in Veeva" },
         { id: "upload", label: "Upload Documents" },
         { id: "blob", label: "Blob Documents" },
         { id: "external", label: "External Resources" },
@@ -433,6 +435,8 @@ export default function AdminScreen({ userId }) {
             </button>
           </div>
         </>
+      ) : activeTab === "veeva-documents" ? (
+        <VeevaDocumentList />
       ) : activeTab === "upload" ? (
         <DocumentUpload
           userId={userId}
