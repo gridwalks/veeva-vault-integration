@@ -486,6 +486,9 @@ The files will upload automatically and I'll be able to perform a detailed compa
       // Route document to the right pane
       const mappedDocument = {
         veeva_document_id: document.id,
+        // Preserve all ID fields for blob documents
+        id: document.id,
+        document_id: document.document_id || document.id,
         document_name: displayName,
         document_type: document.type,
         version: document.version,
@@ -500,7 +503,7 @@ The files will upload automatically and I'll be able to perform a detailed compa
       if (document.isUploaded || document.source_type === 'upload') {
         // For uploaded documents, use the download API
         import('../api').then(({ downloadUploadedDocumentUrl }) => {
-          const url = downloadUploadedDocumentUrl({ documentId: document.id });
+          const url = downloadUploadedDocumentUrl({ documentId: document.id || document.document_id });
           setSelectedDocument({
             url: url,
             name: displayName

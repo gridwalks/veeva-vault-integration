@@ -219,6 +219,7 @@ export default function VeevaDocumentList() {
                   <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontWeight: '600' }}>Subtype</th>
                   <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontWeight: '600' }}>Version</th>
                   <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontWeight: '600' }}>Status</th>
+                  <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #dee2e6', fontWeight: '600' }}>Indexed</th>
                   <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #dee2e6', fontWeight: '600' }}>Actions</th>
                 </tr>
               </thead>
@@ -258,6 +259,31 @@ export default function VeevaDocumentList() {
                       }}>
                         {doc.status || 'N/A'}
                       </span>
+                    </td>
+                    <td style={{ padding: '10px', textAlign: 'center' }}>
+                      {doc.indexed ? (
+                        <span style={{
+                          backgroundColor: '#d1ecf1',
+                          color: '#0c5460',
+                          padding: '4px 8px',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: '600'
+                        }}>
+                          ✓ Indexed
+                        </span>
+                      ) : (
+                        <span style={{
+                          backgroundColor: '#fff3cd',
+                          color: '#856404',
+                          padding: '4px 8px',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: '600'
+                        }}>
+                          Not Indexed
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: '10px', textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>

@@ -763,6 +763,9 @@ The documents will be automatically included in the comparison analysis.
       // Route document to the right pane (both Veeva and uploaded documents)
       const mappedDocument = {
         veeva_document_id: document.id,
+        // Preserve all ID fields for blob documents
+        id: document.id,
+        document_id: document.document_id || document.id,
         document_name: displayName,
         document_type: document.type,
         version: document.version,
