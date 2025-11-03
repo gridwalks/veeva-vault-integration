@@ -13,8 +13,8 @@ export const handler = async (event) => {
     
     let vql = `
       SELECT id, document_number__v, name__v, status__v, major_version_number__v, minor_version_number__v, subtype__v, type__v
-      FROM document_versions
-        WHERE status__v = STEADYSTATE() AND
+      FROM documents
+        WHERE status__v = 'Effective' AND
         (subtype__v = 'Standard Operating Procedure' OR 
          subtype__v = 'Work Instruction' OR 
          subtype__v = 'Policy')
@@ -23,7 +23,7 @@ export const handler = async (event) => {
     
     
     if (nameLike) vql += ` AND name__v CONTAINS '${nameLike.replace(/'/g, "''")}' `;
-    vql += " ORDER BY document_number__v, major_version_number__v DESC, minor_version_number__v DESC ";
+    vql += " ORDER BY name__v ";
 
     const sessionId = await getSessionId();
     const body = new URLSearchParams({ q: vql });
@@ -46,37 +46,23 @@ export const handler = async (event) => {
       return { statusCode: res.status || 500, body: JSON.stringify(data) };
     }
 
-    // Process results to get only the latest steady-state version per document
-    // Since we ordered by document_number__v, major DESC, minor DESC, we can deduplicate
-    const seenDocuments = new Map();
-    const allVersions = (data.data || []).map(d => ({
-      id: d.id,
-      number: d.document_number__v,
-      name: d.name__v,
-      status: d.status__v,
-      major: d.major_version_number__v,
-      minor: d.minor_version_number__v,
-      type: d.type__v,
-      subtype: d.subtype__v,
-    }));
-
-    // Keep only the latest version of each document (first occurrence due to ordering)
-    const latestVersions = [];
-    for (const doc of allVersions) {
-      if (!seenDocuments.has(doc.number)) {
-        seenDocuments.set(doc.number, true);
-        latestVersions.push(doc);
-      }
-    }
-
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        total: latestVersions.length,
+        total: data.responseDetails?.total ?? data?.total ?? 0,
         pageOffset: data.responseDetails?.pageoffset ?? 0,
         pageSize: data.responseDetails?.pagesize ?? limit,
-        items: latestVersions,
+        items: (data.data || []).map(d => ({
+          id: d.id,
+          number: d.document_number__v,
+          name: d.name__v,
+          status: d.status__v,
+          major: d.major_version_number__v,
+          minor: d.minor_version_number__v,
+          type: d.type__v,
+          subtype: d.subtype__v,
+        })),
       }),
     };
   } catch (e) {
