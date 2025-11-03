@@ -1,4 +1,5 @@
 import { getSessionId } from "./vault-auth.js";
+import { getPool, initDatabase } from "./db.js";
 
 export const handler = async (event) => {
   try {
@@ -46,6 +47,28 @@ export const handler = async (event) => {
       return { statusCode: res.status || 500, body: JSON.stringify(data) };
     }
 
+    // Check which documents are indexed
+    let indexedDocumentIds = new Set();
+    try {
+      await initDatabase();
+      const pool = getPool();
+      const veevaIds = (data.data || []).map(d => d.id).filter(Boolean);
+      
+      if (veevaIds.length > 0) {
+        const placeholders = veevaIds.map((_, i) => `$${i + 1}`).join(',');
+        const indexedQuery = `
+          SELECT veeva_document_id 
+          FROM Veeva_Doc_Chat_document_index 
+          WHERE veeva_document_id IN (${placeholders})
+        `;
+        const indexedResult = await pool.query(indexedQuery, veevaIds);
+        indexedDocumentIds = new Set(indexedResult.rows.map(row => row.veeva_document_id));
+      }
+    } catch (dbError) {
+      console.error('Error checking indexed documents:', dbError);
+      // Continue without indexed status if database check fails
+    }
+
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
@@ -62,6 +85,7 @@ export const handler = async (event) => {
           minor: d.minor_version_number__v,
           type: d.type__v,
           subtype: d.subtype__v,
+          indexed: indexedDocumentIds.has(d.id),
         })),
       }),
     };

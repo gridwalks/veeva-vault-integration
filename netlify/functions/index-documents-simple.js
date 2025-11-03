@@ -175,7 +175,8 @@ export const handler = async (event) => {
           document_name: doc.name__v,
           status: doc.status__v,
           subtype: doc.subtype__v,
-          type: doc.type__v
+          type: doc.type__v,
+          indexed: existingDocs.has(doc.id)
         }))
       })
     };

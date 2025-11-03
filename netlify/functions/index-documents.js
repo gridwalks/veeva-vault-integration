@@ -687,6 +687,26 @@ export const handler = async (event) => {
     const documents = data.data || [];
     console.log('Step 9: Getting database pool...');
     const pool = getPool();
+    
+    // Check which documents are already indexed
+    let indexedDocumentIds = new Set();
+    try {
+      const veevaIds = documents.map(d => d.id).filter(Boolean);
+      if (veevaIds.length > 0) {
+        const placeholders = veevaIds.map((_, i) => `$${i + 1}`).join(',');
+        const indexedQuery = `
+          SELECT veeva_document_id 
+          FROM Veeva_Doc_Chat_document_index 
+          WHERE veeva_document_id IN (${placeholders})
+        `;
+        const indexedResult = await pool.query(indexedQuery, veevaIds);
+        indexedDocumentIds = new Set(indexedResult.rows.map(row => row.veeva_document_id));
+        console.log(`Found ${indexedDocumentIds.size} already indexed documents out of ${veevaIds.length} total`);
+      }
+    } catch (dbError) {
+      console.error('Error checking indexed documents:', dbError);
+      // Continue without indexed status if database check fails
+    }
     console.log('Step 9: Database pool obtained:', {
       hasPool: !!pool,
       poolType: typeof pool
@@ -1610,6 +1630,17 @@ ${fallbackText.substring(0, 4000)}`
       duration: totalDuration,
       stats,
       results: results,
+      documents: documents.map(doc => ({
+        id: doc.id,
+        number: doc.document_number__v,
+        name: doc.name__v,
+        status: doc.status__v,
+        major: doc.major_version_number__v,
+        minor: doc.minor_version_number__v,
+        type: doc.type__v,
+        subtype: doc.subtype__v,
+        indexed: indexedDocumentIds.has(doc.id)
+      })),
       batchInfo: {
         batchSize,
         batchOffset,
