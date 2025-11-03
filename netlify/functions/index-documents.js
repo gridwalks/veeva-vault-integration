@@ -612,10 +612,10 @@ export const handler = async (event) => {
       apiVersion: v
     });
 
-    // Query Veeva for approved documents
+    // Query Veeva for approved documents - get latest steady-state version per document
     let vql = `
       SELECT id, document_number__v, name__v, status__v, major_version_number__v, minor_version_number__v, subtype__v, type__v
-      FROM documents
+      FROM document_versions
         WHERE status__v = STEADYSTATE() AND
         (subtype__v = 'Standard Operating Procedure' OR 
          subtype__v = 'Work Instruction' OR 
@@ -623,7 +623,7 @@ export const handler = async (event) => {
     `;
 
     if (nameLike) vql += ` AND (name__v LIKE '%${nameLike.replace(/'/g, "''")}%' OR document_number__v LIKE '%${nameLike.replace(/'/g, "''")}%') `;
-    vql += " ORDER BY name__v ";
+    vql += " ORDER BY document_number__v, major_version_number__v DESC, minor_version_number__v DESC ";
 
     console.log('VQL Query:', vql);
 
@@ -684,7 +684,24 @@ export const handler = async (event) => {
       responseDetails: data.responseDetails
     });
 
-    const documents = data.data || [];
+    // Process results to get only the latest steady-state version per document
+    // Since we ordered by document_number__v, major DESC, minor DESC, we can deduplicate
+    const seenDocuments = new Map();
+    const allVersions = data.data || [];
+    const documents = [];
+    
+    for (const doc of allVersions) {
+      const docNumber = doc.document_number__v;
+      if (!seenDocuments.has(docNumber)) {
+        seenDocuments.set(docNumber, true);
+        documents.push(doc);
+      }
+    }
+    
+    console.log('Step 8.5: Deduplicated to latest steady-state versions:', {
+      totalVersions: allVersions.length,
+      uniqueDocuments: documents.length
+    });
     console.log('Step 9: Getting database pool...');
     const pool = getPool();
     console.log('Step 9: Database pool obtained:', {

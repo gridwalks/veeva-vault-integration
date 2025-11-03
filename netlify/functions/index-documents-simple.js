@@ -17,15 +17,15 @@ export const handler = async (event) => {
     
     console.log('Simple indexing parameters:', { nameLike, limit });
     
-    // Step 1: Get all documents without complex filters
+    // Step 1: Get all documents without complex filters - latest steady-state version per document
     let vql = `
       SELECT id, document_number__v, name__v, status__v, major_version_number__v, minor_version_number__v, subtype__v, type__v
-      FROM documents
+      FROM document_versions
       WHERE status__v = STEADYSTATE() AND
       (subtype__v = 'Standard Operating Procedure' OR 
        subtype__v = 'Work Instruction' OR 
        subtype__v = 'Policy')
-      ORDER BY name__v
+      ORDER BY document_number__v, major_version_number__v DESC, minor_version_number__v DESC
     `;
 
     console.log('VQL Query (no search filter):', vql);
@@ -65,12 +65,25 @@ export const handler = async (event) => {
     }
 
     const allDocuments = data.data || [];
-    console.log(`Retrieved ${allDocuments.length} documents from Veeva`);
+    console.log(`Retrieved ${allDocuments.length} document versions from Veeva`);
+
+    // Step 1.5: Deduplicate to get only latest steady-state version per document
+    // Since we ordered by document_number__v, major DESC, minor DESC, we keep first occurrence
+    const seenDocuments = new Map();
+    const latestVersions = [];
+    for (const doc of allDocuments) {
+      const docNumber = doc.document_number__v;
+      if (!seenDocuments.has(docNumber)) {
+        seenDocuments.set(docNumber, true);
+        latestVersions.push(doc);
+      }
+    }
+    console.log(`Deduplicated to ${latestVersions.length} unique documents (latest steady-state versions)`);
 
     // Step 2: Filter in JavaScript if search term provided
-    let filteredDocuments = allDocuments;
+    let filteredDocuments = latestVersions;
     if (nameLike) {
-      filteredDocuments = allDocuments.filter(doc => {
+      filteredDocuments = latestVersions.filter(doc => {
         const docName = (doc.name__v || '').toLowerCase();
         const docNumber = (doc.document_number__v || '').toLowerCase();
         const searchTerm = nameLike.toLowerCase();
