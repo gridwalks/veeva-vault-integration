@@ -14,7 +14,7 @@ export const handler = async (event) => {
     let vql = `
       SELECT id, document_number__v, name__v, status__v, major_version_number__v, minor_version_number__v, subtype__v, type__v
       FROM documents
-        WHERE status__v = 'Effective' AND
+        WHERE status__v = STEADYSTATE() AND
         (subtype__v = 'Standard Operating Procedure' OR 
          subtype__v = 'Work Instruction' OR 
          subtype__v = 'Policy')
