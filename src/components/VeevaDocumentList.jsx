@@ -29,7 +29,8 @@ export default function VeevaDocumentList() {
       
       console.log('Veeva documents loaded successfully:', {
         total: result.total,
-        items: result.items?.length || 0
+        items: result.items?.length || 0,
+        sampleItem: result.items?.[0] // Debug: check if indexed field is present
       });
       
       setDocuments(result.items || []);
@@ -207,10 +208,11 @@ export default function VeevaDocumentList() {
             backgroundColor: '#f8f9fa',
             border: '1px solid #e9ecef',
             borderRadius: '6px',
-            overflow: 'hidden',
+            overflowX: 'auto',
+            overflowY: 'visible',
             marginBottom: '16px'
           }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: '800px' }}>
               <thead>
                 <tr style={{ backgroundColor: '#e9ecef' }}>
                   <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontWeight: '600' }}>Document Name</th>
@@ -261,7 +263,7 @@ export default function VeevaDocumentList() {
                       </span>
                     </td>
                     <td style={{ padding: '10px', textAlign: 'center' }}>
-                      {doc.indexed ? (
+                      {doc.indexed === true ? (
                         <span style={{
                           backgroundColor: '#d1ecf1',
                           color: '#0c5460',
