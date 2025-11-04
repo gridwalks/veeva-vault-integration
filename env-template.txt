@@ -28,3 +28,15 @@ VITE_AUTH0_CLIENT_ID=<your_auth0_client_id>
 AUTH0_MGMT_DOMAIN=<your_auth0_domain>
 AUTH0_MGMT_CLIENT_ID=<your_management_api_client_id>
 AUTH0_MGMT_CLIENT_SECRET=<your_management_api_client_secret>
+
+# Groq Configuration (for chat)
+GROQ_API_KEY=<your_groq_api_key>
+
+# Security Configuration
+# Rate Limiting (optional - defaults: 100 requests per 60 seconds)
+CHAT_RATE_LIMIT_MAX_REQUESTS=100
+CHAT_RATE_LIMIT_WINDOW_MS=60000
+
+# CORS Configuration (optional - defaults to * if not set)
+# Comma-separated list of allowed origins
+ALLOWED_CORS_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
