@@ -383,10 +383,17 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       });
       
       // Check if user is asking for comparison but hasn't uploaded any documents
-      const isComparisonQuery = userMessage.toLowerCase().includes('compare') || 
-                               userMessage.toLowerCase().includes('comparison') ||
-                               userMessage.toLowerCase().includes('review') ||
-                               userMessage.toLowerCase().includes('errors based on');
+      // Use more restrictive patterns that clearly indicate comparison intent
+      const lowerMessage = userMessage.toLowerCase();
+      const isComparisonQuery = lowerMessage.includes('compare') || 
+                               lowerMessage.includes('comparison') ||
+                               lowerMessage.includes('compare to') ||
+                               lowerMessage.includes('compare with') ||
+                               lowerMessage.includes('review against') ||
+                               lowerMessage.includes('errors based on') ||
+                               lowerMessage.includes('differences between') ||
+                               (lowerMessage.includes('versus') && (lowerMessage.includes('document') || lowerMessage.includes('doc'))) ||
+                               (lowerMessage.includes('vs') && (lowerMessage.includes('document') || lowerMessage.includes('doc')));
       
       // Check if user has documents (either attached or in current message)
       const hasDocuments = allDocumentIds.length > 0 || (files && files.length > 0) || uploadedBlobs.length > 0 || newBlobUploads.length > 0;
