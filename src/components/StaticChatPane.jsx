@@ -22,7 +22,7 @@ const estimateConversationTokens = (conversationHistory) => {
 };
 
 export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane, userId, resumeWorkflowId, onResumeWorkflowComplete, loadChatSessionId, onLoadChatSessionComplete, onReferencedDocumentsUpdate, onClearWorkspace }) {
-  const { user } = useAuth0();
+  const { user, getAccessTokenSilently } = useAuth0();
   const [conversationHistory, setConversationHistory] = useState([]);
   const [attachedDocuments, setAttachedDocuments] = useState([]);
   const [isProcessingAttachments, setIsProcessingAttachments] = useState(false);
@@ -510,10 +510,14 @@ The documents will be automatically included in the comparison analysis.
         conversationHistoryLength: newHistory.length
       });
       
+      // Get access token for authentication
+      const accessToken = await getAccessTokenSilently();
+      
       const response = await fetch('/api/chat-with-documents', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
         },
         body: JSON.stringify(requestBody)
       });

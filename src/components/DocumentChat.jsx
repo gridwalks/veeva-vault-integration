@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useAuth0 } from '@auth0/auth0-react';
 import DocumentViewer from './DocumentViewer.jsx';
 import ChatPromptBox from './ChatPromptBox.jsx';
 import { chatWithDocuments, createQAInteraction, getUploadedDocuments, updateQAFeedback } from '../api';
@@ -22,6 +23,7 @@ const estimateConversationTokens = (conversationHistory) => {
 };
 
 export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], onOpenDocumentInPane, onDocumentsSelected }) {
+  const { getAccessTokenSilently } = useAuth0();
   const [conversationHistory, setConversationHistory] = useState([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -419,12 +421,16 @@ The files will upload automatically and I'll be able to perform a detailed compa
         return;
       }
       
+      // Get access token for authentication
+      const accessToken = await getAccessTokenSilently();
+      
       const data = await chatWithDocuments({
         message: userMessage,
         documentIds: allDocumentIds,
         conversationHistory: newHistory,
         userId: userId,
-        attachments: blobAttachmentsForRequest
+        attachments: blobAttachmentsForRequest,
+        accessToken
       });
 
       // Update conversation with AI response

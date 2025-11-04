@@ -257,11 +257,14 @@ export async function updateUploadedDocumentMetadata({ documentId, userId, docum
   });
 }
 
-export async function chatWithDocuments({ message, documentIds = [], conversationHistory = [], userId, attachments = [] }) {
+export async function chatWithDocuments({ message, documentIds = [], conversationHistory = [], userId, attachments = [], accessToken }) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  
   return apiRequest({
     url: '/api/chat-with-documents',
     method: 'POST',
     body: { message, documentIds, conversationHistory, userId, attachments },
+    headers,
     successMessage: 'Sending chat message...',
     errorMessage: 'Failed to send chat message'
   });
