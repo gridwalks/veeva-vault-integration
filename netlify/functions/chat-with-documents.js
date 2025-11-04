@@ -493,12 +493,17 @@ export const handler = async (event) => {
     // Verify authentication
     const authResult = verifyAuthToken(event);
     if (!authResult.valid) {
-      logSafely('warn', 'Authentication failed', { error: authResult.error });
+      logSafely('warn', 'Authentication failed', { 
+        error: authResult.error,
+        hasHeaders: !!event.headers,
+        headerKeys: event.headers ? Object.keys(event.headers).map(k => k.toLowerCase()) : []
+      });
       return {
         statusCode: 401,
         headers: { ...corsHeaders, ...securityHeaders },
         body: JSON.stringify({
-          error: "Authentication required. Please log in and try again."
+          error: "Authentication required. Please log in and try again.",
+          details: authResult.error // Include specific error for debugging (remove in production if needed)
         })
       };
     }

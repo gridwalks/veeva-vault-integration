@@ -14,8 +14,14 @@ const rateLimitStore = new Map();
  */
 export function decodeJwt(token) {
   try {
+    if (!token || typeof token !== 'string') {
+      console.warn('JWT decode error: token is not a string', { type: typeof token });
+      return null;
+    }
+    
     const parts = token.split('.');
     if (parts.length < 2) {
+      console.warn('JWT decode error: token does not have enough parts', { partsCount: parts.length });
       return null;
     }
 
@@ -23,9 +29,15 @@ export function decodeJwt(token) {
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
     const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
     const json = Buffer.from(padded, 'base64').toString('utf8');
-    return JSON.parse(json);
+    const parsed = JSON.parse(json);
+    return parsed;
   } catch (error) {
-    console.warn('JWT decode error:', error.message);
+    console.warn('JWT decode error:', {
+      message: error.message,
+      tokenLength: token?.length,
+      tokenPrefix: token?.substring(0, 20) + '...',
+      errorType: error.constructor.name
+    });
     return null;
   }
 }
@@ -36,31 +48,68 @@ export function decodeJwt(token) {
  * @returns {Object} - { valid: boolean, token: string|null, claims: Object|null, error: string|null }
  */
 export function verifyAuthToken(event) {
-  const authHeader = event.headers.authorization || event.headers.Authorization;
+  // Netlify normalizes headers to lowercase, but check both cases for compatibility
+  const authHeader = event.headers?.authorization || 
+                     event.headers?.Authorization ||
+                     (event.headers && Object.keys(event.headers).find(key => key.toLowerCase() === 'authorization') ? event.headers[Object.keys(event.headers).find(key => key.toLowerCase() === 'authorization')] : null);
   
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  // Log for debugging (redacted)
+  if (!authHeader) {
+    console.log('Auth header missing. Available headers:', Object.keys(event.headers || {}).map(k => `${k.toLowerCase()}: ${typeof event.headers[k]}`));
     return {
       valid: false,
       token: null,
       claims: null,
-      error: 'Missing or invalid authorization header'
+      error: 'Missing authorization header'
+    };
+  }
+  
+  if (!authHeader.startsWith('Bearer ')) {
+    console.log('Auth header format invalid:', {
+      headerPrefix: authHeader.substring(0, 20) + '...',
+      startsWithBearer: authHeader.startsWith('Bearer ')
+    });
+    return {
+      valid: false,
+      token: null,
+      claims: null,
+      error: 'Invalid authorization header format (must start with "Bearer ")'
     };
   }
 
   const token = authHeader.substring(7);
+  
+  // Log token info for debugging (without exposing full token)
+  console.log('Token received:', {
+    tokenLength: token.length,
+    tokenPrefix: token.substring(0, 20) + '...',
+    hasBearer: authHeader.startsWith('Bearer ')
+  });
+  
   const claims = decodeJwt(token);
 
   if (!claims) {
+    console.log('Failed to decode JWT token');
     return {
       valid: false,
       token: null,
       claims: null,
-      error: 'Invalid token format'
+      error: 'Invalid token format (failed to decode)'
     };
   }
 
+  // Log decoded claims (safe - these are public)
+  console.log('Token decoded successfully:', {
+    sub: claims.sub,
+    exp: claims.exp,
+    expDate: claims.exp ? new Date(claims.exp * 1000).toISOString() : null,
+    now: new Date().toISOString(),
+    isExpired: claims.exp ? claims.exp * 1000 < Date.now() : false
+  });
+
   // Check expiration if present
   if (claims.exp && claims.exp * 1000 < Date.now()) {
+    console.log('Token expired');
     return {
       valid: false,
       token: null,
