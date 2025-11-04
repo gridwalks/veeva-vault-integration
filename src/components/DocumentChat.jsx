@@ -23,7 +23,7 @@ const estimateConversationTokens = (conversationHistory) => {
 };
 
 export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], onOpenDocumentInPane, onDocumentsSelected }) {
-  const { getAccessTokenSilently } = useAuth0();
+  const { user, getAccessTokenSilently } = useAuth0();
   const [conversationHistory, setConversationHistory] = useState([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -422,7 +422,21 @@ The files will upload automatically and I'll be able to perform a detailed compa
       }
       
       // Get access token for authentication
-      const accessToken = await getAccessTokenSilently();
+      if (!user) {
+        throw new Error('User not authenticated. Please log in.');
+      }
+      
+      let accessToken;
+      try {
+        accessToken = await getAccessTokenSilently();
+        if (!accessToken) {
+          throw new Error('Failed to retrieve access token');
+        }
+        console.log('Access token retrieved successfully');
+      } catch (tokenError) {
+        console.error('Error retrieving access token:', tokenError);
+        throw new Error('Authentication failed: Unable to retrieve access token. Please try logging out and back in.');
+      }
       
       const data = await chatWithDocuments({
         message: userMessage,

@@ -511,14 +511,37 @@ The documents will be automatically included in the comparison analysis.
       });
       
       // Get access token for authentication
-      const accessToken = await getAccessTokenSilently();
+      if (!user) {
+        throw new Error('User not authenticated. Please log in.');
+      }
+      
+      let accessToken;
+      try {
+        accessToken = await getAccessTokenSilently();
+        if (!accessToken) {
+          throw new Error('Failed to retrieve access token');
+        }
+        console.log('Access token retrieved successfully', { 
+          tokenLength: accessToken.length, 
+          tokenPrefix: accessToken.substring(0, 20) + '...' 
+        });
+      } catch (tokenError) {
+        console.error('Error retrieving access token:', tokenError);
+        throw new Error('Authentication failed: Unable to retrieve access token. Please try logging out and back in.');
+      }
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      };
+      console.log('Request headers:', { 
+        hasAuthorization: !!headers.Authorization, 
+        authHeaderPrefix: headers.Authorization?.substring(0, 20) + '...' 
+      });
       
       const response = await fetch('/api/chat-with-documents', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
-        },
+        headers,
         body: JSON.stringify(requestBody)
       });
 

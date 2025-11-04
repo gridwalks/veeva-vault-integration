@@ -260,6 +260,15 @@ export async function updateUploadedDocumentMetadata({ documentId, userId, docum
 export async function chatWithDocuments({ message, documentIds = [], conversationHistory = [], userId, attachments = [], accessToken }) {
   const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
   
+  if (accessToken) {
+    console.log('chatWithDocuments: Including Authorization header', { 
+      hasToken: !!accessToken, 
+      tokenLength: accessToken.length 
+    });
+  } else {
+    console.warn('chatWithDocuments: No access token provided');
+  }
+  
   return apiRequest({
     url: '/api/chat-with-documents',
     method: 'POST',
