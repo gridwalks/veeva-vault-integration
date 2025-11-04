@@ -501,7 +501,7 @@ export const handler = async (event) => {
     const { message, documentIds, conversationHistory = [], userId, attachments = [] } = body;
     
     // Detect comparison intent
-    const isComparisonQuery = detectComparisonIntent(message);
+    let isComparisonQuery = detectComparisonIntent(message);
     console.log('Comparison intent detected:', isComparisonQuery);
     
     if (!message || !message.trim()) {
@@ -1167,6 +1167,20 @@ export const handler = async (event) => {
       });
       // Continue without external resources if search fails
       relevantExternalResources = [];
+    }
+
+    // Only treat as comparison query if documents are actually available
+    // This prevents false positives when user just wants to generate content
+    if (isComparisonQuery) {
+      const hasDocumentsToCompare = relevantChunks.length > 0 || 
+                                    relevantDocuments.length > 0 || 
+                                    (processedAttachments && processedAttachments.length > 0 && 
+                                     processedAttachments.some(att => att.text && att.text.trim().length > 0));
+      
+      if (!hasDocumentsToCompare) {
+        console.log('Comparison intent detected but no documents available - treating as regular query');
+        isComparisonQuery = false;
+      }
     }
 
     if (
