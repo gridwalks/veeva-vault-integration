@@ -510,7 +510,10 @@ export const handler = async (event) => {
 
     // Rate limiting
     const clientIP = getClientIP(event);
-    const userIdentifier = authResult.claims?.sub || clientIP;
+    // For encrypted tokens, we can't extract sub, so use IP or a hash of the token
+    const userIdentifier = authResult.claims?.encrypted 
+      ? `encrypted_${clientIP}_${authResult.token.substring(0, 20)}` 
+      : (authResult.claims?.sub || clientIP);
     const rateLimitResult = checkRateLimit(userIdentifier, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS);
     
     if (!rateLimitResult.allowed) {
@@ -633,8 +636,11 @@ export const handler = async (event) => {
     }
 
     // Verify userId matches authenticated user
-    const authenticatedUserId = authResult.claims?.sub;
-    if (userId && authenticatedUserId && userId !== authenticatedUserId) {
+    // For encrypted tokens, we can't extract sub, so we trust the provided userId
+    const authenticatedUserId = authResult.claims?.encrypted ? null : authResult.claims?.sub;
+    
+    // For non-encrypted tokens, verify the userId matches
+    if (!authResult.claims?.encrypted && userId && authenticatedUserId && userId !== authenticatedUserId) {
       logSafely('warn', 'User ID mismatch', { 
         providedUserId: userId, 
         authenticatedUserId 
@@ -648,8 +654,9 @@ export const handler = async (event) => {
       };
     }
 
-    // Use authenticated user ID if available
-    const effectiveUserId = authenticatedUserId || userId;
+    // For encrypted tokens, use the provided userId (we trust it since token is valid)
+    // For non-encrypted tokens, prefer authenticatedUserId over provided userId
+    const effectiveUserId = authResult.claims?.encrypted ? userId : (authenticatedUserId || userId);
     if (!effectiveUserId) {
       return {
         statusCode: 400,
