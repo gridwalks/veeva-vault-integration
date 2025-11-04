@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 import StaticChatPane from "./components/StaticChatPane.jsx";
 import Header from "./components/Header.jsx";
@@ -23,6 +23,14 @@ export default function App() {
   const [resumeWorkflowId, setResumeWorkflowId] = useState(null);
   const [loadChatSessionId, setLoadChatSessionId] = useState(null);
   const documentViewerRef = useRef(null);
+  
+  // Resizable panel state
+  const [leftPanelWidth, setLeftPanelWidth] = useState(() => {
+    const saved = localStorage.getItem('chatPanelWidth');
+    return saved ? parseFloat(saved) : 50; // Default to 50%
+  });
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef(null);
 
   // Set up inactivity logout for authenticated users
   const handleLogout = () => logout({ logoutParams: { returnTo: window.location.origin } });
@@ -34,6 +42,67 @@ export default function App() {
       setLocalUser(user);
     }
   }, [user]);
+
+  // Load saved panel width on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('chatPanelWidth');
+    if (saved) {
+      setLeftPanelWidth(parseFloat(saved));
+    }
+  }, []);
+
+  // Handle panel resizing
+  const handleMouseDown = useCallback((e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleMouseMove = useCallback((e) => {
+    if (!containerRef.current) return;
+    
+    const container = containerRef.current;
+    const rect = container.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const containerWidth = rect.width;
+    const newWidth = (mouseX / containerWidth) * 100;
+    
+    // Constrain between 20% and 80%
+    const constrainedWidth = Math.max(20, Math.min(80, newWidth));
+    setLeftPanelWidth(constrainedWidth);
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Save panel width to localStorage when dragging ends
+  useEffect(() => {
+    if (!isDragging && leftPanelWidth !== null) {
+      localStorage.setItem('chatPanelWidth', leftPanelWidth.toString());
+    }
+  }, [isDragging, leftPanelWidth]);
+
+  // Attach/remove global mouse event listeners
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = 'none'; // Prevent text selection during drag
+      document.body.style.cursor = 'col-resize';
+    } else {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   // Handle user profile updates
   const handleUserUpdate = (updatedUser) => {
@@ -199,20 +268,24 @@ useEffect(() => {
       {/* Main Content Area */}
       {currentScreen === "main" ? (
         /* Main Chat Interface */
-        <div style={{
-          display: 'flex',
-          height: 'calc(100vh - 60px)',
-          margin: '8px 12px',
-          gap: '12px'
-        }}>
+        <div 
+          ref={containerRef}
+          style={{
+            display: 'flex',
+            height: 'calc(100vh - 60px)',
+            margin: '8px 12px',
+            gap: '0px'
+          }}
+        >
           {/* Left Panel - Chat */}
           <div style={{
-            flex: '1',
+            width: `${leftPanelWidth}%`,
             backgroundColor: '#ffffff',
             border: '1px solid #e5e7eb',
             borderRadius: '8px',
             overflow: 'hidden',
-            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+            marginRight: '12px'
           }}>
             <StaticChatPane 
               selectedDocuments={selectedDocuments} 
@@ -233,18 +306,43 @@ useEffect(() => {
             />
           </div>
 
-                {/* Right Panel - Selected Documents Viewer */}
-                <div style={{
-                  flex: '1'
-                }}>
-                  <SelectedDocumentViewer 
-                    ref={documentViewerRef}
-                    selectedDocuments={selectedDocuments}
-                    onDocumentsSelected={setSelectedDocuments}
-                    referencedDocuments={referencedDocuments}
-                    referencedExternalResources={referencedExternalResources}
-                  />
-                </div>
+          {/* Resizable Divider */}
+          <div
+            onMouseDown={handleMouseDown}
+            style={{
+              width: '6px',
+              backgroundColor: isDragging ? '#9ca3af' : '#e5e7eb',
+              cursor: 'col-resize',
+              flexShrink: 0,
+              transition: isDragging ? 'none' : 'background-color 0.2s',
+              position: 'relative'
+            }}
+            onMouseEnter={(e) => {
+              if (!isDragging) {
+                e.currentTarget.style.backgroundColor = '#d1d5db';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isDragging) {
+                e.currentTarget.style.backgroundColor = '#e5e7eb';
+              }
+            }}
+          />
+
+          {/* Right Panel - Selected Documents Viewer */}
+          <div style={{
+            flex: '1',
+            minWidth: 0,
+            marginLeft: '12px'
+          }}>
+            <SelectedDocumentViewer 
+              ref={documentViewerRef}
+              selectedDocuments={selectedDocuments}
+              onDocumentsSelected={setSelectedDocuments}
+              referencedDocuments={referencedDocuments}
+              referencedExternalResources={referencedExternalResources}
+            />
+          </div>
         </div>
       ) : currentScreen === "admin" ? (
         /* Admin Screen */
