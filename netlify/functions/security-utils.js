@@ -407,23 +407,43 @@ export function getSecurityHeaders() {
 }
 
 /**
+ * Recursively redact sensitive information from an object
+ * @param {Object} obj - Object to redact
+ * @returns {Object} - Redacted object
+ */
+function redactObject(obj) {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => 
+      typeof item === 'string' ? redactError(item) : 
+      typeof item === 'object' && item !== null ? redactObject(item) : 
+      item
+    );
+  }
+
+  const redacted = { ...obj };
+  Object.keys(redacted).forEach(key => {
+    if (typeof redacted[key] === 'string') {
+      redacted[key] = redactError(redacted[key]);
+    } else if (typeof redacted[key] === 'object' && redacted[key] !== null) {
+      redacted[key] = redactObject(redacted[key]);
+    }
+  });
+
+  return redacted;
+}
+
+/**
  * Log with redaction
  * @param {string} level - Log level (info, warn, error)
  * @param {string} message - Log message
  * @param {Object} data - Additional data to log
  */
 export function logSafely(level, message, data = {}) {
-  const redactedData = { ...data };
-  
-  // Redact sensitive fields
-  Object.keys(redactedData).forEach(key => {
-    if (typeof redactedData[key] === 'string') {
-      redactedData[key] = redactError(redactedData[key]);
-    } else if (typeof redactedData[key] === 'object' && redactedData[key] !== null) {
-      redactedData[key] = logSafely(level, '', redactedData[key]);
-    }
-  });
-
+  const redactedData = redactObject(data);
   const logMessage = redactError(message);
   
   switch (level) {
