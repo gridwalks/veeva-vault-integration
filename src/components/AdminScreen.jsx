@@ -163,7 +163,11 @@ export default function AdminScreen({ userId }) {
     setIsLoadingSettings(true);
     setSettingsError(null);
     try {
-      const result = await getSystemSettings({ setting_key: 'veeva_integration_enabled' });
+      const accessToken = await getAccessTokenSilently();
+      const result = await getSystemSettings({ 
+        setting_key: 'veeva_integration_enabled',
+        accessToken 
+      });
       if (result.setting) {
         setVeevaIntegrationEnabled(result.setting.value);
       }

@@ -496,6 +496,15 @@ export async function verifyAdminRole(event) {
   const hasAdminRole = allRoles.includes('admin');
   
   if (!hasAdminRole) {
+    console.log('Admin role check failed:', {
+      allRoles,
+      rolesFromCustomClaim,
+      rolesFromAcceleraqaClaim,
+      rolesFromRolesProperty,
+      customClaimNamespace,
+      auth0Domain,
+      claimsKeys: Object.keys(claims).filter(k => k.includes('role') || k.includes('Role'))
+    });
     return {
       authorized: false,
       error: 'Admin role required'

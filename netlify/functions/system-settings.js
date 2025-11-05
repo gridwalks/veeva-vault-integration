@@ -1,5 +1,5 @@
 import { getPool } from './db.js';
-import { verifyAdminRole } from './security-utils.js';
+import { verifyAdminRole, verifyAuthToken } from './security-utils.js';
 
 /**
  * Netlify serverless function to manage system settings
@@ -25,17 +25,41 @@ export async function handler(event, context) {
   }
 
   try {
-    // Verify admin role for all operations
-    const authResult = await verifyAdminRole(event);
-    if (!authResult.authorized) {
-      return {
-        statusCode: 403,
-        headers,
-        body: JSON.stringify({
-          error: 'Unauthorized',
-          message: 'Admin role required to manage system settings'
-        })
-      };
+    // For GET requests, just verify authentication (any authenticated user can read)
+    // For PUT requests, require admin role
+    if (event.httpMethod === 'PUT') {
+      const authResult = await verifyAdminRole(event);
+      if (!authResult.authorized) {
+        console.log('PUT request denied - admin role required', {
+          error: authResult.error,
+          hasAuthHeader: !!event.headers?.authorization || !!event.headers?.Authorization
+        });
+        return {
+          statusCode: 403,
+          headers,
+          body: JSON.stringify({
+            error: 'Unauthorized',
+            message: 'Admin role required to update system settings'
+          })
+        };
+      }
+    } else if (event.httpMethod === 'GET') {
+      // For GET, just verify token is valid (not necessarily admin)
+      const authResult = verifyAuthToken(event);
+      if (!authResult.valid) {
+        console.log('GET request denied - authentication required', {
+          error: authResult.error,
+          hasAuthHeader: !!event.headers?.authorization || !!event.headers?.Authorization
+        });
+        return {
+          statusCode: 401,
+          headers,
+          body: JSON.stringify({
+            error: 'Unauthorized',
+            message: 'Authentication required to access system settings'
+          })
+        };
+      }
     }
 
     const pool = getPool();

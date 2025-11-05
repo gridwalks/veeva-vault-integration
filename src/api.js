@@ -657,13 +657,16 @@ export async function sendPasswordReset({ userId, email, connection, accessToken
 }
 
 // System Settings API functions
-export async function getSystemSettings({ setting_key } = {}) {
+export async function getSystemSettings({ setting_key, accessToken } = {}) {
   const params = {};
   if (setting_key) params.setting_key = setting_key;
+  
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
   
   const data = await apiRequest({
     url: '/api/system-settings',
     params,
+    headers,
     successMessage: 'Fetching system settings...',
     errorMessage: 'Failed to load system settings'
   });
