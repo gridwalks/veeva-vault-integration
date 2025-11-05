@@ -544,6 +544,22 @@ export default function UserManagement() {
                         fontWeight: '600',
                         color: '#374151',
                         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                      }}>Logins</th>
+                      <th style={{
+                        padding: '12px',
+                        textAlign: 'left',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: '#374151',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                      }}>Last Login</th>
+                      <th style={{
+                        padding: '12px',
+                        textAlign: 'left',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: '#374151',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                       }}>Actions</th>
                     </tr>
                   </thead>
@@ -606,6 +622,33 @@ export default function UserManagement() {
                             </div>
                           ) : (
                             <span style={{ color: '#9ca3af' }}>No roles</span>
+                          )}
+                        </td>
+                        <td style={{
+                          padding: '12px',
+                          fontSize: '14px',
+                          color: '#374151',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                          textAlign: 'center'
+                        }}>
+                          {user.logins_count !== undefined && user.logins_count !== null ? user.logins_count : 0}
+                        </td>
+                        <td style={{
+                          padding: '12px',
+                          fontSize: '14px',
+                          color: '#374151',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                        }}>
+                          {user.last_login ? (
+                            new Date(user.last_login).toLocaleString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })
+                          ) : (
+                            <span style={{ color: '#9ca3af' }}>Never</span>
                           )}
                         </td>
                         <td style={{
