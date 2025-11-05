@@ -458,3 +458,53 @@ export function logSafely(level, message, data = {}) {
   }
 }
 
+/**
+ * Verify if the user has admin role
+ * @param {Object} event - Netlify function event
+ * @returns {Object} - { authorized: boolean, error: string|null }
+ */
+export async function verifyAdminRole(event) {
+  const authResult = verifyAuthToken(event);
+  
+  if (!authResult.valid || !authResult.claims) {
+    return {
+      authorized: false,
+      error: authResult.error || 'Authentication required'
+    };
+  }
+
+  const claims = authResult.claims;
+  
+  // Check multiple possible locations for roles in Auth0
+  // Common namespaces for roles
+  const auth0Domain = claims.iss ? claims.iss.replace('https://', '').replace('.auth0.com', '') : null;
+  const customClaimNamespace = auth0Domain ? `https://${auth0Domain}.auth0.com/roles` : 'https://your-domain.com/roles';
+  const acceleraqaClaim = 'https://acceleraqa.com/roles';
+  
+  // Extract roles from various possible locations
+  const rolesFromCustomClaim = claims[customClaimNamespace];
+  const rolesFromAcceleraqaClaim = claims[acceleraqaClaim];
+  const rolesFromRolesProperty = claims.roles;
+  
+  // Collect all roles
+  const allRoles = [
+    ...(Array.isArray(rolesFromCustomClaim) ? rolesFromCustomClaim : []),
+    ...(Array.isArray(rolesFromAcceleraqaClaim) ? rolesFromAcceleraqaClaim : []),
+    ...(Array.isArray(rolesFromRolesProperty) ? rolesFromRolesProperty : [])
+  ];
+
+  const hasAdminRole = allRoles.includes('admin');
+  
+  if (!hasAdminRole) {
+    return {
+      authorized: false,
+      error: 'Admin role required'
+    };
+  }
+
+  return {
+    authorized: true,
+    error: null
+  };
+}
+

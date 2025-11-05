@@ -655,3 +655,31 @@ export async function sendPasswordReset({ userId, email, connection, accessToken
     errorMessage: 'Failed to send password reset email'
   });
 }
+
+// System Settings API functions
+export async function getSystemSettings({ setting_key } = {}) {
+  const params = {};
+  if (setting_key) params.setting_key = setting_key;
+  
+  const data = await apiRequest({
+    url: '/api/system-settings',
+    params,
+    successMessage: 'Fetching system settings...',
+    errorMessage: 'Failed to load system settings'
+  });
+  
+  return data;
+}
+
+export async function updateSystemSetting({ setting_key, setting_value, accessToken }) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  
+  return apiRequest({
+    url: '/api/system-settings',
+    method: 'PUT',
+    body: { setting_key, setting_value },
+    headers,
+    successMessage: 'Updating system setting...',
+    errorMessage: 'Failed to update system setting'
+  });
+}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { indexDocuments, getIndexedDocuments } from "../api";
+import { useAuth0 } from '@auth0/auth0-react';
+import { indexDocuments, getIndexedDocuments, getSystemSettings, updateSystemSetting } from "../api";
 import IndexedDocumentList from "./IndexedDocumentList.jsx";
 import BlobDocumentList from "./BlobDocumentList.jsx";
 import DocumentUpload from "./DocumentUpload.jsx";
@@ -12,11 +13,15 @@ import UserManagement from "./UserManagement.jsx";
 import VeevaDocumentList from "./VeevaDocumentList.jsx";
 
 export default function AdminScreen({ userId }) {
+  const { getAccessTokenSilently } = useAuth0();
   const [q, setQ] = useState("");
   const [indexedData, setIndexedData] = useState({ items: [], total: 0, pageOffset: 0, pageSize: 50 });
   const [activeTab, setActiveTab] = useState("indexed");
   const [isIndexing, setIsIndexing] = useState(false);
   const [indexResult, setIndexResult] = useState(null);
+  const [veevaIntegrationEnabled, setVeevaIntegrationEnabled] = useState(true);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+  const [settingsError, setSettingsError] = useState(null);
 
   async function loadIndexed(offset = 0) {
     console.log('Loading indexed documents...', { query: q, offset });
@@ -151,37 +156,88 @@ export default function AdminScreen({ userId }) {
   useEffect(() => {
     console.log('Admin screen mounted, loading initial data...');
     loadIndexed(0);
+    loadSystemSettings();
   }, []);
+
+  async function loadSystemSettings() {
+    setIsLoadingSettings(true);
+    setSettingsError(null);
+    try {
+      const result = await getSystemSettings({ setting_key: 'veeva_integration_enabled' });
+      if (result.setting) {
+        setVeevaIntegrationEnabled(result.setting.value);
+      }
+    } catch (err) {
+      console.error('Error loading system settings:', err);
+      setSettingsError(err.message);
+      // Default to enabled if we can't load settings
+      setVeevaIntegrationEnabled(true);
+    } finally {
+      setIsLoadingSettings(false);
+    }
+  }
+
+  async function handleToggleVeevaIntegration(enabled) {
+    setIsLoadingSettings(true);
+    setSettingsError(null);
+    try {
+      const accessToken = await getAccessTokenSilently();
+      await updateSystemSetting({
+        setting_key: 'veeva_integration_enabled',
+        setting_value: enabled,
+        accessToken
+      });
+      setVeevaIntegrationEnabled(enabled);
+      
+      // If disabling and user is on veeva-documents tab, switch to indexed tab
+      if (!enabled && activeTab === 'veeva-documents') {
+        setActiveTab('indexed');
+      }
+    } catch (err) {
+      console.error('Error updating system settings:', err);
+      setSettingsError(err.message);
+      // Revert the toggle on error
+      setVeevaIntegrationEnabled(!enabled);
+    } finally {
+      setIsLoadingSettings(false);
+    }
+  }
 
   const menuGroups = [
     {
       header: "Knowledge Management",
       items: [
-        { id: "indexed", label: "Indexed Documents" },
-        { id: "veeva-documents", label: "Available Documents in Veeva" },
-        { id: "upload", label: "Upload Documents" },
-        { id: "blob", label: "Blob Documents" },
-        { id: "external", label: "External Resources" },
-        { id: "cfr", label: "CFR Title 21" },
-        { id: "qa", label: "Q&A Management" }
+        { id: "indexed", label: "Indexed Documents", requiresVeeva: false },
+        ...(veevaIntegrationEnabled ? [{ id: "veeva-documents", label: "Available Documents in Veeva", requiresVeeva: true }] : []),
+        { id: "upload", label: "Upload Documents", requiresVeeva: false },
+        { id: "blob", label: "Blob Documents", requiresVeeva: false },
+        { id: "external", label: "External Resources", requiresVeeva: false },
+        { id: "cfr", label: "CFR Title 21", requiresVeeva: false },
+        { id: "qa", label: "Q&A Management", requiresVeeva: false }
       ]
     },
     {
       header: "Workflow Management",
       items: [
-        { id: "workflow", label: "Workflow Management" }
+        { id: "workflow", label: "Workflow Management", requiresVeeva: false }
       ]
     },
     {
       header: "User Management",
       items: [
-        { id: "users", label: "User Management" }
+        { id: "users", label: "User Management", requiresVeeva: false }
+      ]
+    },
+    {
+      header: "System Settings",
+      items: [
+        { id: "settings", label: "System Settings", requiresVeeva: false }
       ]
     },
     {
       header: "Logs",
       items: [
-        { id: "logs", label: "Indexing Logs" }
+        { id: "logs", label: "Indexing Logs", requiresVeeva: false }
       ]
     }
   ];
@@ -307,32 +363,34 @@ export default function AdminScreen({ userId }) {
           <button
             type="button"
             onClick={() => handleIndexDocuments(false)}
-            disabled={isIndexing}
+            disabled={isIndexing || !veevaIntegrationEnabled}
             style={{
               padding:'6px 12px',
-              backgroundColor: isIndexing ? '#ccc' : '#28a745',
+              backgroundColor: (isIndexing || !veevaIntegrationEnabled) ? '#ccc' : '#28a745',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
-              cursor: isIndexing ? 'not-allowed' : 'pointer',
+              cursor: (isIndexing || !veevaIntegrationEnabled) ? 'not-allowed' : 'pointer',
               fontSize:'12px'
             }}
+            title={!veevaIntegrationEnabled ? 'Veeva integration is disabled' : ''}
           >
             {isIndexing ? 'Indexing...' : 'Index Documents'}
           </button>
           <button
             type="button"
             onClick={() => handleIndexDocuments(true)}
-            disabled={isIndexing}
+            disabled={isIndexing || !veevaIntegrationEnabled}
             style={{
               padding:'6px 12px',
-              backgroundColor: isIndexing ? '#ccc' : '#ff6b35',
+              backgroundColor: (isIndexing || !veevaIntegrationEnabled) ? '#ccc' : '#ff6b35',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
-              cursor: isIndexing ? 'not-allowed' : 'pointer',
+              cursor: (isIndexing || !veevaIntegrationEnabled) ? 'not-allowed' : 'pointer',
               fontSize:'12px'
             }}
+            title={!veevaIntegrationEnabled ? 'Veeva integration is disabled' : ''}
           >
             {isIndexing ? 'Regenerating...' : 'Regenerate Summaries'}
           </button>
@@ -468,6 +526,136 @@ export default function AdminScreen({ userId }) {
         <IndexingLogs />
       ) : activeTab === "users" ? (
         <UserManagement />
+      ) : activeTab === "settings" ? (
+        <div style={{ padding: '20px' }}>
+          <h2 style={{
+            margin: '0 0 20px 0',
+            color: '#374151',
+            fontSize: '18px',
+            fontWeight: '600',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          }}>
+            System Settings
+          </h2>
+
+          {settingsError && (
+            <div style={{
+              backgroundColor: '#f8d7da',
+              color: '#721c24',
+              padding: '12px',
+              borderRadius: '6px',
+              marginBottom: '16px',
+              border: '1px solid #f5c6cb',
+              fontSize: '14px'
+            }}>
+              Error: {settingsError}
+            </div>
+          )}
+
+          <div style={{
+            backgroundColor: '#f8f9fa',
+            border: '1px solid #e9ecef',
+            borderRadius: '6px',
+            padding: '20px',
+            marginBottom: '16px'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '12px'
+            }}>
+              <div>
+                <h3 style={{
+                  margin: '0 0 4px 0',
+                  color: '#374151',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  Veeva Vault Integration
+                </h3>
+                <p style={{
+                  margin: 0,
+                  color: '#6b7280',
+                  fontSize: '14px',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  Enable or disable integration with Veeva Vault. When disabled, Veeva-related features will be hidden.
+                </p>
+              </div>
+              <label style={{
+                position: 'relative',
+                display: 'inline-block',
+                width: '60px',
+                height: '34px',
+                cursor: isLoadingSettings ? 'not-allowed' : 'pointer'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={veevaIntegrationEnabled}
+                  onChange={(e) => handleToggleVeevaIntegration(e.target.checked)}
+                  disabled={isLoadingSettings}
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: veevaIntegrationEnabled ? '#28a745' : '#ccc',
+                  borderRadius: '34px',
+                  transition: 'background-color 0.3s',
+                  opacity: isLoadingSettings ? 0.6 : 1
+                }}>
+                  <span style={{
+                    position: 'absolute',
+                    content: '""',
+                    height: '26px',
+                    width: '26px',
+                    left: veevaIntegrationEnabled ? '34px' : '4px',
+                    bottom: '4px',
+                    backgroundColor: 'white',
+                    borderRadius: '50%',
+                    transition: 'left 0.3s',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                  }} />
+                </span>
+              </label>
+            </div>
+            <div style={{
+              marginTop: '12px',
+              padding: '12px',
+              backgroundColor: '#ffffff',
+              borderRadius: '4px',
+              border: '1px solid #dee2e6'
+            }}>
+              <p style={{
+                margin: 0,
+                fontSize: '13px',
+                color: '#495057',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}>
+                <strong>Current Status:</strong> {veevaIntegrationEnabled ? (
+                  <span style={{ color: '#28a745', fontWeight: '600' }}>Enabled</span>
+                ) : (
+                  <span style={{ color: '#dc3545', fontWeight: '600' }}>Disabled</span>
+                )}
+              </p>
+              {isLoadingSettings && (
+                <p style={{
+                  margin: '8px 0 0 0',
+                  fontSize: '12px',
+                  color: '#6c757d',
+                  fontStyle: 'italic'
+                }}>
+                  Updating setting...
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       ) : null}
       </div>
     </div>
