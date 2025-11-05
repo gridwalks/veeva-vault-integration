@@ -1,123 +1,50 @@
-import { ManagementClient } from 'auth0';
+import { getCorsHeaders, handleOptionsRequest, extractAuthToken, parseRequestBody, getJsonParseErrorResponse, initAuth0ManagementClient, errorResponses, createErrorResponse, createSuccessResponse } from './shared-utils.js';
 
 export const handler = async (event) => {
-  const headers = {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'PUT, PATCH, OPTIONS'
-  };
+  const headers = getCorsHeaders(['PUT', 'PATCH'], event);
 
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: ''
-    };
+    return handleOptionsRequest(headers);
   }
 
   try {
     // Extract JWT token for authentication
-    const authHeader = event.headers.authorization || event.headers.Authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return {
-        statusCode: 401,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Missing or invalid authorization header' })
-      };
+    const auth = extractAuthToken(event);
+    if (!auth.valid) {
+      return errorResponses.unauthorized(headers);
     }
 
-    const token = authHeader.substring(7);
     console.log('Received authenticated request for updating user status');
 
     // Validate request body
     if (!event.body) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Request body is required' })
-      };
+      return errorResponses.missingBody(headers);
     }
 
-    let payload;
-    try {
-      payload = JSON.parse(event.body);
-    } catch (parseError) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Invalid JSON payload' })
-      };
+    const payload = parseRequestBody(event.body, headers);
+    if (!payload) {
+      return getJsonParseErrorResponse(headers);
     }
 
     const { userId, blocked } = payload;
 
     if (!userId) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: 'User ID is required' })
-      };
+      return createErrorResponse(400, 'User ID is required', headers);
     }
 
     if (typeof blocked !== 'boolean') {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Blocked status must be a boolean' })
-      };
+      return createErrorResponse(400, 'Blocked status must be a boolean', headers);
     }
 
     console.log('Updating user status:', { userId, blocked });
 
-    // Get Auth0 Management API credentials
-    let domain = process.env.AUTH0_MGMT_DOMAIN;
-    const clientId = process.env.AUTH0_MGMT_CLIENT_ID;
-    const clientSecret = process.env.AUTH0_MGMT_CLIENT_SECRET;
-
-    // Clean domain - remove https:// prefix and /api/v2/ suffix if present
-    if (domain && domain.startsWith('https://')) {
-      domain = domain.replace('https://', '');
-    }
-    if (domain && domain.endsWith('/api/v2/')) {
-      domain = domain.replace('/api/v2/', '');
-    }
-    if (domain && domain.endsWith('/api/v2')) {
-      domain = domain.replace('/api/v2', '');
-    }
-
-    if (!domain || !clientId || !clientSecret) {
-      console.error('Missing Auth0 Management API credentials');
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ 
-          success: false, 
-          error: 'Server configuration error: Missing Auth0 credentials' 
-        })
-      };
-    }
-
     // Initialize Auth0 Management Client
-    console.log('Initializing Auth0 Management Client with domain:', domain);
+    const { client: management, error: clientError } = initAuth0ManagementClient('read:users update:users');
     
-    const managementConfig = {
-      domain: domain,
-      clientId: clientId,
-      clientSecret: clientSecret,
-      scope: 'read:users update:users'
-    };
-    
-    // Add token configuration to help the SDK authenticate properly
-    if (!managementConfig.domain.startsWith('https://')) {
-      managementConfig.audience = `https://${domain}/api/v2/`;
-      managementConfig.tokenProvider = {
-        enableCache: true,
-        cacheTTLInSeconds: 3600
-      };
+    if (clientError) {
+      console.error(clientError);
+      return errorResponses.missingAuth0Credentials(headers);
     }
-    
-    const management = new ManagementClient(managementConfig);
 
     // Update user blocked status
     try {

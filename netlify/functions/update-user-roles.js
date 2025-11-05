@@ -1,141 +1,67 @@
-import { ManagementClient } from 'auth0';
+import { getCorsHeaders, handleOptionsRequest, extractAuthToken, parseRequestBody, getJsonParseErrorResponse, initAuth0ManagementClient, getAuth0Credentials, errorResponses, createErrorResponse } from './shared-utils.js';
 
 export const handler = async (event) => {
-  const headers = {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'PUT, PATCH, POST, OPTIONS'
-  };
+  const headers = getCorsHeaders(['PUT', 'PATCH', 'POST'], event);
 
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: ''
-    };
+    return handleOptionsRequest(headers);
   }
 
   try {
     // Extract JWT token for authentication
-    const authHeader = event.headers.authorization || event.headers.Authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return {
-        statusCode: 401,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Missing or invalid authorization header' })
-      };
+    const auth = extractAuthToken(event);
+    if (!auth.valid) {
+      return errorResponses.unauthorized(headers);
     }
 
-    const token = authHeader.substring(7);
     console.log('Received authenticated request for updating user roles');
 
     // Validate request body
     if (!event.body) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Request body is required' })
-      };
+      return errorResponses.missingBody(headers);
     }
 
-    let payload;
-    try {
-      payload = JSON.parse(event.body);
-    } catch (parseError) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Invalid JSON payload' })
-      };
+    const payload = parseRequestBody(event.body, headers);
+    if (!payload) {
+      return getJsonParseErrorResponse(headers);
     }
 
     const { userId, role, action } = payload;
 
     if (!userId) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: 'User ID is required' })
-      };
+      return createErrorResponse(400, 'User ID is required', headers);
     }
 
     if (!role) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Role is required' })
-      };
+      return createErrorResponse(400, 'Role is required', headers);
     }
 
     if (!action || !['add', 'remove', 'set'].includes(action)) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Action must be "add", "remove", or "set"' })
-      };
+      return createErrorResponse(400, 'Action must be "add", "remove", or "set"', headers);
     }
 
     console.log('Updating user roles:', { userId, role, action });
 
-    // Get Auth0 Management API credentials
-    let domain = process.env.AUTH0_MGMT_DOMAIN;
-    const clientId = process.env.AUTH0_MGMT_CLIENT_ID;
-    const clientSecret = process.env.AUTH0_MGMT_CLIENT_SECRET;
-
-    // Clean domain - remove https:// prefix and /api/v2/ suffix if present
-    if (domain && domain.startsWith('https://')) {
-      domain = domain.replace('https://', '');
-    }
-    if (domain && domain.endsWith('/api/v2/')) {
-      domain = domain.replace('/api/v2/', '');
-    }
-    if (domain && domain.endsWith('/api/v2')) {
-      domain = domain.replace('/api/v2', '');
-    }
-
-    if (!domain || !clientId || !clientSecret) {
-      console.error('Missing Auth0 Management API credentials');
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ 
-          success: false, 
-          error: 'Server configuration error: Missing Auth0 credentials' 
-        })
-      };
-    }
-
     // Initialize Auth0 Management Client
-    console.log('Initializing Auth0 Management Client with domain:', domain);
+    const { client: management, error: clientError } = initAuth0ManagementClient('read:users update:users read:roles create:roles');
     
-    const managementConfig = {
-      domain: domain,
-      clientId: clientId,
-      clientSecret: clientSecret,
-      scope: 'read:users update:users read:roles create:roles'
-    };
-    
-    // Add token configuration to help the SDK authenticate properly
-    if (!managementConfig.domain.startsWith('https://')) {
-      managementConfig.audience = `https://${domain}/api/v2/`;
-      managementConfig.tokenProvider = {
-        enableCache: true,
-        cacheTTLInSeconds: 3600
-      };
+    if (clientError) {
+      console.error(clientError);
+      return errorResponses.missingAuth0Credentials(headers);
     }
-    
-    const management = new ManagementClient(managementConfig);
 
+    // Get Auth0 credentials for direct API calls if needed
+    const credentials = getAuth0Credentials();
+    
     // Helper function to get access token for direct API calls
     const getAccessToken = async () => {
-      const tokenResponse = await fetch(`https://${domain}/oauth/token`, {
+      const tokenResponse = await fetch(`https://${credentials.domain}/oauth/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          client_id: clientId,
-          client_secret: clientSecret,
-          audience: `https://${domain}/api/v2/`,
+          client_id: credentials.clientId,
+          client_secret: credentials.clientSecret,
+          audience: `https://${credentials.domain}/api/v2/`,
           grant_type: 'client_credentials',
           scope: 'read:users update:users read:roles create:roles'
         })

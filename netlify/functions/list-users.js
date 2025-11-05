@@ -1,33 +1,19 @@
-import { ManagementClient } from 'auth0';
+import { getCorsHeaders, handleOptionsRequest, extractAuthToken, initAuth0ManagementClient, errorResponses } from './shared-utils.js';
 
 export const handler = async (event) => {
-  const headers = {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS'
-  };
+  const headers = getCorsHeaders(['GET'], event);
 
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: ''
-    };
+    return handleOptionsRequest(headers);
   }
 
   try {
     // Extract JWT token for authentication
-    const authHeader = event.headers.authorization || event.headers.Authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return {
-        statusCode: 401,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Missing or invalid authorization header' })
-      };
+    const auth = extractAuthToken(event);
+    if (!auth.valid) {
+      return errorResponses.unauthorized(headers);
     }
 
-    const token = authHeader.substring(7);
     console.log('Received authenticated request for listing users');
 
     // Parse query parameters
@@ -38,54 +24,13 @@ export const handler = async (event) => {
 
     console.log('Fetching users with params:', { limit: perPage, page, search });
 
-    // Get Auth0 Management API credentials
-    let domain = process.env.AUTH0_MGMT_DOMAIN;
-    const clientId = process.env.AUTH0_MGMT_CLIENT_ID;
-    const clientSecret = process.env.AUTH0_MGMT_CLIENT_SECRET;
-
-    // Clean domain - remove https:// prefix and /api/v2/ suffix if present
-    if (domain && domain.startsWith('https://')) {
-      domain = domain.replace('https://', '');
-    }
-    if (domain && domain.endsWith('/api/v2/')) {
-      domain = domain.replace('/api/v2/', '');
-    }
-    if (domain && domain.endsWith('/api/v2')) {
-      domain = domain.replace('/api/v2', '');
-    }
-
-    if (!domain || !clientId || !clientSecret) {
-      console.error('Missing Auth0 Management API credentials');
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ 
-          success: false, 
-          error: 'Server configuration error: Missing Auth0 credentials' 
-        })
-      };
-    }
-
     // Initialize Auth0 Management Client
-    console.log('Initializing Auth0 Management Client with domain:', domain);
+    const { client: management, error: clientError } = initAuth0ManagementClient('read:users read:roles');
     
-    const managementConfig = {
-      domain: domain,
-      clientId: clientId,
-      clientSecret: clientSecret,
-      scope: 'read:users read:roles'
-    };
-    
-    // Add token configuration to help the SDK authenticate properly
-    if (!managementConfig.domain.startsWith('https://')) {
-      managementConfig.audience = `https://${domain}/api/v2/`;
-      managementConfig.tokenProvider = {
-        enableCache: true,
-        cacheTTLInSeconds: 3600
-      };
+    if (clientError) {
+      console.error(clientError);
+      return errorResponses.missingAuth0Credentials(headers);
     }
-    
-    const management = new ManagementClient(managementConfig);
 
     // Build query parameters for Auth0 API
     const queryParams = {
