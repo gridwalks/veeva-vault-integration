@@ -29,11 +29,22 @@ export function generateSafeFileName(fileName) {
     extension = lower.substring(lastDotIndex + 1);
   }
 
-  const safeBase = base
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+/, '')
-    .replace(/-+$/, '')
-    .substring(0, 96) || 'document';
+  // Limit length first to prevent ReDoS, then sanitize
+  const limitedBase = base.substring(0, 96);
+  let safeBase = limitedBase.replace(/[^a-z0-9]+/g, '-');
+  
+  // Trim leading hyphens using string methods to avoid ReDoS vulnerability
+  // Since string is already limited to 96 chars, this is safe
+  while (safeBase.startsWith('-') && safeBase.length > 0) {
+    safeBase = safeBase.slice(1);
+  }
+  
+  // Trim trailing hyphens using string methods to avoid ReDoS vulnerability
+  while (safeBase.endsWith('-') && safeBase.length > 0) {
+    safeBase = safeBase.slice(0, -1);
+  }
+  
+  safeBase = safeBase || 'document';
 
   const safeExtension = extension.replace(/[^a-z0-9]+/g, '').substring(0, 16);
   return safeExtension ? `${safeBase}.${safeExtension}` : safeBase;

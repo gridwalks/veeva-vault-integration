@@ -71,7 +71,16 @@ export default function UserManagement() {
   };
 
   const validateEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // Validate email format - using safer regex to prevent ReDoS
+    // Limit email length to prevent excessive backtracking (RFC 5321 limit is 254)
+    if (typeof email !== 'string' || email.length > 254) {
+      return false;
+    }
+    
+    // Use a safer regex pattern that avoids catastrophic backtracking
+    // Pattern matches: local-part@domain.tld where local-part and domain are non-empty
+    // Using more specific character classes to reduce backtracking
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
     return emailRegex.test(email);
   };
 
