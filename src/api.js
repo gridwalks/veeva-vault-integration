@@ -686,3 +686,15 @@ export async function updateSystemSetting({ setting_key, setting_value, accessTo
     errorMessage: 'Failed to update system setting'
   });
 }
+
+export async function deleteVeevaData({ accessToken }) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  
+  return apiRequest({
+    url: '/api/delete-veeva-data',
+    method: 'DELETE',
+    headers,
+    successMessage: 'Deleting Veeva data...',
+    errorMessage: 'Failed to delete Veeva data'
+  });
+}

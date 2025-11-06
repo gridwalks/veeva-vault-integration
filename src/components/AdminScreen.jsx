@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth0 } from '@auth0/auth0-react';
-import { indexDocuments, getIndexedDocuments, getSystemSettings, updateSystemSetting } from "../api";
+import { indexDocuments, getIndexedDocuments, getSystemSettings, updateSystemSetting, deleteVeevaData } from "../api";
 import IndexedDocumentList from "./IndexedDocumentList.jsx";
 import BlobDocumentList from "./BlobDocumentList.jsx";
 import DocumentUpload from "./DocumentUpload.jsx";
@@ -22,6 +22,9 @@ export default function AdminScreen({ userId }) {
   const [veevaIntegrationEnabled, setVeevaIntegrationEnabled] = useState(true);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [settingsError, setSettingsError] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeletingVeevaData, setIsDeletingVeevaData] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   async function loadIndexed(offset = 0) {
     console.log('Loading indexed documents...', { query: q, offset });
@@ -204,6 +207,31 @@ export default function AdminScreen({ userId }) {
       setVeevaIntegrationEnabled(!enabled);
     } finally {
       setIsLoadingSettings(false);
+    }
+  }
+
+  async function handleDeleteVeevaData() {
+    setIsDeletingVeevaData(true);
+    setDeleteError(null);
+    try {
+      const accessToken = await getAccessTokenSilently();
+      const result = await deleteVeevaData({ accessToken });
+      
+      console.log('Veeva data deleted successfully:', result);
+      
+      // Close confirmation dialog
+      setShowDeleteConfirm(false);
+      
+      // Refresh indexed documents to reflect the deletion
+      await loadIndexed(0);
+      
+      // Show success message (you could add a success state here)
+      alert(`Successfully deleted ${result.deletedDocuments} Veeva documents and ${result.deletedChunks} chunks from the database.`);
+    } catch (err) {
+      console.error('Error deleting Veeva data:', err);
+      setDeleteError(err.message);
+    } finally {
+      setIsDeletingVeevaData(false);
     }
   }
 
@@ -659,6 +687,167 @@ export default function AdminScreen({ userId }) {
               )}
             </div>
           </div>
+
+          {/* Delete Veeva Data Section */}
+          <div style={{
+            backgroundColor: '#fff3cd',
+            border: '1px solid #ffc107',
+            borderRadius: '6px',
+            padding: '20px',
+            marginTop: '20px'
+          }}>
+            <div style={{
+              marginBottom: '12px'
+            }}>
+              <h3 style={{
+                margin: '0 0 4px 0',
+                color: '#856404',
+                fontSize: '16px',
+                fontWeight: '600',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}>
+                Delete All Veeva Data
+              </h3>
+              <p style={{
+                margin: 0,
+                color: '#856404',
+                fontSize: '14px',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}>
+                Permanently remove all Veeva documents and chunks from the database. This action cannot be undone.
+              </p>
+            </div>
+            
+            {deleteError && (
+              <div style={{
+                backgroundColor: '#f8d7da',
+                color: '#721c24',
+                padding: '12px',
+                borderRadius: '4px',
+                marginBottom: '12px',
+                border: '1px solid #f5c6cb',
+                fontSize: '14px'
+              }}>
+                Error: {deleteError}
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isDeletingVeevaData}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: isDeletingVeevaData ? '#ccc' : '#dc3545',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: isDeletingVeevaData ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                if (!isDeletingVeevaData) {
+                  e.target.style.backgroundColor = '#c82333';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isDeletingVeevaData) {
+                  e.target.style.backgroundColor = '#dc3545';
+                }
+              }}
+            >
+              {isDeletingVeevaData ? 'Deleting...' : 'Delete All Veeva Data'}
+            </button>
+          </div>
+
+          {/* Confirmation Dialog */}
+          {showDeleteConfirm && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000
+            }}>
+              <div style={{
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                padding: '24px',
+                maxWidth: '500px',
+                width: '90%',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+              }}>
+                <h3 style={{
+                  margin: '0 0 16px 0',
+                  color: '#dc3545',
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  Confirm Deletion
+                </h3>
+                <p style={{
+                  margin: '0 0 24px 0',
+                  color: '#495057',
+                  fontSize: '14px',
+                  lineHeight: '1.5',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  Are you sure you want to permanently delete all Veeva documents and chunks from the database? This action cannot be undone.
+                </p>
+                <div style={{
+                  display: 'flex',
+                  gap: '12px',
+                  justifyContent: 'flex-end'
+                }}>
+                  <button
+                    onClick={() => {
+                      setShowDeleteConfirm(false);
+                      setDeleteError(null);
+                    }}
+                    disabled={isDeletingVeevaData}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#6c757d',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: isDeletingVeevaData ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeleteVeevaData}
+                    disabled={isDeletingVeevaData}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: isDeletingVeevaData ? '#ccc' : '#dc3545',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: isDeletingVeevaData ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}
+                  >
+                    {isDeletingVeevaData ? 'Deleting...' : 'Yes, Delete All Data'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : null}
       </div>
