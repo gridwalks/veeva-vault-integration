@@ -475,41 +475,91 @@ export async function verifyAdminRole(event) {
 
   const claims = authResult.claims;
   
+  // Log all claim keys for debugging
+  const allClaimKeys = Object.keys(claims);
+  console.log('JWT Claims keys:', allClaimKeys);
+  
   // Check multiple possible locations for roles in Auth0
-  // Common namespaces for roles
-  const auth0Domain = claims.iss ? claims.iss.replace('https://', '').replace('.auth0.com', '') : null;
-  const customClaimNamespace = auth0Domain ? `https://${auth0Domain}.auth0.com/roles` : 'https://your-domain.com/roles';
-  const acceleraqaClaim = 'https://acceleraqa.com/roles';
+  // Extract domain from issuer
+  let auth0Domain = null;
+  if (claims.iss) {
+    // Handle various Auth0 issuer formats:
+    // https://dev-aedhk47a2vv8iis3.us.auth0.com/
+    // https://domain.auth0.com/
+    // https://domain.us.auth0.com/
+    const iss = claims.iss.replace('https://', '').replace('http://', '').replace(/\/$/, '');
+    if (iss.includes('.auth0.com')) {
+      auth0Domain = iss.split('.auth0.com')[0];
+    }
+  }
   
-  // Extract roles from various possible locations
-  const rolesFromCustomClaim = claims[customClaimNamespace];
-  const rolesFromAcceleraqaClaim = claims[acceleraqaClaim];
-  const rolesFromRolesProperty = claims.roles;
+  // Build possible role claim namespaces
+  const possibleRoleClaims = [];
   
-  // Collect all roles
-  const allRoles = [
-    ...(Array.isArray(rolesFromCustomClaim) ? rolesFromCustomClaim : []),
-    ...(Array.isArray(rolesFromAcceleraqaClaim) ? rolesFromAcceleraqaClaim : []),
-    ...(Array.isArray(rolesFromRolesProperty) ? rolesFromRolesProperty : [])
-  ];
-
-  const hasAdminRole = allRoles.includes('admin');
+  // Standard Auth0 namespace format
+  if (auth0Domain) {
+    possibleRoleClaims.push(`https://${auth0Domain}.auth0.com/roles`);
+    // Also try without the domain part (just the base)
+    const baseDomain = auth0Domain.split('.')[0]; // In case it's like "dev-aedhk47a2vv8iis3.us"
+    if (baseDomain !== auth0Domain) {
+      possibleRoleClaims.push(`https://${baseDomain}.auth0.com/roles`);
+    }
+  }
+  
+  // Common custom namespaces
+  possibleRoleClaims.push('https://acceleraqa.com/roles');
+  possibleRoleClaims.push('https://your-domain.com/roles');
+  
+  // Direct property names
+  possibleRoleClaims.push('roles');
+  possibleRoleClaims.push('role');
+  possibleRoleClaims.push('http://schemas.microsoft.com/ws/2008/06/identity/claims/role');
+  
+  // Also check all keys that contain "role" (case insensitive)
+  const roleKeys = allClaimKeys.filter(k => k.toLowerCase().includes('role'));
+  possibleRoleClaims.push(...roleKeys);
+  
+  console.log('Checking for roles in:', possibleRoleClaims);
+  
+  // Extract roles from all possible locations
+  const allRoles = [];
+  for (const claimKey of possibleRoleClaims) {
+    const value = claims[claimKey];
+    if (Array.isArray(value)) {
+      allRoles.push(...value);
+      console.log(`Found roles in ${claimKey}:`, value);
+    } else if (typeof value === 'string') {
+      allRoles.push(value);
+      console.log(`Found role in ${claimKey}:`, value);
+    } else if (value) {
+      console.log(`Found non-array/non-string value in ${claimKey}:`, typeof value, value);
+    }
+  }
+  
+  // Remove duplicates
+  const uniqueRoles = [...new Set(allRoles)];
+  console.log('All unique roles found:', uniqueRoles);
+  
+  const hasAdminRole = uniqueRoles.some(role => 
+    role && role.toString().toLowerCase() === 'admin'
+  );
   
   if (!hasAdminRole) {
     console.log('Admin role check failed:', {
-      allRoles,
-      rolesFromCustomClaim,
-      rolesFromAcceleraqaClaim,
-      rolesFromRolesProperty,
-      customClaimNamespace,
+      allRoles: uniqueRoles,
+      possibleRoleClaims,
       auth0Domain,
-      claimsKeys: Object.keys(claims).filter(k => k.includes('role') || k.includes('Role'))
+      issuer: claims.iss,
+      allClaimKeys: allClaimKeys,
+      roleKeys: roleKeys
     });
     return {
       authorized: false,
       error: 'Admin role required'
     };
   }
+  
+  console.log('Admin role verified successfully');
 
   return {
     authorized: true,
