@@ -1,5 +1,6 @@
 import { getPool, initDatabase } from "./db.js";
 import { ensureUploadedDocumentColumnSupport } from "./uploaded-document-columns.js";
+import { isVeevaIntegrationEnabled } from "./settings-helper.js";
 import OpenAI from "openai";
 import Groq from "groq-sdk";
 import { getStore } from "@netlify/blobs";
@@ -673,6 +674,10 @@ export const handler = async (event) => {
 
     // Initialize database
     await initDatabase();
+    
+    // Check if Veeva integration is enabled
+    const veevaEnabled = await isVeevaIntegrationEnabled();
+    console.log('Veeva integration enabled:', veevaEnabled);
     const pool = getPool();
 
     const uploadedColumnSupport = await ensureUploadedDocumentColumnSupport(pool);
@@ -705,9 +710,19 @@ export const handler = async (event) => {
           // Extract the UUID after 'uploaded_' prefix
           uploadedDocumentIds.push(id.substring(9));
         } else {
-          veevaDocumentIds.push(id);
+          // Only add Veeva document IDs if integration is enabled
+          if (veevaEnabled) {
+            veevaDocumentIds.push(id);
+          } else {
+            console.log('Skipping Veeva document ID (integration disabled):', id);
+          }
         }
       });
+    }
+    
+    // If Veeva integration is disabled, clear any Veeva document IDs
+    if (!veevaEnabled) {
+      veevaDocumentIds = [];
     }
 
     console.log('Chat request details:', {
@@ -798,8 +813,8 @@ export const handler = async (event) => {
         let veevaChunks = [];
         let uploadedChunks = [];
         
-        // Query Veeva document chunks if we have Veeva document IDs
-        if (veevaDocumentIds.length > 0) {
+        // Query Veeva document chunks if we have Veeva document IDs and integration is enabled
+        if (veevaDocumentIds.length > 0 && veevaEnabled) {
           const veevaPlaceholders = veevaDocumentIds.map((_, index) => `$${index + 2}`).join(',');
           // Increase chunk limit for comparison mode to get more comprehensive content
           const chunkLimit = isComparisonQuery ? 10 : 5;
@@ -851,8 +866,8 @@ export const handler = async (event) => {
             const uploadedResult = await pool.query(uploadedQuery, [embeddingStr, effectiveUserId]);
             uploadedChunks = uploadedResult.rows;
             console.log(`Found ${uploadedChunks.length} uploaded chunks for uploaded doc query`);
-          } else {
-            // If no specific docs selected and not asking about uploaded docs, search all Veeva docs
+          } else if (veevaEnabled) {
+            // If no specific docs selected and not asking about uploaded docs, search all Veeva docs (only if enabled)
             const veevaQuery = `
               SELECT 
                 dc.chunk_text,
@@ -1112,9 +1127,10 @@ export const handler = async (event) => {
           relevantDocuments.push(...uploadedKeywordDocuments);
         } else {
           // Regular search for both Veeva and uploaded documents
-          // First, try exact document number matches (case-insensitive)
+          // First, try exact document number matches (case-insensitive) - only if Veeva enabled
           const exactMatches = [];
-        for (const term of searchTerms) {
+        if (veevaEnabled) {
+          for (const term of searchTerms) {
           if (/^[a-z0-9\-_]+$/i.test(term)) {
             console.log(`Checking for exact document number match: ${term}`);
             const exactQuery = `
@@ -1133,35 +1149,38 @@ export const handler = async (event) => {
           }
         }
         
-        // Create a search query that looks for terms in document names, summaries, manual summaries, types, and document numbers
-        const searchConditions = searchTerms.map((term, index) => 
-          `(document_name ILIKE $${index + 1} OR summary ILIKE $${index + 1} OR manual_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1} OR document_number ILIKE $${index + 1})`
-        ).join(' OR ');
-        
-        const searchParams = searchTerms.map(term => `%${term}%`);
-        const query = `
-          SELECT veeva_document_id, document_number, document_name, 
-                 major_version, minor_version, document_type, status, summary, manual_summary,
-                 'veeva' as source_type
-          FROM Veeva_Doc_Chat_document_index 
-          WHERE ${searchConditions}
-          ORDER BY 
-            CASE 
-              WHEN document_name ILIKE ANY($${searchParams.length + 1}) THEN 1
-              WHEN manual_summary ILIKE ANY($${searchParams.length + 2}) THEN 2
-              WHEN summary ILIKE ANY($${searchParams.length + 3}) THEN 3
-              ELSE 4
-            END,
-            document_name
-          LIMIT 10
-        `;
-        
-        console.log('Keyword search query:', query);
-        console.log('Search parameters:', searchParams);
-        console.log('Search conditions:', searchConditions);
-        
-        const result = await pool.query(query, [...searchParams, searchParams, searchParams, searchParams]);
-        const keywordSearchDocuments = result.rows;
+        // Create a search query that looks for terms in document names, summaries, manual summaries, types, and document numbers (only if Veeva enabled)
+        let keywordSearchDocuments = [];
+        if (veevaEnabled) {
+          const searchConditions = searchTerms.map((term, index) => 
+            `(document_name ILIKE $${index + 1} OR summary ILIKE $${index + 1} OR manual_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1} OR document_number ILIKE $${index + 1})`
+          ).join(' OR ');
+          
+          const searchParams = searchTerms.map(term => `%${term}%`);
+          const query = `
+            SELECT veeva_document_id, document_number, document_name, 
+                   major_version, minor_version, document_type, status, summary, manual_summary,
+                   'veeva' as source_type
+            FROM Veeva_Doc_Chat_document_index 
+            WHERE ${searchConditions}
+            ORDER BY 
+              CASE 
+                WHEN document_name ILIKE ANY($${searchParams.length + 1}) THEN 1
+                WHEN manual_summary ILIKE ANY($${searchParams.length + 2}) THEN 2
+                WHEN summary ILIKE ANY($${searchParams.length + 3}) THEN 3
+                ELSE 4
+              END,
+              document_name
+            LIMIT 10
+          `;
+          
+          console.log('Keyword search query:', query);
+          console.log('Search parameters:', searchParams);
+          console.log('Search conditions:', searchConditions);
+          
+          const result = await pool.query(query, [...searchParams, searchParams, searchParams, searchParams]);
+          keywordSearchDocuments = result.rows;
+        }
         
         // Also search uploaded documents
         const uploadedSearchConditions = searchTerms.map((term, index) => 
@@ -1230,8 +1249,8 @@ export const handler = async (event) => {
           // The AI will use their summaries and metadata to respond
         }
         } // End of else block for regular search
-    } else if (documentIds && documentIds.length > 0) {
-      // Get specific documents by IDs
+    } else if (documentIds && documentIds.length > 0 && veevaEnabled) {
+      // Get specific documents by IDs (only if Veeva integration is enabled)
       const placeholders = documentIds.map((_, index) => `$${index + 1}`).join(',');
       const query = `
         SELECT veeva_document_id, document_number, document_name, 
@@ -1246,8 +1265,8 @@ export const handler = async (event) => {
       relevantDocuments = result.rows;
       
       console.log(`Retrieved ${relevantDocuments.length} specific documents for chat`);
-    } else if (searchTerms.length === 0) {
-      // If no search terms, get the most recent documents
+    } else if (searchTerms.length === 0 && veevaEnabled) {
+      // If no search terms, get the most recent documents (only if Veeva integration is enabled)
       const query = `
         SELECT veeva_document_id, document_number, document_name, 
                major_version, minor_version, document_type, status, summary, manual_summary,

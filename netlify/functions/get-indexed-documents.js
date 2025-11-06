@@ -1,4 +1,5 @@
 import { getPool, initDatabase } from "./db.js";
+import { isVeevaIntegrationEnabled } from "./settings-helper.js";
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -10,6 +11,10 @@ export const handler = async (event) => {
   try {
     // Initialize database
     await initDatabase();
+    
+    // Check if Veeva integration is enabled
+    const veevaEnabled = await isVeevaIntegrationEnabled();
+    console.log('Veeva integration enabled:', veevaEnabled);
     
     const q = new URL(event.rawUrl).searchParams;
     const nameLike = q.get("name")?.trim();
@@ -42,17 +47,23 @@ export const handler = async (event) => {
 
     let query;
     if (hasNewColumns) {
+      // Build query conditionally based on Veeva integration status
+      const veevaPart = veevaEnabled ? `
+        SELECT 
+          id::text as id, veeva_document_id, document_number, document_name, 
+          major_version, minor_version, document_type, status, 
+          summary, manual_summary, indexed_at, updated_at,
+          'veeva' as source_type, null as blob_url, null as original_filename, null as mime_type
+        FROM Veeva_Doc_Chat_document_index
+      ` : '';
+      
+      const unionKeyword = veevaEnabled ? 'UNION ALL' : '';
+      
       query = `
         SELECT * FROM (
-          SELECT 
-            id::text as id, veeva_document_id, document_number, document_name, 
-            major_version, minor_version, document_type, status, 
-            summary, manual_summary, indexed_at, updated_at,
-            'veeva' as source_type, null as blob_url, null as original_filename, null as mime_type
-          FROM Veeva_Doc_Chat_document_index
-          
-          UNION ALL
-          
+          ${veevaPart}
+          ${unionKeyword}
+          ${veevaPart ? '' : ''}
           SELECT 
             id::text as id, 
             null as veeva_document_id, 
@@ -74,17 +85,22 @@ export const handler = async (event) => {
         ) combined_documents
       `;
     } else {
+      // Build query conditionally based on Veeva integration status
+      const veevaPart = veevaEnabled ? `
+        SELECT 
+          id::text as id, veeva_document_id, document_number, document_name, 
+          major_version, minor_version, document_type, status, 
+          summary, manual_summary, indexed_at, updated_at,
+          'veeva' as source_type, null as blob_url, null as original_filename, null as mime_type
+        FROM Veeva_Doc_Chat_document_index
+      ` : '';
+      
+      const unionKeyword = veevaEnabled ? 'UNION ALL' : '';
+      
       query = `
         SELECT * FROM (
-          SELECT 
-            id::text as id, veeva_document_id, document_number, document_name, 
-            major_version, minor_version, document_type, status, 
-            summary, manual_summary, indexed_at, updated_at,
-            'veeva' as source_type, null as blob_url, null as original_filename, null as mime_type
-          FROM Veeva_Doc_Chat_document_index
-          
-          UNION ALL
-          
+          ${veevaPart}
+          ${unionKeyword}
           SELECT 
             id::text as id, 
             null as veeva_document_id, 
@@ -130,22 +146,19 @@ export const handler = async (event) => {
     });
 
     // Get total count for pagination
+    const veevaCountPart = veevaEnabled ? `
+      SELECT id::text FROM Veeva_Doc_Chat_document_index${nameLike ? ' WHERE document_name ILIKE $1' : ''}
+    ` : '';
+    
+    const unionKeyword = veevaEnabled ? 'UNION ALL' : '';
+    
     let countQuery = `
       SELECT COUNT(*) FROM (
-        SELECT id::text FROM Veeva_Doc_Chat_document_index
-        UNION ALL
-        SELECT id::text FROM qms_chat_documents
+        ${veevaCountPart}
+        ${unionKeyword}
+        SELECT id::text FROM qms_chat_documents${nameLike ? ' WHERE document_name ILIKE $1' : ''}
       ) combined_documents
     `;
-    if (nameLike) {
-      countQuery = `
-        SELECT COUNT(*) FROM (
-          SELECT id::text FROM Veeva_Doc_Chat_document_index WHERE document_name ILIKE $1
-          UNION ALL
-          SELECT id::text FROM qms_chat_documents WHERE document_name ILIKE $1
-        ) combined_documents
-      `;
-    }
     
     const countStartTime = Date.now();
     const countResult = await pool.query(countQuery, nameLike ? [`%${nameLike}%`] : []);

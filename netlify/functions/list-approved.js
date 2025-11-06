@@ -1,8 +1,26 @@
 import { getSessionId } from "./vault-auth.js";
 import { getPool, initDatabase } from "./db.js";
+import { isVeevaIntegrationEnabled } from "./settings-helper.js";
 
 export const handler = async (event) => {
   try {
+    // Check if Veeva integration is enabled
+    const veevaEnabled = await isVeevaIntegrationEnabled();
+    if (!veevaEnabled) {
+      return {
+        statusCode: 403,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          error: "Veeva integration is disabled",
+          message: "Veeva Vault integration has been disabled. Please contact an administrator.",
+          total: 0,
+          items: [],
+          pageOffset: 0,
+          pageSize: 0
+        })
+      };
+    }
+    
     const domain = process.env.VAULT_DOMAIN;
     const v = process.env.VAULT_API_VERSION;
     const q = new URL(event.rawUrl).searchParams;

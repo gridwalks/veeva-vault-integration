@@ -1,7 +1,26 @@
 import { getSessionId } from "./vault-auth.js";
+import { isVeevaIntegrationEnabled } from "./settings-helper.js";
 
 export const handler = async (event) => {
   try {
+    // Check if Veeva integration is enabled
+    const veevaEnabled = await isVeevaIntegrationEnabled();
+    if (!veevaEnabled) {
+      return {
+        statusCode: 403,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Frame-Options": "DENY",
+          "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.auth0.com https://*.auth0.com.au; frame-ancestors 'none'; base-uri 'self'; upgrade-insecure-requests",
+          "X-Content-Type-Options": "nosniff"
+        },
+        body: JSON.stringify({ 
+          error: "Veeva integration is disabled",
+          message: "Veeva Vault integration has been disabled. Please contact an administrator."
+        })
+      };
+    }
+    
     const domain = process.env.VAULT_DOMAIN;
     const v = process.env.VAULT_API_VERSION;
 
