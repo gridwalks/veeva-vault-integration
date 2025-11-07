@@ -675,9 +675,17 @@ export const handler = async (event) => {
     // Initialize database
     await initDatabase();
     
-    // Check if Veeva integration is enabled
-    const veevaEnabled = await isVeevaIntegrationEnabled();
-    console.log('Veeva integration enabled:', veevaEnabled);
+    // Check if Veeva integration is enabled (with error handling)
+    let veevaEnabled = true; // Default to enabled if check fails
+    try {
+      veevaEnabled = await isVeevaIntegrationEnabled();
+      console.log('Veeva integration enabled:', veevaEnabled);
+    } catch (settingsError) {
+      console.error('Error checking Veeva integration setting, defaulting to enabled:', settingsError);
+      // Default to enabled if we can't check the setting
+      veevaEnabled = true;
+    }
+    
     const pool = getPool();
 
     const uploadedColumnSupport = await ensureUploadedDocumentColumnSupport(pool);
@@ -1127,36 +1135,37 @@ export const handler = async (event) => {
           relevantDocuments.push(...uploadedKeywordDocuments);
         } else {
           // Regular search for both Veeva and uploaded documents
+          // Define searchParams here so it's available for both Veeva and uploaded document queries
+          const searchParams = searchTerms.map(term => `%${term}%`);
+          
           // First, try exact document number matches (case-insensitive) - only if Veeva enabled
           const exactMatches = [];
-        if (veevaEnabled) {
-          for (const term of searchTerms) {
-          if (/^[a-z0-9\-_]+$/i.test(term)) {
-            console.log(`Checking for exact document number match: ${term}`);
-            const exactQuery = `
-              SELECT veeva_document_id, document_number, document_name, 
-                     major_version, minor_version, document_type, status, summary, manual_summary,
-                     'veeva' as source_type
-              FROM Veeva_Doc_Chat_document_index 
-              WHERE document_number ILIKE $1
-              LIMIT 5
-            `;
-            const exactResult = await pool.query(exactQuery, [term]);
-            if (exactResult.rows.length > 0) {
-              console.log(`Found exact match for ${term}:`, exactResult.rows.map(doc => doc.document_number));
-              exactMatches.push(...exactResult.rows);
-            }
-          }
-        }
-        
-        // Create a search query that looks for terms in document names, summaries, manual summaries, types, and document numbers (only if Veeva enabled)
-        let keywordSearchDocuments = [];
-        if (veevaEnabled) {
-          const searchConditions = searchTerms.map((term, index) => 
-            `(document_name ILIKE $${index + 1} OR summary ILIKE $${index + 1} OR manual_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1} OR document_number ILIKE $${index + 1})`
-          ).join(' OR ');
+          let keywordSearchDocuments = [];
           
-          const searchParams = searchTerms.map(term => `%${term}%`);
+          if (veevaEnabled) {
+            for (const term of searchTerms) {
+              if (/^[a-z0-9\-_]+$/i.test(term)) {
+                console.log(`Checking for exact document number match: ${term}`);
+                const exactQuery = `
+                  SELECT veeva_document_id, document_number, document_name, 
+                         major_version, minor_version, document_type, status, summary, manual_summary,
+                         'veeva' as source_type
+                  FROM Veeva_Doc_Chat_document_index 
+                  WHERE document_number ILIKE $1
+                  LIMIT 5
+                `;
+                const exactResult = await pool.query(exactQuery, [term]);
+                if (exactResult.rows.length > 0) {
+                  console.log(`Found exact match for ${term}:`, exactResult.rows.map(doc => doc.document_number));
+                  exactMatches.push(...exactResult.rows);
+                }
+              }
+            }
+            
+            // Create a search query that looks for terms in document names, summaries, manual summaries, types, and document numbers
+            const searchConditions = searchTerms.map((term, index) => 
+              `(document_name ILIKE $${index + 1} OR summary ILIKE $${index + 1} OR manual_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1} OR document_number ILIKE $${index + 1})`
+            ).join(' OR ');
           const query = `
             SELECT veeva_document_id, document_number, document_name, 
                    major_version, minor_version, document_type, status, summary, manual_summary,

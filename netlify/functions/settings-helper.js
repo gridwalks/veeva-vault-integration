@@ -42,29 +42,35 @@ export async function isVeevaIntegrationEnabled() {
  * Ensure settings table exists
  */
 async function ensureSettingsTable(pool) {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS qms_chat_system_settings (
-      id SERIAL PRIMARY KEY,
-      setting_key VARCHAR(255) UNIQUE NOT NULL,
-      setting_value TEXT NOT NULL,
-      setting_type VARCHAR(50) DEFAULT 'boolean',
-      description TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS qms_chat_system_settings (
+        id SERIAL PRIMARY KEY,
+        setting_key VARCHAR(255) UNIQUE NOT NULL,
+        setting_value TEXT NOT NULL,
+        setting_type VARCHAR(50) DEFAULT 'boolean',
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_qms_chat_system_settings_key 
-    ON qms_chat_system_settings(setting_key)
-  `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_system_settings_key 
+      ON qms_chat_system_settings(setting_key)
+    `);
 
-  // Insert default settings if they don't exist
-  await pool.query(`
-    INSERT INTO qms_chat_system_settings (setting_key, setting_value, setting_type, description) 
-    VALUES ('veeva_integration_enabled', 'true', 'boolean', 'Enable or disable Veeva Vault integration')
-    ON CONFLICT (setting_key) DO NOTHING
-  `);
+    // Insert default settings if they don't exist
+    await pool.query(`
+      INSERT INTO qms_chat_system_settings (setting_key, setting_value, setting_type, description) 
+      VALUES ('veeva_integration_enabled', 'true', 'boolean', 'Enable or disable Veeva Vault integration')
+      ON CONFLICT (setting_key) DO NOTHING
+    `);
+  } catch (error) {
+    console.error('Error ensuring settings table exists:', error);
+    // Don't throw - let the query proceed and fail gracefully if table doesn't exist
+    // This allows the function to continue even if table creation fails
+  }
 }
 
 /**
