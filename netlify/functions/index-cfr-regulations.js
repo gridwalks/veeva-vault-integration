@@ -312,7 +312,12 @@ async function indexRegulation(item, granuleData, pool, batchId) {
 
   } catch (error) {
     const processingDuration = Date.now() - startTime;
-    console.error(`Error indexing regulation ${id}:`, error);
+    console.error(`Error indexing regulation ${id}:`, {
+      message: error.message,
+      stack: error.stack,
+      item: item,
+      type: type
+    });
 
     // Log failure
     await logIndexingActivity(pool, {
@@ -340,7 +345,7 @@ async function indexRegulation(item, granuleData, pool, batchId) {
       regulationType: type,
       title: item.title || id,
       chunksCreated: 0,
-      error: error.message,
+      error: error.message || 'Unknown error occurred',
       processingDuration
     };
   }
@@ -395,6 +400,17 @@ export const handler = async (event) => {
     }
 
     console.log(`Processing ${selectedItems.length} selected items`);
+    console.log('Selected items:', JSON.stringify(selectedItems, null, 2));
+    console.log('Granule data structure:', {
+      hasGranules: !!granuleData.granules,
+      granulesCount: granuleData.granules?.length || 0,
+      firstGranule: granuleData.granules?.[0] ? {
+        granuleId: granuleData.granules[0].granuleId,
+        title: granuleData.granules[0].title,
+        hasSubchapters: !!granuleData.granules[0].subchapters,
+        subchaptersCount: granuleData.granules[0].subchapters?.length || 0
+      } : null
+    });
 
     // Expand subchapters to include all their parts
     const itemsToIndex = [];
@@ -402,7 +418,18 @@ export const handler = async (event) => {
       if (item.type === 'subchapter') {
         // Find all parts in this subchapter
         const chapter = granuleData.granules?.find(ch => ch.granuleId === item.chapterId);
+        if (!chapter) {
+          console.warn(`Chapter not found for subchapter ${item.id}, chapterId: ${item.chapterId}`);
+          // Still add the subchapter item so we can report the error
+          itemsToIndex.push(item);
+          continue;
+        }
         const subchapter = chapter?.subchapters?.find(sc => sc.granuleId === item.id);
+        if (!subchapter) {
+          console.warn(`Subchapter not found: ${item.id} in chapter ${item.chapterId}`);
+          itemsToIndex.push(item);
+          continue;
+        }
         if (subchapter?.parts && subchapter.parts.length > 0) {
           // Add all parts from this subchapter
           for (const part of subchapter.parts) {
@@ -415,6 +442,10 @@ export const handler = async (event) => {
               title: part.title
             });
           }
+        } else {
+          console.warn(`Subchapter ${item.id} has no parts`);
+          // Still try to index the subchapter itself
+          itemsToIndex.push(item);
         }
       } else {
         // Add the part directly

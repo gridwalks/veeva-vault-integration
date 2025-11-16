@@ -435,10 +435,30 @@ export default function CfrTitle21() {
                                   <strong>Indexing Complete!</strong>
                                   <div>Processed: {indexingStatus.processed || 0}, Successful: {indexingStatus.successful || 0}, Failed: {indexingStatus.failed || 0}</div>
                                   <div>Total chunks created: {indexingStatus.totalChunksCreated || 0}</div>
+                                  {indexingStatus.results && indexingStatus.results.length > 0 && (
+                                    <div style={{ marginTop: "8px" }}>
+                                      <strong>Details:</strong>
+                                      {indexingStatus.results.map((result, idx) => (
+                                        <div key={idx} style={{ marginTop: "4px", fontSize: "10px" }}>
+                                          {result.title || result.regulationId}: {result.success ? `✓ ${result.chunksCreated || 0} chunks` : `✗ ${result.error || 'Failed'}`}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </>
                               ) : (
                                 <>
                                   <strong>Indexing Failed:</strong> {indexingStatus.error || 'Unknown error'}
+                                  {indexingStatus.results && indexingStatus.results.length > 0 && (
+                                    <div style={{ marginTop: "8px" }}>
+                                      <strong>Error Details:</strong>
+                                      {indexingStatus.results.map((result, idx) => (
+                                        <div key={idx} style={{ marginTop: "4px", fontSize: "10px" }}>
+                                          {result.title || result.regulationId}: {result.error || 'Unknown error'}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </>
                               )}
                             </div>
