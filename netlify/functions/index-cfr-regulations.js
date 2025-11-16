@@ -55,23 +55,40 @@ async function logIndexingActivity(pool, logData) {
 async function downloadHTMLContent(url) {
   try {
     console.log(`Downloading content from: ${url}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; CFR-Indexer/1.0)',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
       },
-      timeout: 30000 // 30 second timeout
+      signal: controller.signal
     });
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const errorText = await response.text().catch(() => '');
+      throw new Error(`HTTP ${response.status}: ${response.statusText}. Response: ${errorText.substring(0, 200)}`);
     }
 
     const htmlContent = await response.text();
     console.log(`Downloaded ${htmlContent.length} characters from ${url}`);
+    
+    if (htmlContent.length < 100) {
+      throw new Error(`Downloaded content too short (${htmlContent.length} chars). May be an error page.`);
+    }
+    
     return htmlContent;
   } catch (error) {
-    console.error(`Error downloading from ${url}:`, error);
+    if (error.name === 'AbortError') {
+      throw new Error(`Download timeout after 30 seconds`);
+    }
+    console.error(`Error downloading from ${url}:`, error.message);
     throw error;
   }
 }
@@ -169,29 +186,57 @@ async function indexRegulation(item, granuleData, pool, batchId) {
   const { type, id, granuleId, chapterId, subchapterId } = item;
   
   try {
-    console.log(`Indexing ${type}: ${id}`);
+    console.log(`Indexing ${type}: ${id}`, {
+      item: item,
+      chapterId: chapterId,
+      subchapterId: subchapterId,
+      granuleId: granuleId
+    });
     
     // Determine the regulation data
     // granuleData has a 'granules' array where each granule is a chapter
     let regulationData;
     if (type === 'subchapter') {
       // Find subchapter in granule data
+      console.log(`Looking for subchapter ${id} in chapter ${chapterId}`);
       const chapter = granuleData.granules?.find(ch => ch.granuleId === chapterId);
-      regulationData = chapter?.subchapters?.find(sc => sc.granuleId === id);
+      console.log(`Chapter found:`, !!chapter, chapter ? { granuleId: chapter.granuleId, title: chapter.title } : null);
+      if (chapter) {
+        console.log(`Chapter has ${chapter.subchapters?.length || 0} subchapters`);
+        regulationData = chapter?.subchapters?.find(sc => sc.granuleId === id);
+        console.log(`Subchapter found:`, !!regulationData, regulationData ? { granuleId: regulationData.granuleId, title: regulationData.title } : null);
+      }
     } else if (type === 'part') {
       // Find part in granule data
+      console.log(`Looking for part ${id} in chapter ${chapterId}, subchapter ${subchapterId || 'none'}`);
       const chapter = granuleData.granules?.find(ch => ch.granuleId === chapterId);
+      console.log(`Chapter found:`, !!chapter);
       if (subchapterId) {
         const subchapter = chapter?.subchapters?.find(sc => sc.granuleId === subchapterId);
+        console.log(`Subchapter found:`, !!subchapter, subchapter ? { partsCount: subchapter.parts?.length || 0 } : null);
         regulationData = subchapter?.parts?.find(p => p.granuleId === id);
+        console.log(`Part found:`, !!regulationData, regulationData ? { granuleId: regulationData.granuleId, title: regulationData.title } : null);
       } else {
         regulationData = chapter?.parts?.find(p => p.granuleId === id);
+        console.log(`Part found (no subchapter):`, !!regulationData);
       }
     }
 
     if (!regulationData) {
-      throw new Error(`Regulation data not found for ${type} ${id}`);
+      console.error(`Regulation data not found for ${type} ${id}`, {
+        availableChapters: granuleData.granules?.map(ch => ch.granuleId) || [],
+        chapterId: chapterId,
+        subchapterId: subchapterId
+      });
+      throw new Error(`Regulation data not found for ${type} ${id}. Chapter: ${chapterId}, Subchapter: ${subchapterId || 'none'}`);
     }
+    
+    console.log(`Found regulation data:`, {
+      title: regulationData.title,
+      granuleId: regulationData.granuleId,
+      htmlLink: regulationData.htmlLink,
+      detailsLink: regulationData.detailsLink
+    });
 
     // Determine download URL (try htmlLink first, fallback to detailsLink)
     let downloadUrl = regulationData.htmlLink || regulationData.detailsLink;
@@ -203,42 +248,62 @@ async function indexRegulation(item, granuleData, pool, batchId) {
     let htmlContent;
     let extractionMethod = 'html';
     try {
+      console.log(`Attempting to download from: ${downloadUrl}`);
       htmlContent = await downloadHTMLContent(downloadUrl);
+      console.log(`Successfully downloaded ${htmlContent.length} characters`);
     } catch (error) {
+      console.error(`Download failed from ${downloadUrl}:`, error.message);
       // Try fallback URL if htmlLink failed
       if (regulationData.htmlLink && regulationData.detailsLink && downloadUrl === regulationData.htmlLink) {
-        console.log(`htmlLink failed, trying detailsLink as fallback`);
+        console.log(`htmlLink failed, trying detailsLink as fallback: ${regulationData.detailsLink}`);
         downloadUrl = regulationData.detailsLink;
-        htmlContent = await downloadHTMLContent(downloadUrl);
+        try {
+          htmlContent = await downloadHTMLContent(downloadUrl);
+          console.log(`Successfully downloaded ${htmlContent.length} characters from fallback URL`);
+        } catch (fallbackError) {
+          console.error(`Fallback download also failed:`, fallbackError.message);
+          throw new Error(`Failed to download from both URLs. htmlLink: ${error.message}, detailsLink: ${fallbackError.message}`);
+        }
       } else {
         throw error;
       }
     }
 
     // Extract text from HTML
+    console.log(`Extracting text from HTML (${htmlContent.length} chars)...`);
     const extractedText = extractTextFromHTMLStructured(htmlContent);
+    console.log(`Extracted text length: ${extractedText?.length || 0} characters`);
     if (!extractedText || extractedText.trim().length < 100) {
-      throw new Error(`Extracted text too short or empty (${extractedText?.length || 0} chars)`);
+      console.error(`Extracted text too short:`, {
+        length: extractedText?.length || 0,
+        trimmedLength: extractedText?.trim().length || 0,
+        preview: extractedText?.substring(0, 200) || 'empty'
+      });
+      throw new Error(`Extracted text too short or empty (${extractedText?.length || 0} chars, trimmed: ${extractedText?.trim().length || 0} chars)`);
     }
 
-    console.log(`Extracted ${extractedText.length} characters from ${type} ${id}`);
+    console.log(`Successfully extracted ${extractedText.length} characters from ${type} ${id}`);
 
     // Check if regulation already exists
+    console.log(`Checking if regulation ${id} already exists in database...`);
     const existingReg = await pool.query(
       'SELECT id FROM cfr_title21_regulations WHERE regulation_id = $1',
       [id]
     );
+    console.log(`Existing regulation check: ${existingReg.rows.length > 0 ? 'found' : 'not found'}`);
 
     let regulationDbId;
     if (existingReg.rows.length > 0) {
       // Update existing record
       regulationDbId = existingReg.rows[0].id;
-      await pool.query(`
+      console.log(`Updating existing regulation record ID: ${regulationDbId}`);
+      const updateResult = await pool.query(`
         UPDATE cfr_title21_regulations 
         SET title = $1, granule_id = $2, chapter_id = $3, subchapter_id = $4,
             html_link = $5, details_link = $6, full_text = $7, 
             extraction_method = $8, updated_at = CURRENT_TIMESTAMP
         WHERE id = $9
+        RETURNING id
       `, [
         regulationData.title || id,
         granuleId,
@@ -250,9 +315,10 @@ async function indexRegulation(item, granuleData, pool, batchId) {
         extractionMethod,
         regulationDbId
       ]);
-      console.log(`Updated existing regulation record: ${id}`);
+      console.log(`Updated existing regulation record: ${id} (DB ID: ${regulationDbId}), rows affected: ${updateResult.rowCount}`);
     } else {
       // Create new record
+      console.log(`Creating new regulation record for ${id}...`);
       const insertResult = await pool.query(`
         INSERT INTO cfr_title21_regulations 
         (regulation_id, regulation_type, title, granule_id, chapter_id, subchapter_id,
@@ -271,8 +337,12 @@ async function indexRegulation(item, granuleData, pool, batchId) {
         extractedText,
         extractionMethod
       ]);
-      regulationDbId = insertResult.rows[0].id;
-      console.log(`Created new regulation record: ${id} (DB ID: ${regulationDbId})`);
+      regulationDbId = insertResult.rows[0]?.id;
+      console.log(`Created new regulation record: ${id} (DB ID: ${regulationDbId}), rows inserted: ${insertResult.rowCount}`);
+      
+      if (!regulationDbId) {
+        throw new Error('Failed to get database ID after insert');
+      }
     }
 
     // Chunk and embed the regulation
@@ -356,11 +426,15 @@ export const handler = async (event) => {
   const MAX_EXECUTION_TIME = 25000; // 25 seconds
 
   console.log('=== CFR REGULATION INDEXING STARTED ===');
+  console.log('Event method:', event.httpMethod);
+  console.log('Event body length:', event.body?.length || 0);
 
   try {
     // Initialize database
+    console.log('Initializing database...');
     await initDatabase();
     const pool = getPool();
+    console.log('Database pool obtained');
 
     // Parse request body
     let requestBody;
@@ -455,10 +529,29 @@ export const handler = async (event) => {
 
     console.log(`Expanded to ${itemsToIndex.length} items to index (${selectedItems.length} selected, ${itemsToIndex.length - selectedItems.length} parts from subchapters)`);
 
+    // Verify database tables exist
+    try {
+      const tableCheck = await pool.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_name = 'cfr_title21_regulations'
+        )
+      `);
+      console.log('CFR regulations table exists:', tableCheck.rows[0]?.exists || false);
+      
+      if (!tableCheck.rows[0]?.exists) {
+        console.warn('CFR regulations table does not exist, attempting to create...');
+        await initDatabase();
+      }
+    } catch (tableError) {
+      console.error('Error checking database tables:', tableError);
+    }
+
     const batchId = `cfr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const results = [];
 
     // Process each item
+    console.log(`Starting to process ${itemsToIndex.length} items...`);
     for (let i = 0; i < itemsToIndex.length; i++) {
       // Check timeout
       const elapsedTime = Date.now() - startTime;
@@ -467,13 +560,35 @@ export const handler = async (event) => {
         results.push({
           success: false,
           regulationId: itemsToIndex[i].id,
-          error: 'Processing timeout - not all items were processed'
+          regulationType: itemsToIndex[i].type,
+          title: itemsToIndex[i].title || itemsToIndex[i].id,
+          error: 'Processing timeout - not all items were processed',
+          chunksCreated: 0
         });
         break;
       }
 
-      const result = await indexRegulation(itemsToIndex[i], granuleData, pool, batchId);
-      results.push(result);
+      console.log(`Processing item ${i + 1}/${itemsToIndex.length}: ${itemsToIndex[i].type} ${itemsToIndex[i].id}`);
+      try {
+        const result = await indexRegulation(itemsToIndex[i], granuleData, pool, batchId);
+        console.log(`Item ${i + 1} result:`, {
+          success: result.success,
+          regulationId: result.regulationId,
+          chunksCreated: result.chunksCreated,
+          error: result.error
+        });
+        results.push(result);
+      } catch (itemError) {
+        console.error(`Error processing item ${i + 1}:`, itemError);
+        results.push({
+          success: false,
+          regulationId: itemsToIndex[i].id,
+          regulationType: itemsToIndex[i].type,
+          title: itemsToIndex[i].title || itemsToIndex[i].id,
+          error: itemError.message || 'Unknown error',
+          chunksCreated: 0
+        });
+      }
     }
 
     const totalDuration = Date.now() - startTime;
