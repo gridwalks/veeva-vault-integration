@@ -298,8 +298,21 @@ export default function CfrTitle21() {
 
 function GranuleItem({ granule }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [selectedSubchapters, setSelectedSubchapters] = useState(new Set());
   const hasSubchapters = granule.subchapters && granule.subchapters.length > 0;
   const hasParts = granule.parts && granule.parts.length > 0;
+
+  const toggleSubchapter = (subchapterId) => {
+    setSelectedSubchapters(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(subchapterId)) {
+        newSet.delete(subchapterId);
+      } else {
+        newSet.add(subchapterId);
+      }
+      return newSet;
+    });
+  };
 
   return (
     <div
@@ -380,19 +393,34 @@ function GranuleItem({ granule }) {
             Subchapters ({granule.subchapters.length}):
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            {granule.subchapters.map(subchapter => (
-              <div
-                key={subchapter.granuleId || subchapter.title}
-                style={{
-                  border: "1px solid #d1d5db",
-                  borderRadius: "3px",
-                  padding: "6px",
-                  backgroundColor: "#ffffff"
-                }}
-              >
-                <div style={{ fontSize: "12px", fontWeight: 600, color: "#1f2937", marginBottom: "3px" }}>
-                  {subchapter.title || subchapter.granuleId}
-                </div>
+            {granule.subchapters.map(subchapter => {
+              const subchapterId = subchapter.granuleId || subchapter.title;
+              const isChecked = selectedSubchapters.has(subchapterId);
+              return (
+                <div
+                  key={subchapterId}
+                  style={{
+                    border: "1px solid #d1d5db",
+                    borderRadius: "3px",
+                    padding: "6px",
+                    backgroundColor: "#ffffff"
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "3px" }}>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleSubchapter(subchapterId)}
+                      style={{
+                        width: "16px",
+                        height: "16px",
+                        cursor: "pointer"
+                      }}
+                    />
+                    <div style={{ fontSize: "12px", fontWeight: 600, color: "#1f2937" }}>
+                      {subchapter.title || subchapter.granuleId}
+                    </div>
+                  </div>
                 <div style={{ display: "flex", gap: "8px", fontSize: "10px", color: "#6b7280", flexWrap: "wrap" }}>
                   {subchapter.granuleId && <span>ID: {subchapter.granuleId}</span>}
                   {subchapter.granuleClass && <span>Type: {subchapter.granuleClass}</span>}
@@ -458,7 +486,8 @@ function GranuleItem({ granule }) {
                   </div>
                 )}
               </div>
-            ))}
+            );
+            })}
           </div>
         </div>
       )}
