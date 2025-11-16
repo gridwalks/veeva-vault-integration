@@ -167,6 +167,71 @@ export async function initDatabase() {
 
     console.log('Document comparison history table created or already exists');
 
+    // Create CFR Title 21 regulations table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cfr_title21_regulations (
+        id SERIAL PRIMARY KEY,
+        regulation_id VARCHAR(255) UNIQUE NOT NULL,
+        regulation_type VARCHAR(50) NOT NULL,
+        title TEXT NOT NULL,
+        granule_id VARCHAR(255),
+        chapter_id VARCHAR(255),
+        subchapter_id VARCHAR(255),
+        html_link TEXT,
+        details_link TEXT,
+        full_text TEXT,
+        ai_summary TEXT,
+        extraction_method VARCHAR(100),
+        indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create indexes for CFR regulations
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_cfr_title21_regulations_regulation_id 
+      ON cfr_title21_regulations(regulation_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_cfr_title21_regulations_regulation_type 
+      ON cfr_title21_regulations(regulation_type)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_cfr_title21_regulations_chapter_id 
+      ON cfr_title21_regulations(chapter_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_cfr_title21_regulations_subchapter_id 
+      ON cfr_title21_regulations(subchapter_id)
+    `);
+
+    console.log('CFR Title 21 regulations table created or already exists');
+
+    // Create CFR Title 21 regulation chunks table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cfr_title21_regulation_chunks (
+        id SERIAL PRIMARY KEY,
+        regulation_id INTEGER NOT NULL REFERENCES cfr_title21_regulations(id) ON DELETE CASCADE,
+        chunk_index INTEGER NOT NULL,
+        chunk_text TEXT NOT NULL,
+        embedding vector(1536),
+        token_count INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(regulation_id, chunk_index)
+      )
+    `);
+
+    // Create index for CFR regulation chunks
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_cfr_title21_regulation_chunks_regulation_id 
+      ON cfr_title21_regulation_chunks(regulation_id)
+    `);
+
+    console.log('CFR Title 21 regulation chunks table created or already exists');
+
     const duration = Date.now() - startTime;
     console.log(`Database schema initialized successfully in ${duration}ms`);
   } catch (error) {

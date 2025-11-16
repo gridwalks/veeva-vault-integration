@@ -383,6 +383,60 @@ UPDATE qms_chat_workflow_steps
 SET validation_rules = '{"minLength": 20, "maxLength": 1000}'::jsonb
 WHERE step_order = 10 AND workflow_template_id = 1;
 
+-- CFR Title 21 Regulations Tables
+
+-- Table for storing CFR Title 21 regulations (subchapters and parts)
+CREATE TABLE IF NOT EXISTS cfr_title21_regulations (
+  id SERIAL PRIMARY KEY,
+  regulation_id VARCHAR(255) UNIQUE NOT NULL, -- e.g., "subchapter-A" or "part-11"
+  regulation_type VARCHAR(50) NOT NULL, -- 'subchapter' or 'part'
+  title TEXT NOT NULL,
+  granule_id VARCHAR(255),
+  chapter_id VARCHAR(255),
+  subchapter_id VARCHAR(255), -- NULL for parts that are direct children of chapters
+  html_link TEXT,
+  details_link TEXT,
+  full_text TEXT, -- extracted regulation content
+  ai_summary TEXT,
+  extraction_method VARCHAR(100),
+  indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for CFR regulations
+CREATE INDEX IF NOT EXISTS idx_cfr_title21_regulations_regulation_id 
+ON cfr_title21_regulations(regulation_id);
+
+CREATE INDEX IF NOT EXISTS idx_cfr_title21_regulations_regulation_type 
+ON cfr_title21_regulations(regulation_type);
+
+CREATE INDEX IF NOT EXISTS idx_cfr_title21_regulations_chapter_id 
+ON cfr_title21_regulations(chapter_id);
+
+CREATE INDEX IF NOT EXISTS idx_cfr_title21_regulations_subchapter_id 
+ON cfr_title21_regulations(subchapter_id);
+
+-- Table for storing CFR regulation chunks with embeddings for RAG
+CREATE TABLE IF NOT EXISTS cfr_title21_regulation_chunks (
+  id SERIAL PRIMARY KEY,
+  regulation_id INTEGER NOT NULL REFERENCES cfr_title21_regulations(id) ON DELETE CASCADE,
+  chunk_index INTEGER NOT NULL,
+  chunk_text TEXT NOT NULL,
+  embedding vector(1536),  -- OpenAI ada-002 produces 1536-dimensional embeddings
+  token_count INTEGER,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(regulation_id, chunk_index)
+);
+
+-- Create indexes for CFR regulation chunks
+CREATE INDEX IF NOT EXISTS idx_cfr_title21_regulation_chunks_regulation_id 
+ON cfr_title21_regulation_chunks(regulation_id);
+
+-- Create IVFFLAT index for faster vector similarity search
+-- Note: This index should be created after inserting data for better performance
+-- CREATE INDEX IF NOT EXISTS idx_cfr_title21_regulation_chunks_embedding 
+-- ON cfr_title21_regulation_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
 -- Sample data insertion (optional)
 -- INSERT INTO Veeva_Doc_Chat_document_index (veeva_document_id, document_number, document_name, major_version, minor_version, document_type, status, summary) 
 -- VALUES ('sample-id', 'DOC-001', 'Sample Document', 1, 0, 'Standard Operating Procedure', 'STEADYSTATE', 'This is a sample document summary.');

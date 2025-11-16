@@ -927,6 +927,36 @@ export const handler = async (event) => {
           }
         }
         
+        // Query CFR regulation chunks
+        let cfrChunks = [];
+        if (queryEmbedding && !vectorSearchFailed) {
+          const cfrQuery = `
+            SELECT 
+              c.chunk_text,
+              c.regulation_id,
+              c.chunk_index,
+              r.title,
+              r.regulation_type,
+              r.regulation_id as regulation_identifier,
+              r.chapter_id,
+              r.subchapter_id,
+              1 - (c.embedding <=> $1::vector) as similarity,
+              'cfr_regulation' as source_type
+            FROM cfr_title21_regulation_chunks c
+            JOIN cfr_title21_regulations r ON c.regulation_id = r.id
+            ORDER BY c.embedding <=> $1::vector
+            LIMIT 5
+          `;
+          try {
+            const cfrResult = await pool.query(cfrQuery, [embeddingStr]);
+            cfrChunks = cfrResult.rows;
+            console.log(`Found ${cfrChunks.length} CFR regulation chunks`);
+          } catch (cfrError) {
+            console.error('Error querying CFR regulations:', cfrError);
+            // Continue without CFR chunks if query fails
+          }
+        }
+        
         // Query uploaded document chunks if we have uploaded document IDs
         if (uploadedDocumentIds.length > 0) {
           const uploadedPlaceholders = uploadedDocumentIds.map((_, index) => `$${index + 2}`).join(',');
@@ -992,7 +1022,7 @@ export const handler = async (event) => {
         // Combine and sort by similarity
         // For comparison mode, limit chunks to prevent context overflow
         const maxChunks = isComparisonQuery ? 6 : 5;
-        relevantChunks = [...veevaChunks, ...uploadedChunks]
+        relevantChunks = [...veevaChunks, ...uploadedChunks, ...cfrChunks]
           .sort((a, b) => b.similarity - a.similarity)
           .slice(0, maxChunks);
         
@@ -1021,13 +1051,18 @@ export const handler = async (event) => {
         .filter(c => c.source_type === 'upload' && c.upload_document_id)
         .map(c => c.upload_document_id))];
       
+      const uniqueCfrRegulationIds = [...new Set(relevantChunks
+        .filter(c => c.source_type === 'cfr_regulation' && c.regulation_id)
+        .map(c => c.regulation_id))];
+      
       console.log('Semantic search results:', {
         totalChunks: relevantChunks.length,
         uniqueVeevaDocIds: uniqueVeevaDocIds,
         uniqueUploadedDocIds: uniqueUploadedDocIds,
+        uniqueCfrRegulationIds: uniqueCfrRegulationIds,
         chunkDetails: relevantChunks.map(c => ({
-          docId: c.veeva_document_id || c.upload_document_id,
-          docName: c.document_name,
+          docId: c.veeva_document_id || c.upload_document_id || c.regulation_id,
+          docName: c.document_name || c.title,
           docNumber: c.document_number,
           similarity: c.similarity,
           source: c.source_type
@@ -1060,6 +1095,20 @@ export const handler = async (event) => {
         `;
         const uploadedDocResult = await pool.query(uploadedDocQuery, uniqueUploadedDocIds);
         relevantDocuments.push(...uploadedDocResult.rows);
+      }
+      
+      // Fetch CFR regulation metadata
+      if (uniqueCfrRegulationIds.length > 0) {
+        const cfrDocPlaceholders = uniqueCfrRegulationIds.map((_, index) => `$${index + 1}`).join(',');
+        const cfrDocQuery = `
+          SELECT id as document_id, title as document_name, regulation_type as document_type,
+                 regulation_id, chapter_id, subchapter_id, ai_summary,
+                 'cfr_regulation' as source_type
+          FROM cfr_title21_regulations
+          WHERE id IN (${cfrDocPlaceholders})
+        `;
+        const cfrDocResult = await pool.query(cfrDocQuery, uniqueCfrRegulationIds);
+        relevantDocuments.push(...cfrDocResult.rows);
       }
     }
     
@@ -1420,7 +1469,10 @@ export const handler = async (event) => {
       // Use RAG approach with semantic chunks
       console.log('Building context from relevant chunks (RAG)');
       const documentMetadataMap = new Map(
-        relevantDocuments.map(doc => [doc.veeva_document_id || doc.document_id, doc])
+        relevantDocuments.map(doc => [
+          doc.veeva_document_id || doc.document_id || (doc.source_type === 'cfr_regulation' ? doc.document_id : null), 
+          doc
+        ])
       );
       const manualSummariesIncluded = new Set();
 
@@ -1428,12 +1480,20 @@ export const handler = async (event) => {
       const MAX_CHUNK_TEXT_LENGTH = isComparisonQuery ? 600 : 1500;
       
       const chunkContext = relevantChunks.map((chunk, index) => {
-        const docId = chunk.veeva_document_id || chunk.upload_document_id;
+        const docId = chunk.veeva_document_id || chunk.upload_document_id || chunk.regulation_id;
         const docMetadata = documentMetadataMap.get(docId);
         const manualSummary = docMetadata?.manual_summary;
+        const isCfrChunk = chunk.source_type === 'cfr_regulation';
 
-        let context = `**Relevant Section ${index + 1}** from "${chunk.document_name}" (${chunk.document_number} v${chunk.major_version}.${chunk.minor_version})
+        let context;
+        if (isCfrChunk) {
+          context = `**Relevant Section ${index + 1}** from "${chunk.title || chunk.document_name}" (CFR Title 21 ${chunk.regulation_type || 'regulation'})
+Regulation ID: ${chunk.regulation_identifier || 'N/A'}
 Similarity: ${(chunk.similarity * 100).toFixed(1)}%`;
+        } else {
+          context = `**Relevant Section ${index + 1}** from "${chunk.document_name}" (${chunk.document_number} v${chunk.major_version}.${chunk.minor_version})
+Similarity: ${(chunk.similarity * 100).toFixed(1)}%`;
+        }
 
         if (manualSummary && !manualSummariesIncluded.has(docId)) {
           context += `\nManual Summary Guidance: ${manualSummary}`;
@@ -1453,7 +1513,7 @@ Similarity: ${(chunk.similarity * 100).toFixed(1)}%`;
       }).join('\n\n');
       
       // Also include document summaries for any documents that weren't found by semantic search
-      const documentsWithChunks = new Set(relevantChunks.map(c => c.veeva_document_id || c.upload_document_id));
+      const documentsWithChunks = new Set(relevantChunks.map(c => c.veeva_document_id || c.upload_document_id || c.regulation_id));
       const documentsWithoutChunks = relevantDocuments.filter(doc => {
         const docId = doc.veeva_document_id || doc.document_id;
         return docId && !documentsWithChunks.has(docId);
@@ -1501,13 +1561,37 @@ Status: ${doc.status || 'Unknown'}`;
       // Fallback to document summaries
       console.log('Building context from document summaries (keyword search fallback)');
       documentContext = relevantDocuments.map(doc => {
-        // Handle both Veeva and uploaded documents
+        // Handle Veeva, uploaded documents, and CFR regulations
         const isVeevaDoc = doc.source_type === 'veeva';
         const isUploadedDoc = doc.source_type === 'upload';
+        const isCfrRegulation = doc.source_type === 'cfr_regulation';
         
         let context = '';
         
-        if (isVeevaDoc) {
+        if (isCfrRegulation) {
+          context = `**${doc.document_name}** (CFR Title 21 ${doc.document_type})
+Regulation ID: ${doc.regulation_id || 'N/A'}`;
+          if (doc.chapter_id) {
+            context += `\nChapter: ${doc.chapter_id}`;
+          }
+          if (doc.subchapter_id) {
+            context += `\nSubchapter: ${doc.subchapter_id}`;
+          }
+          
+          // Add AI summary if available
+          if (doc.ai_summary) {
+            const maxSummaryLength = isComparisonQuery ? 300 : 800;
+            const summaryText = doc.ai_summary.length > maxSummaryLength 
+              ? doc.ai_summary.substring(0, maxSummaryLength) + '...' 
+              : doc.ai_summary;
+            context += `\nSummary: ${summaryText}`;
+          } else {
+            context += `\nSummary: No summary available for this CFR regulation.`;
+          }
+          
+          context += '\n\n---';
+          return context;
+        } else if (isVeevaDoc) {
           context = `**${doc.document_name}** (${doc.document_number} v${doc.major_version}.${doc.minor_version})
 Type: ${doc.document_type || 'Unknown'}
 Status: ${doc.status || 'Unknown'}`;

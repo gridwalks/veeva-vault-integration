@@ -138,6 +138,16 @@ export async function getIndexedDocuments({ name = "", limit = 50, offset = 0 } 
   return data;
 }
 
+export async function indexCfrRegulations({ selectedItems, granuleData } = {}) {
+  return apiRequest({
+    url: '/api/index-cfr-regulations',
+    method: 'POST',
+    body: JSON.stringify({ selectedItems, granuleData }),
+    successMessage: 'Indexing CFR regulations...',
+    errorMessage: 'Failed to index CFR regulations'
+  });
+}
+
 export async function getCfrTitle21({ packageId = null, fromDate = null } = {}) {
   const params = {};
   if (packageId) params.packageId = packageId;

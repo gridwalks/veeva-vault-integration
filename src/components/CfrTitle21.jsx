@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getCfrTitle21 } from "../api";
+import { getCfrTitle21, indexCfrRegulations } from "../api";
 
 export default function CfrTitle21() {
   const [isLoading, setIsLoading] = useState(false);
@@ -10,6 +10,13 @@ export default function CfrTitle21() {
   const [selectedPackageId, setSelectedPackageId] = useState(null);
   const [packageDetails, setPackageDetails] = useState({});
   const [detailsLoading, setDetailsLoading] = useState({});
+  
+  // Track selected subchapters and parts across all granules
+  // Key format: "packageId:chapterId:subchapterId" or "packageId:chapterId:subchapterId:partId"
+  const [selectedSubchapters, setSelectedSubchapters] = useState(new Set());
+  const [selectedParts, setSelectedParts] = useState(new Set());
+  const [isIndexing, setIsIndexing] = useState(false);
+  const [indexingStatus, setIndexingStatus] = useState(null);
 
   useEffect(() => {
     loadPackages();
@@ -268,9 +275,176 @@ export default function CfrTitle21() {
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "320px", overflow: "auto" }}>
                         {details.granules.map(granule => (
-                          <GranuleItem key={granule.granuleId || granule.title} granule={granule} />
+                          <GranuleItem 
+                            key={granule.granuleId || granule.title} 
+                            granule={granule}
+                            packageId={pkg.packageId}
+                            selectedSubchapters={selectedSubchapters}
+                            selectedParts={selectedParts}
+                            onToggleSubchapter={(key) => {
+                              const newSet = new Set(selectedSubchapters);
+                              if (newSet.has(key)) {
+                                newSet.delete(key);
+                                // Uncheck all parts from this subchapter
+                                const newPartsSet = new Set(selectedParts);
+                                const partsToRemove = Array.from(selectedParts).filter(partKey => partKey.startsWith(key + ':'));
+                                partsToRemove.forEach(partKey => newPartsSet.delete(partKey));
+                                setSelectedParts(newPartsSet);
+                              } else {
+                                newSet.add(key);
+                                // Auto-check all parts from this subchapter
+                                const newPartsSet = new Set(selectedParts);
+                                const chapter = details.granules.find(ch => ch.granuleId === granule.granuleId);
+                                const subchapter = chapter?.subchapters?.find(sc => {
+                                  const subchapterKey = `${pkg.packageId}:${granule.granuleId}:${sc.granuleId || sc.title}`;
+                                  return subchapterKey === key;
+                                });
+                                if (subchapter?.parts) {
+                                  subchapter.parts.forEach(part => {
+                                    const partKey = `${key}:${part.granuleId || part.title}`;
+                                    newPartsSet.add(partKey);
+                                  });
+                                }
+                                setSelectedParts(newPartsSet);
+                              }
+                              setSelectedSubchapters(newSet);
+                            }}
+                            onTogglePart={(key) => {
+                              const newSet = new Set(selectedParts);
+                              if (newSet.has(key)) {
+                                newSet.delete(key);
+                              } else {
+                                newSet.add(key);
+                              }
+                              setSelectedParts(newSet);
+                            }}
+                          />
                         ))}
                       </div>
+                      {/* Index Selected Button */}
+                      {(selectedSubchapters.size > 0 || selectedParts.size > 0) && (
+                        <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #e5e7eb" }}>
+                          <button
+                            onClick={async () => {
+                              if (isIndexing) return;
+                              setIsIndexing(true);
+                              setIndexingStatus(null);
+                              setError(null);
+                              
+                              try {
+                                // Collect selected items
+                                const selectedItems = [];
+                                
+                                // Add selected subchapters
+                                selectedSubchapters.forEach(key => {
+                                  const [packageId, chapterId, subchapterId] = key.split(':');
+                                  const chapter = details.granules.find(ch => ch.granuleId === chapterId);
+                                  const subchapter = chapter?.subchapters?.find(sc => {
+                                    const scKey = `${packageId}:${chapterId}:${sc.granuleId || sc.title}`;
+                                    return scKey === key;
+                                  });
+                                  if (subchapter) {
+                                    selectedItems.push({
+                                      type: 'subchapter',
+                                      id: subchapter.granuleId || subchapter.title,
+                                      granuleId: subchapter.granuleId,
+                                      chapterId: chapterId,
+                                      title: subchapter.title
+                                    });
+                                  }
+                                });
+                                
+                                // Add selected parts
+                                selectedParts.forEach(key => {
+                                  const parts = key.split(':');
+                                  if (parts.length >= 4) {
+                                    const [packageId, chapterId, subchapterId, partId] = parts;
+                                    const chapter = details.granules.find(ch => ch.granuleId === chapterId);
+                                    let part = null;
+                                    if (subchapterId) {
+                                      const subchapter = chapter?.subchapters?.find(sc => sc.granuleId === subchapterId);
+                                      part = subchapter?.parts?.find(p => (p.granuleId || p.title) === partId);
+                                    } else {
+                                      part = chapter?.parts?.find(p => (p.granuleId || p.title) === partId);
+                                    }
+                                    if (part) {
+                                      selectedItems.push({
+                                        type: 'part',
+                                        id: part.granuleId || part.title,
+                                        granuleId: part.granuleId,
+                                        chapterId: chapterId,
+                                        subchapterId: subchapterId || null,
+                                        title: part.title
+                                      });
+                                    }
+                                  }
+                                });
+                                
+                                console.log('Indexing selected items:', selectedItems);
+                                
+                                const result = await indexCfrRegulations({
+                                  selectedItems,
+                                  granuleData: { granules: details.granules }
+                                });
+                                
+                                setIndexingStatus(result);
+                                
+                                // Clear selections after successful indexing
+                                if (result.success) {
+                                  setSelectedSubchapters(new Set());
+                                  setSelectedParts(new Set());
+                                }
+                              } catch (err) {
+                                console.error('Indexing error:', err);
+                                setError(err.message || 'Failed to index regulations');
+                                setIndexingStatus({
+                                  success: false,
+                                  error: err.message || 'Failed to index regulations'
+                                });
+                              } finally {
+                                setIsIndexing(false);
+                              }
+                            }}
+                            disabled={isIndexing}
+                            style={{
+                              padding: "8px 16px",
+                              fontSize: "12px",
+                              borderRadius: "4px",
+                              border: "none",
+                              backgroundColor: isIndexing ? "#9ca3af" : "#4338ca",
+                              color: "#ffffff",
+                              cursor: isIndexing ? "not-allowed" : "pointer",
+                              fontWeight: 600
+                            }}
+                          >
+                            {isIndexing ? "Indexing..." : `Index Selected (${selectedSubchapters.size + selectedParts.size} items)`}
+                          </button>
+                          
+                          {indexingStatus && (
+                            <div style={{
+                              marginTop: "8px",
+                              padding: "8px",
+                              borderRadius: "4px",
+                              backgroundColor: indexingStatus.success ? "#d1fae5" : "#fee2e2",
+                              border: `1px solid ${indexingStatus.success ? "#10b981" : "#ef4444"}`,
+                              fontSize: "11px",
+                              color: indexingStatus.success ? "#065f46" : "#991b1b"
+                            }}>
+                              {indexingStatus.success ? (
+                                <>
+                                  <strong>Indexing Complete!</strong>
+                                  <div>Processed: {indexingStatus.processed || 0}, Successful: {indexingStatus.successful || 0}, Failed: {indexingStatus.failed || 0}</div>
+                                  <div>Total chunks created: {indexingStatus.totalChunksCreated || 0}</div>
+                                </>
+                              ) : (
+                                <>
+                                  <strong>Indexing Failed:</strong> {indexingStatus.error || 'Unknown error'}
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -296,36 +470,10 @@ export default function CfrTitle21() {
   );
 }
 
-function GranuleItem({ granule }) {
+function GranuleItem({ granule, packageId, selectedSubchapters, selectedParts, onToggleSubchapter, onTogglePart }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [selectedSubchapters, setSelectedSubchapters] = useState(new Set());
-  const [selectedParts, setSelectedParts] = useState(new Set());
   const hasSubchapters = granule.subchapters && granule.subchapters.length > 0;
   const hasParts = granule.parts && granule.parts.length > 0;
-
-  const toggleSubchapter = (subchapterId) => {
-    setSelectedSubchapters(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(subchapterId)) {
-        newSet.delete(subchapterId);
-      } else {
-        newSet.add(subchapterId);
-      }
-      return newSet;
-    });
-  };
-
-  const togglePart = (partId) => {
-    setSelectedParts(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(partId)) {
-        newSet.delete(partId);
-      } else {
-        newSet.add(partId);
-      }
-      return newSet;
-    });
-  };
 
   return (
     <div
@@ -408,7 +556,8 @@ function GranuleItem({ granule }) {
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             {granule.subchapters.map(subchapter => {
               const subchapterId = subchapter.granuleId || subchapter.title;
-              const isChecked = selectedSubchapters.has(subchapterId);
+              const subchapterKey = `${packageId}:${granule.granuleId}:${subchapterId}`;
+              const isChecked = selectedSubchapters.has(subchapterKey);
               return (
                 <div
                   key={subchapterId}
@@ -423,7 +572,7 @@ function GranuleItem({ granule }) {
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      onChange={() => toggleSubchapter(subchapterId)}
+                      onChange={() => onToggleSubchapter(subchapterKey)}
                       style={{
                         width: "16px",
                         height: "16px",
@@ -460,7 +609,8 @@ function GranuleItem({ granule }) {
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                       {subchapter.parts.map(part => {
                         const partId = part.granuleId || part.title;
-                        const isPartChecked = selectedParts.has(partId);
+                        const partKey = `${subchapterKey}:${partId}`;
+                        const isPartChecked = selectedParts.has(partKey);
                         return (
                           <div
                             key={partId}
@@ -475,7 +625,7 @@ function GranuleItem({ granule }) {
                               <input
                                 type="checkbox"
                                 checked={isPartChecked}
-                                onChange={() => togglePart(partId)}
+                                onChange={() => onTogglePart(partKey)}
                                 style={{
                                   width: "14px",
                                   height: "14px",
