@@ -299,6 +299,7 @@ export default function CfrTitle21() {
 function GranuleItem({ granule }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedSubchapters, setSelectedSubchapters] = useState(new Set());
+  const [selectedParts, setSelectedParts] = useState(new Set());
   const hasSubchapters = granule.subchapters && granule.subchapters.length > 0;
   const hasParts = granule.parts && granule.parts.length > 0;
 
@@ -309,6 +310,18 @@ function GranuleItem({ granule }) {
         newSet.delete(subchapterId);
       } else {
         newSet.add(subchapterId);
+      }
+      return newSet;
+    });
+  };
+
+  const togglePart = (partId) => {
+    setSelectedParts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(partId)) {
+        newSet.delete(partId);
+      } else {
+        newSet.add(partId);
       }
       return newSet;
     });
@@ -445,19 +458,34 @@ function GranuleItem({ granule }) {
                       Parts ({subchapter.parts.length}):
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                      {subchapter.parts.map(part => (
-                        <div
-                          key={part.granuleId || part.title}
-                          style={{
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "2px",
-                            padding: "4px",
-                            backgroundColor: "#f9fafb"
-                          }}
-                        >
-                          <div style={{ fontSize: "11px", fontWeight: 600, color: "#1f2937", marginBottom: "2px" }}>
-                            {part.title || part.granuleId}
-                          </div>
+                      {subchapter.parts.map(part => {
+                        const partId = part.granuleId || part.title;
+                        const isPartChecked = selectedParts.has(partId);
+                        return (
+                          <div
+                            key={partId}
+                            style={{
+                              border: "1px solid #e5e7eb",
+                              borderRadius: "2px",
+                              padding: "4px",
+                              backgroundColor: "#f9fafb"
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
+                              <input
+                                type="checkbox"
+                                checked={isPartChecked}
+                                onChange={() => togglePart(partId)}
+                                style={{
+                                  width: "14px",
+                                  height: "14px",
+                                  cursor: "pointer"
+                                }}
+                              />
+                              <div style={{ fontSize: "11px", fontWeight: 600, color: "#1f2937" }}>
+                                {part.title || part.granuleId}
+                              </div>
+                            </div>
                           <div style={{ display: "flex", gap: "6px", fontSize: "9px", color: "#6b7280", flexWrap: "wrap" }}>
                             {part.granuleId && <span>ID: {part.granuleId}</span>}
                             {part.granuleClass && <span>Type: {part.granuleClass}</span>}
@@ -481,7 +509,8 @@ function GranuleItem({ granule }) {
                             )}
                           </div>
                         </div>
-                      ))}
+                      );
+                      })}
                     </div>
                   </div>
                 )}
