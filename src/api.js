@@ -142,7 +142,7 @@ export async function indexCfrRegulations({ selectedItems, granuleData } = {}) {
   return apiRequest({
     url: '/api/index-cfr-regulations',
     method: 'POST',
-    body: JSON.stringify({ selectedItems, granuleData }),
+    body: { selectedItems, granuleData },
     successMessage: 'Indexing CFR regulations...',
     errorMessage: 'Failed to index CFR regulations'
   });
