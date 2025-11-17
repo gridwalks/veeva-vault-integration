@@ -387,6 +387,9 @@ export default function CfrTitle21() {
                                   granuleData: { granules: details.granules }
                                 });
                                 
+                                console.log('Indexing result:', result);
+                                console.log('Results array:', result.results);
+                                
                                 setIndexingStatus(result);
                                 
                                 // Clear selections after successful indexing
@@ -430,7 +433,7 @@ export default function CfrTitle21() {
                               fontSize: "11px",
                               color: indexingStatus.success ? "#065f46" : "#991b1b"
                             }}>
-                              {indexingStatus.success ? (
+                              {indexingStatus.successful > 0 || (indexingStatus.successful === 0 && indexingStatus.failed === 0) ? (
                                 <>
                                   <strong>Indexing Complete!</strong>
                                   <div>Processed: {indexingStatus.processed || 0}, Successful: {indexingStatus.successful || 0}, Failed: {indexingStatus.failed || 0}</div>
@@ -448,15 +451,21 @@ export default function CfrTitle21() {
                                 </>
                               ) : (
                                 <>
-                                  <strong>Indexing Failed:</strong> {indexingStatus.error || 'Unknown error'}
+                                  <strong>Indexing Failed</strong>
+                                  <div>Processed: {indexingStatus.processed || 0}, Successful: {indexingStatus.successful || 0}, Failed: {indexingStatus.failed || 0}</div>
                                   {indexingStatus.results && indexingStatus.results.length > 0 && (
                                     <div style={{ marginTop: "8px" }}>
                                       <strong>Error Details:</strong>
                                       {indexingStatus.results.map((result, idx) => (
-                                        <div key={idx} style={{ marginTop: "4px", fontSize: "10px" }}>
-                                          {result.title || result.regulationId}: {result.error || 'Unknown error'}
+                                        <div key={idx} style={{ marginTop: "4px", fontSize: "10px", wordBreak: "break-word" }}>
+                                          <strong>{result.title || result.regulationId}:</strong> {result.error || 'Unknown error'}
                                         </div>
                                       ))}
+                                    </div>
+                                  )}
+                                  {(!indexingStatus.results || indexingStatus.results.length === 0) && (
+                                    <div style={{ marginTop: "4px", fontSize: "10px" }}>
+                                      {indexingStatus.error || 'No error details available'}
                                     </div>
                                   )}
                                 </>
