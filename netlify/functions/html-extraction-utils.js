@@ -26,12 +26,16 @@ export function extractTextFromHTML(htmlContent) {
     text = text.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '');
     text = text.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '');
     
-    // Try to extract main content area (eCFR.gov uses specific classes)
-    // Look for main content containers
+    // Try to extract main content area (eCFR.gov uses specific classes/IDs)
+    // eCFR.gov structure: look for content divs with specific patterns
     const mainContentMatch = text.match(/<main[^>]*>([\s\S]*?)<\/main>/i) ||
-                            text.match(/<div[^>]*class="[^"]*content[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
+                            text.match(/<div[^>]*id="[^"]*cfr-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
+                            text.match(/<div[^>]*class="[^"]*cfr-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
                             text.match(/<div[^>]*id="[^"]*content[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
-                            text.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
+                            text.match(/<div[^>]*class="[^"]*content[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
+                            text.match(/<article[^>]*>([\s\S]*?)<\/article>/i) ||
+                            // Try to find the body content directly
+                            text.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
     
     if (mainContentMatch && mainContentMatch[1]) {
       text = mainContentMatch[1];
@@ -84,6 +88,8 @@ export function extractTextFromHTMLStructured(htmlContent) {
   }
 
   try {
+    console.log(`Extracting text from HTML (${htmlContent.length} chars)`);
+    
     // Remove script and style elements
     let text = htmlContent.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
     text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
@@ -94,13 +100,35 @@ export function extractTextFromHTMLStructured(htmlContent) {
     text = text.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '');
     text = text.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '');
     
-    // Try to extract main content
-    const mainContentMatch = text.match(/<main[^>]*>([\s\S]*?)<\/main>/i) ||
-                            text.match(/<div[^>]*class="[^"]*content[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
-                            text.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
+    // Try multiple patterns to find main content (eCFR.gov specific)
+    let mainContentMatch = null;
+    const patterns = [
+      /<main[^>]*>([\s\S]*?)<\/main>/i,
+      /<div[^>]*id="[^"]*cfr-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div[^>]*class="[^"]*cfr-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div[^>]*id="[^"]*content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div[^>]*class="[^"]*content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<article[^>]*>([\s\S]*?)<\/article>/i,
+      /<div[^>]*class="[^"]*section[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div[^>]*id="[^"]*section[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      // Last resort: get body content
+      /<body[^>]*>([\s\S]*?)<\/body>/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match && match[1] && match[1].trim().length > 100) {
+        mainContentMatch = match;
+        console.log(`Found content using pattern: ${pattern}`);
+        break;
+      }
+    }
     
     if (mainContentMatch && mainContentMatch[1]) {
       text = mainContentMatch[1];
+      console.log(`Extracted content section (${text.length} chars)`);
+    } else {
+      console.warn('No main content section found, using full HTML');
     }
     
     // Convert block-level elements to line breaks

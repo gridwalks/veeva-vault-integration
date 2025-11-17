@@ -271,15 +271,50 @@ async function indexRegulation(item, granuleData, pool, batchId) {
 
     // Extract text from HTML
     console.log(`Extracting text from HTML (${htmlContent.length} chars)...`);
-    const extractedText = extractTextFromHTMLStructured(htmlContent);
+    console.log(`HTML preview (first 500 chars):`, htmlContent.substring(0, 500));
+    
+    // Check if this looks like an error page or redirect
+    if (htmlContent.toLowerCase().includes('access denied') || 
+        htmlContent.toLowerCase().includes('forbidden') ||
+        htmlContent.toLowerCase().includes('403') ||
+        htmlContent.toLowerCase().includes('404') ||
+        htmlContent.toLowerCase().includes('not found')) {
+      throw new Error(`Downloaded page appears to be an error or access denied page`);
+    }
+    
+    let extractedText = extractTextFromHTMLStructured(htmlContent);
     console.log(`Extracted text length: ${extractedText?.length || 0} characters`);
+    console.log(`Extracted text preview (first 500 chars):`, extractedText?.substring(0, 500) || 'empty');
+    
     if (!extractedText || extractedText.trim().length < 100) {
       console.error(`Extracted text too short:`, {
         length: extractedText?.length || 0,
         trimmedLength: extractedText?.trim().length || 0,
-        preview: extractedText?.substring(0, 200) || 'empty'
+        preview: extractedText?.substring(0, 500) || 'empty',
+        htmlLength: htmlContent.length,
+        htmlPreview: htmlContent.substring(0, 500)
       });
-      throw new Error(`Extracted text too short or empty (${extractedText?.length || 0} chars, trimmed: ${extractedText?.trim().length || 0} chars)`);
+      
+      // If extraction failed but we have HTML, try a more aggressive extraction
+      if (htmlContent.length > 1000 && (!extractedText || extractedText.trim().length < 100)) {
+        console.log('Trying fallback extraction method...');
+        // Fallback: remove all tags and get all text
+        const fallbackText = htmlContent
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        if (fallbackText.length > 100) {
+          console.log(`Fallback extraction successful: ${fallbackText.length} chars`);
+          extractedText = fallbackText;
+        }
+      }
+      
+      if (!extractedText || extractedText.trim().length < 100) {
+        throw new Error(`Extracted text too short or empty (${extractedText?.length || 0} chars, trimmed: ${extractedText?.trim().length || 0} chars). HTML length: ${htmlContent.length}. This may indicate the page requires authentication or JavaScript rendering.`);
+      }
     }
 
     console.log(`Successfully extracted ${extractedText.length} characters from ${type} ${id}`);
