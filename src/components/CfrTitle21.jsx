@@ -389,6 +389,25 @@ export default function CfrTitle21() {
                                 
                                 console.log('Indexing result:', result);
                                 console.log('Results array:', result.results);
+                                if (result.results && result.results.length > 0) {
+                                  result.results.forEach((r, idx) => {
+                                    const resultDetails = {
+                                      success: r.success,
+                                      regulationId: r.regulationId,
+                                      title: r.title,
+                                      error: r.error,
+                                      chunksCreated: r.chunksCreated,
+                                      regulationType: r.regulationType,
+                                      processingDuration: r.processingDuration
+                                    };
+                                    console.log(`Result ${idx + 1} (full):`, resultDetails);
+                                    console.log(`Result ${idx + 1} (JSON):`, JSON.stringify(resultDetails, null, 2));
+                                    if (r.error) {
+                                      console.error(`❌ ERROR for ${r.title || r.regulationId}:`, r.error);
+                                      console.error(`Full error details:`, r);
+                                    }
+                                  });
+                                }
                                 
                                 setIndexingStatus(result);
                                 
