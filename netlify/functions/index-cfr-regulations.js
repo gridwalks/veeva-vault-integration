@@ -326,9 +326,24 @@ async function indexRegulation(item, granuleData, pool, batchId) {
     });
 
     // Extract source_date - try API data first, will fallback to HTML extraction later if needed
+    // Check part data, then parent subchapter, then parent chapter for dateIssued
     let sourceDate = regulationData.dateIssued || regulationData.issueDate || null;
+    
+    // If not found in part, try parent subchapter or chapter
+    if (!sourceDate && subchapterId) {
+      const chapter = granuleData.granules?.find(ch => ch.granuleId === chapterId);
+      const subchapter = chapter?.subchapters?.find(sc => sc.granuleId === subchapterId);
+      sourceDate = subchapter?.dateIssued || subchapter?.issueDate || null;
+    }
+    if (!sourceDate) {
+      const chapter = granuleData.granules?.find(ch => ch.granuleId === chapterId);
+      sourceDate = chapter?.dateIssued || chapter?.issueDate || null;
+    }
+    
     if (sourceDate) {
       console.log(`Source date from API data: ${sourceDate}`);
+    } else {
+      console.log(`No source date found in API data, will try to extract from HTML`);
     }
 
     // Check if regulation already exists and get stored source_date
@@ -338,6 +353,11 @@ async function indexRegulation(item, granuleData, pool, batchId) {
       [id]
     );
     console.log(`Existing regulation check: ${existingReg.rows.length > 0 ? 'found' : 'not found'}`);
+    
+    if (existingReg.rows.length > 0) {
+      const storedSourceDate = existingReg.rows[0].source_date;
+      console.log(`Stored source_date: ${storedSourceDate || 'null'}, New source_date: ${sourceDate || 'null'}`);
+    }
 
     // If regulation exists and we have a source_date, check if we can skip reindexing
     if (existingReg.rows.length > 0 && sourceDate) {
@@ -369,6 +389,8 @@ async function indexRegulation(item, granuleData, pool, batchId) {
       } else if (!storedSourceDate) {
         console.log(`No stored source_date found, will extract and store date`);
       }
+    } else if (existingReg.rows.length > 0 && !sourceDate) {
+      console.log(`Regulation exists but no source_date available yet, will extract from HTML and compare`);
     }
 
     // Determine download URL - try multiple sources in order of preference
@@ -516,6 +538,8 @@ async function indexRegulation(item, granuleData, pool, batchId) {
     // If we now have a source_date and regulation exists, check again before reindexing
     if (existingReg.rows.length > 0 && sourceDate) {
       const storedSourceDate = existingReg.rows[0].source_date;
+      console.log(`Comparing dates after HTML extraction - stored: "${storedSourceDate || 'null'}", new: "${sourceDate}"`);
+      
       if (storedSourceDate && storedSourceDate === sourceDate) {
         // Check if chunks exist
         const chunkCheck = await pool.query(
@@ -535,8 +559,16 @@ async function indexRegulation(item, granuleData, pool, batchId) {
             skipped: true,
             processingDuration: Date.now() - startTime
           };
+        } else {
+          console.log(`Source date matches but no chunks exist (${chunkCount}), will reindex`);
         }
+      } else if (storedSourceDate && storedSourceDate !== sourceDate) {
+        console.log(`Source date changed after HTML extraction: stored="${storedSourceDate}", new="${sourceDate}". Will reindex.`);
+      } else if (!storedSourceDate) {
+        console.log(`No stored source_date found, will store new date: ${sourceDate}`);
       }
+    } else if (existingReg.rows.length > 0 && !sourceDate) {
+      console.log(`Regulation exists but could not extract source_date, will reindex to store date`);
     }
 
     let regulationDbId;
