@@ -512,7 +512,8 @@ export default function CfrTitle21() {
                                 console.log('Indexing selected items:', selectedItems);
                                 
                                 // Process items in batches to avoid gateway timeout
-                                const BATCH_SIZE = 2; // Process 2 items at a time to stay under 30s gateway timeout
+                                // Use smaller batches for large operations to prevent timeout
+                                const BATCH_SIZE = selectedItems.length > 20 ? 1 : 2; // Use batch size 1 for large operations
                                 const allResults = [];
                                 let totalProcessed = 0;
                                 let totalSuccessful = 0;
