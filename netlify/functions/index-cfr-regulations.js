@@ -360,6 +360,7 @@ async function indexRegulation(item, granuleData, pool, batchId) {
     }
 
     // Check if regulation already exists and get stored source_date
+    // Do this EARLY to skip expensive operations if not needed
     console.log(`Checking if regulation ${id} already exists in database...`);
     const existingReg = await pool.query(
       'SELECT id, source_date FROM cfr_title21_regulations WHERE regulation_id = $1',
@@ -367,43 +368,43 @@ async function indexRegulation(item, granuleData, pool, batchId) {
     );
     console.log(`Existing regulation check: ${existingReg.rows.length > 0 ? 'found' : 'not found'}`);
     
+    // If regulation exists, check if we can skip immediately (before any downloads)
     if (existingReg.rows.length > 0) {
       const storedSourceDate = existingReg.rows[0].source_date;
-      console.log(`Stored source_date: ${storedSourceDate || 'null'}, New source_date: ${sourceDate || 'null'}`);
-    }
-
-    // If regulation exists and we have a source_date, check if we can skip reindexing
-    if (existingReg.rows.length > 0 && sourceDate) {
-      const storedSourceDate = existingReg.rows[0].source_date;
-      if (storedSourceDate && storedSourceDate === sourceDate) {
-        // Check if chunks exist
-        const chunkCheck = await pool.query(
-          'SELECT COUNT(*) as count FROM cfr_title21_regulation_chunks WHERE regulation_id = $1',
-          [existingReg.rows[0].id]
-        );
-        const chunkCount = parseInt(chunkCheck.rows[0].count);
-        
-        if (chunkCount > 0) {
-          console.log(`⏭️ Skipping reindexing for regulation ${id}: source_date unchanged (${sourceDate}) and ${chunkCount} chunks exist`);
-          return {
-            success: true,
-            regulationId: id,
-            regulationType: type,
-            title: regulationData.title || id,
-            chunksCreated: chunkCount,
-            skipped: true,
-            processingDuration: Date.now() - startTime
-          };
-        } else {
-          console.log(`Source date matches but no chunks exist, will reindex`);
-        }
-      } else if (storedSourceDate && storedSourceDate !== sourceDate) {
-        console.log(`Source date changed: stored="${storedSourceDate}", new="${sourceDate}". Will reindex.`);
-      } else if (!storedSourceDate) {
-        console.log(`No stored source_date found, will extract and store date`);
+      console.log(`Stored source_date: ${storedSourceDate || 'null'}, New source_date (from API): ${sourceDate || 'null'}`);
+      
+      // First, quickly check if chunks exist - if they do and dates match, skip immediately
+      const chunkCheck = await pool.query(
+        'SELECT COUNT(*) as count FROM cfr_title21_regulation_chunks WHERE regulation_id = $1',
+        [existingReg.rows[0].id]
+      );
+      const chunkCount = parseInt(chunkCheck.rows[0].count);
+      
+      // If chunks exist and we have matching source dates, skip immediately
+      if (chunkCount > 0 && sourceDate && storedSourceDate && storedSourceDate === sourceDate) {
+        console.log(`⏭️ Skipping reindexing for regulation ${id}: source_date unchanged (${sourceDate}) and ${chunkCount} chunks exist`);
+        return {
+          success: true,
+          regulationId: id,
+          regulationType: type,
+          title: regulationData.title || id,
+          chunksCreated: chunkCount,
+          skipped: true,
+          processingDuration: Date.now() - startTime
+        };
       }
-    } else if (existingReg.rows.length > 0 && !sourceDate) {
-      console.log(`Regulation exists but no source_date available yet, will extract from HTML and compare`);
+      
+      // If chunks exist but no source_date match, check if we should still skip
+      // (for backward compatibility with regulations indexed before source_date was added)
+      if (chunkCount > 0 && (!sourceDate || !storedSourceDate)) {
+        console.log(`Regulation has ${chunkCount} chunks but source_date check inconclusive (stored: ${storedSourceDate || 'null'}, new: ${sourceDate || 'null'}). Will check after HTML extraction.`);
+      } else if (chunkCount === 0) {
+        console.log(`Regulation exists but has no chunks (${chunkCount}), will reindex to create chunks`);
+      } else if (storedSourceDate && sourceDate && storedSourceDate !== sourceDate) {
+        console.log(`Source date changed: stored="${storedSourceDate}", new="${sourceDate}". Will reindex.`);
+      } else if (!storedSourceDate && sourceDate) {
+        console.log(`No stored source_date found, will extract and store date: ${sourceDate}`);
+      }
     }
 
     // Determine download URL - try multiple sources in order of preference
