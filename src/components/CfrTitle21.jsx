@@ -511,43 +511,107 @@ export default function CfrTitle21() {
                                 
                                 console.log('Indexing selected items:', selectedItems);
                                 
-                                const result = await indexCfrRegulations({
-                                  selectedItems,
-                                  granuleData: { granules: details.granules }
-                                });
+                                // Process items in batches to avoid gateway timeout
+                                const BATCH_SIZE = 2; // Process 2 items at a time to stay under 30s gateway timeout
+                                const allResults = [];
+                                let totalProcessed = 0;
+                                let totalSuccessful = 0;
+                                let totalFailed = 0;
+                                let totalChunksCreated = 0;
                                 
-                                console.log('Indexing result:', result);
-                                console.log('Results array:', result.results);
-                                if (result.results && result.results.length > 0) {
-                                  result.results.forEach((r, idx) => {
-                                    const resultDetails = {
-                                      success: r.success,
-                                      regulationId: r.regulationId,
-                                      title: r.title,
-                                      error: r.error,
-                                      chunksCreated: r.chunksCreated,
-                                      regulationType: r.regulationType,
-                                      processingDuration: r.processingDuration
-                                    };
-                                    console.log(`Result ${idx + 1} (full):`, resultDetails);
-                                    console.log(`Result ${idx + 1} (JSON):`, JSON.stringify(resultDetails, null, 2));
-                                    if (r.error) {
-                                      console.error(`❌ ERROR for ${r.title || r.regulationId}:`, r.error);
-                                      console.error(`Full error details:`, r);
+                                for (let i = 0; i < selectedItems.length; i += BATCH_SIZE) {
+                                  const batch = selectedItems.slice(i, i + BATCH_SIZE);
+                                  console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(selectedItems.length / BATCH_SIZE)}: ${batch.length} items`);
+                                  
+                                  try {
+                                    const result = await indexCfrRegulations({
+                                      selectedItems: batch,
+                                      granuleData: { granules: details.granules }
+                                    });
+                                    
+                                    console.log(`Batch result:`, result);
+                                    if (result.results && result.results.length > 0) {
+                                      allResults.push(...result.results);
+                                      totalProcessed += result.processed || result.results.length;
+                                      totalSuccessful += result.successful || result.results.filter(r => r.success).length;
+                                      totalFailed += result.failed || result.results.filter(r => !r.success).length;
+                                      totalChunksCreated += result.totalChunksCreated || result.results.reduce((sum, r) => sum + (r.chunksCreated || 0), 0);
+                                      
+                                      // Log each result
+                                      result.results.forEach((r, idx) => {
+                                        const resultDetails = {
+                                          success: r.success,
+                                          regulationId: r.regulationId,
+                                          title: r.title,
+                                          error: r.error,
+                                          chunksCreated: r.chunksCreated,
+                                          regulationType: r.regulationType,
+                                          processingDuration: r.processingDuration
+                                        };
+                                        console.log(`Result ${totalProcessed - result.results.length + idx + 1} (full):`, resultDetails);
+                                        if (r.error) {
+                                          console.error(`❌ ERROR for ${r.title || r.regulationId}:`, r.error);
+                                        }
+                                      });
                                     }
-                                  });
+                                    
+                                    // Update status after each batch
+                                    setIndexingStatus({
+                                      success: totalFailed < totalProcessed,
+                                      total: selectedItems.length,
+                                      processed: totalProcessed,
+                                      successful: totalSuccessful,
+                                      failed: totalFailed,
+                                      totalChunksCreated: totalChunksCreated,
+                                      results: allResults,
+                                      inProgress: i + BATCH_SIZE < selectedItems.length
+                                    });
+                                    
+                                    // Small delay between batches to avoid overwhelming the server
+                                    if (i + BATCH_SIZE < selectedItems.length) {
+                                      await new Promise(resolve => setTimeout(resolve, 500));
+                                    }
+                                  } catch (batchError) {
+                                    console.error(`Error processing batch ${Math.floor(i / BATCH_SIZE) + 1}:`, batchError);
+                                    // Add error results for items in this batch
+                                    batch.forEach(item => {
+                                      allResults.push({
+                                        success: false,
+                                        regulationId: item.id,
+                                        regulationType: item.type,
+                                        title: item.title || item.id,
+                                        error: batchError.message || 'Batch processing error',
+                                        chunksCreated: 0
+                                      });
+                                      totalProcessed++;
+                                      totalFailed++;
+                                    });
+                                  }
                                 }
                                 
-                                setIndexingStatus(result);
+                                // Final status update
+                                const finalResult = {
+                                  success: totalFailed < totalProcessed,
+                                  total: selectedItems.length,
+                                  processed: totalProcessed,
+                                  successful: totalSuccessful,
+                                  failed: totalFailed,
+                                  totalChunksCreated: totalChunksCreated,
+                                  results: allResults,
+                                  inProgress: false
+                                };
+                                
+                                console.log('Final indexing result:', finalResult);
+                                setIndexingStatus(finalResult);
                                 
                                 // Reload indexed regulations after successful indexing
-                                if (result.success && result.totalChunksCreated > 0) {
+                                if (finalResult.successful > 0) {
                                   await loadIndexedRegulations();
                                   // The useEffect will automatically update checkboxes when indexedRegulations updates
                                 }
                                 
                                 // Clear selections after successful indexing (but keep pre-checked indexed ones)
-                                if (result.success) {
+                                if (finalResult.success) {
                                   // Don't clear - let the checkIndexedRegulations function handle it
                                   // This way indexed regulations stay checked
                                 }
@@ -587,7 +651,14 @@ export default function CfrTitle21() {
                               fontSize: "11px",
                               color: indexingStatus.success ? "#065f46" : "#991b1b"
                             }}>
-                              {indexingStatus.successful > 0 || (indexingStatus.successful === 0 && indexingStatus.failed === 0) ? (
+                              {indexingStatus.inProgress ? (
+                                <>
+                                  <strong>Indexing in progress...</strong>
+                                  <div>Processed: {indexingStatus.processed || 0} / {indexingStatus.total || 0}</div>
+                                  <div>Successful: {indexingStatus.successful || 0}, Failed: {indexingStatus.failed || 0}</div>
+                                  <div>Total chunks created: {indexingStatus.totalChunksCreated || 0}</div>
+                                </>
+                              ) : indexingStatus.successful > 0 || (indexingStatus.successful === 0 && indexingStatus.failed === 0) ? (
                                 <>
                                   <strong>Indexing Complete!</strong>
                                   <div>Processed: {indexingStatus.processed || 0}, Successful: {indexingStatus.successful || 0}, Failed: {indexingStatus.failed || 0}</div>
