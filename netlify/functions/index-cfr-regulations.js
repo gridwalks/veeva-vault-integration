@@ -325,25 +325,37 @@ async function indexRegulation(item, granuleData, pool, batchId) {
       dateIssued: regulationData.dateIssued
     });
 
-    // Extract source_date - try API data first, will fallback to HTML extraction later if needed
+    // Extract source_date - try API data first, but ignore hardcoded fallback dates
     // Check part data, then parent subchapter, then parent chapter for dateIssued
     let sourceDate = regulationData.dateIssued || regulationData.issueDate || null;
+    
+    // Ignore the hardcoded fallback date "2024-01-01" - treat as null
+    if (sourceDate === '2024-01-01') {
+      console.log(`Ignoring hardcoded fallback date from API: ${sourceDate}`);
+      sourceDate = null;
+    }
     
     // If not found in part, try parent subchapter or chapter
     if (!sourceDate && subchapterId) {
       const chapter = granuleData.granules?.find(ch => ch.granuleId === chapterId);
       const subchapter = chapter?.subchapters?.find(sc => sc.granuleId === subchapterId);
-      sourceDate = subchapter?.dateIssued || subchapter?.issueDate || null;
+      const subchapterDate = subchapter?.dateIssued || subchapter?.issueDate || null;
+      if (subchapterDate && subchapterDate !== '2024-01-01') {
+        sourceDate = subchapterDate;
+      }
     }
     if (!sourceDate) {
       const chapter = granuleData.granules?.find(ch => ch.granuleId === chapterId);
-      sourceDate = chapter?.dateIssued || chapter?.issueDate || null;
+      const chapterDate = chapter?.dateIssued || chapter?.issueDate || null;
+      if (chapterDate && chapterDate !== '2024-01-01') {
+        sourceDate = chapterDate;
+      }
     }
     
     if (sourceDate) {
       console.log(`Source date from API data: ${sourceDate}`);
     } else {
-      console.log(`No source date found in API data, will try to extract from HTML`);
+      console.log(`No valid source date found in API data (or was fallback date), will try to extract from HTML`);
     }
 
     // Check if regulation already exists and get stored source_date
@@ -523,16 +535,23 @@ async function indexRegulation(item, granuleData, pool, batchId) {
 
     console.log(`Successfully extracted ${extractedText.length} characters from ${type} ${id}`);
 
-    // Extract source_date from HTML if we don't have it from API
-    if (!sourceDate && htmlContent && (extractionMethod === 'html' || extractionMethod === 'xml')) {
+    // Extract source_date from HTML - prioritize HTML extraction over API data
+    // since API data may have hardcoded fallback dates
+    if (htmlContent && (extractionMethod === 'html' || extractionMethod === 'xml')) {
       console.log(`Attempting to extract source_date from ${extractionMethod} content...`);
       const extractedDate = extractDateFromHTML(htmlContent);
       if (extractedDate) {
+        // HTML extraction takes precedence over API date
         sourceDate = extractedDate;
         console.log(`Extracted source_date from ${extractionMethod}: ${sourceDate}`);
       } else {
         console.log(`Could not extract source_date from ${extractionMethod} content`);
+        if (!sourceDate) {
+          console.log(`No source_date available from API or HTML extraction`);
+        }
       }
+    } else if (!sourceDate) {
+      console.log(`No HTML content available for date extraction, using API date: ${sourceDate || 'null'}`);
     }
 
     // If we now have a source_date and regulation exists, check again before reindexing

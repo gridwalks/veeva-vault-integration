@@ -172,7 +172,42 @@ export function extractDateFromHTML(htmlContent) {
   }
 
   try {
-    // Try meta tags first (common in eCFR.gov)
+    // PRIORITY 1: Look for "Source:" section in eCFR.gov HTML (most reliable)
+    // Pattern: "Source: 62 FR 13429, Mar. 20, 1997" or "Source: 1997-Mar-20"
+    const sourcePatterns = [
+      // Format: "Source: ... Mar. 20, 1997" or "Source: ... March 20, 1997"
+      /Source[:\s]+(?:[^,]*,\s*)?([A-Z][a-z]{2,8}\.?\s+\d{1,2},?\s+\d{4})/gi,
+      // Format: "Source: 1997-Mar-20" or "Source: 1997-Mar-20, ..."
+      /Source[:\s]+(\d{4}-[A-Z][a-z]{2}-\d{1,2})/gi,
+      // Format: "Source: ... 1997/03/20" or "Source: ... 03/20/1997"
+      /Source[:\s]+(?:[^,]*,\s*)?(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/gi
+    ];
+
+    for (const pattern of sourcePatterns) {
+      const matches = [...htmlContent.matchAll(pattern)];
+      for (const match of matches) {
+        const dateValue = match[1];
+        if (dateValue && dateValue.trim().length > 0) {
+          const cleaned = dateValue.trim();
+          // Skip if it looks like a Federal Register citation (e.g., "62 FR 13429")
+          if (!/^\d+\s+FR\s+\d+/.test(cleaned) && cleaned.length < 50) {
+            console.log(`Found date in Source section: ${cleaned}`);
+            return cleaned;
+          }
+        }
+      }
+    }
+
+    // PRIORITY 2: Look for YYYY-MMM-DD format (e.g., "1997-Mar-20")
+    const yyyyMmmDdPattern = /\b(\d{4}-[A-Z][a-z]{2}-\d{1,2})\b/g;
+    const yyyyMmmDdMatches = [...htmlContent.matchAll(yyyyMmmDdPattern)];
+    if (yyyyMmmDdMatches.length > 0) {
+      const dateValue = yyyyMmmDdMatches[0][1];
+      console.log(`Found date in YYYY-MMM-DD format: ${dateValue}`);
+      return dateValue;
+    }
+
+    // PRIORITY 3: Try meta tags (common in eCFR.gov)
     const metaDatePatterns = [
       /<meta[^>]*name=["']?(date|datePublished|dateModified|effectiveDate|lastModified|versionDate)["']?[^>]*content=["']?([^"']+)["']?/gi,
       /<meta[^>]*property=["']?(og:updated_time|article:published_time|article:modified_time)["']?[^>]*content=["']?([^"']+)["']?/gi,
@@ -185,7 +220,8 @@ export function extractDateFromHTML(htmlContent) {
         const dateValue = match[2] || match[1];
         if (dateValue && dateValue.trim().length > 0) {
           const cleaned = dateValue.trim();
-          if (cleaned.length > 0 && cleaned.length < 100) { // Reasonable date length
+          // Skip the hardcoded fallback date
+          if (cleaned !== '2024-01-01' && cleaned.length > 0 && cleaned.length < 100) {
             console.log(`Found date in meta tag: ${cleaned}`);
             return cleaned;
           }
@@ -193,7 +229,7 @@ export function extractDateFromHTML(htmlContent) {
       }
     }
 
-    // Try data attributes
+    // PRIORITY 4: Try data attributes
     const dataDatePatterns = [
       /data-date=["']?([^"']+)["']?/gi,
       /data-version=["']?([^"']+)["']?/gi,
@@ -206,7 +242,7 @@ export function extractDateFromHTML(htmlContent) {
         const dateValue = match[1];
         if (dateValue && dateValue.trim().length > 0) {
           const cleaned = dateValue.trim();
-          if (cleaned.length > 0 && cleaned.length < 100) {
+          if (cleaned !== '2024-01-01' && cleaned.length > 0 && cleaned.length < 100) {
             console.log(`Found date in data attribute: ${cleaned}`);
             return cleaned;
           }
@@ -214,10 +250,13 @@ export function extractDateFromHTML(htmlContent) {
       }
     }
 
-    // Try common eCFR.gov text patterns
+    // PRIORITY 5: Try common eCFR.gov text patterns
     const textDatePatterns = [
-      /(?:Effective|Last updated|Published|Modified|Version|Date)[\s:]+(?:as of|on)?[\s:]*([A-Za-z]+\s+\d{1,2},?\s+\d{4})/gi,
+      // Format: "Mar. 20, 1997" or "March 20, 1997"
+      /(?:Effective|Last updated|Published|Modified|Version|Date)[\s:]+(?:as of|on)?[\s:]*([A-Z][a-z]{2,8}\.?\s+\d{1,2},?\s+\d{4})/gi,
+      // Format: "03/20/1997" or "20/03/1997"
       /(?:Effective|Last updated|Published|Modified|Version|Date)[\s:]+(?:as of|on)?[\s:]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/gi,
+      // Format: "1997-03-20"
       /(?:Effective|Last updated|Published|Modified|Version|Date)[\s:]+(?:as of|on)?[\s:]*(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/gi,
       /<time[^>]*datetime=["']?([^"']+)["']?/gi,
       /<time[^>]*>([^<]+)<\/time>/gi
@@ -229,7 +268,7 @@ export function extractDateFromHTML(htmlContent) {
         const dateValue = match[1];
         if (dateValue && dateValue.trim().length > 0) {
           const cleaned = dateValue.trim();
-          if (cleaned.length > 0 && cleaned.length < 100) {
+          if (cleaned !== '2024-01-01' && cleaned.length > 0 && cleaned.length < 100) {
             console.log(`Found date in text pattern: ${cleaned}`);
             return cleaned;
           }
@@ -237,19 +276,23 @@ export function extractDateFromHTML(htmlContent) {
       }
     }
 
-    // Try looking for date-like strings in the first 5000 characters (header area)
-    const headerSection = htmlContent.substring(0, 5000);
+    // PRIORITY 6: Try looking for date-like strings in the first 10000 characters (header/content area)
+    const headerSection = htmlContent.substring(0, 10000);
     const dateLikePatterns = [
+      // YYYY-MMM-DD format
+      /\b(\d{4}-[A-Z][a-z]{2}-\d{1,2})\b/g,
+      // YYYY-MM-DD format
       /\b(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})\b/g,
-      /\b([A-Za-z]+\s+\d{1,2},?\s+\d{4})\b/g
+      // "Month Day, Year" format
+      /\b([A-Z][a-z]{2,8}\.?\s+\d{1,2},?\s+\d{4})\b/g
     ];
 
     for (const pattern of dateLikePatterns) {
       const matches = [...headerSection.matchAll(pattern)];
       if (matches.length > 0) {
-        // Take the first match that looks like a date
+        // Take the first match that looks like a date and isn't the fallback
         const dateValue = matches[0][1];
-        if (dateValue && dateValue.trim().length > 0) {
+        if (dateValue && dateValue.trim().length > 0 && dateValue !== '2024-01-01') {
           const cleaned = dateValue.trim();
           console.log(`Found date-like string in header: ${cleaned}`);
           return cleaned;
