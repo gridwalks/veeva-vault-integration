@@ -324,66 +324,106 @@ async function indexRegulation(item, granuleData, pool, batchId) {
       detailsLink: regulationData.detailsLink
     });
 
-    // Determine download URL (try htmlLink first, fallback to detailsLink)
-    let downloadUrl = regulationData.htmlLink || regulationData.detailsLink;
-    if (!downloadUrl) {
-      throw new Error(`No download URL available for ${type} ${id}`);
+    // Determine download URL - try multiple sources in order of preference
+    const urlSources = [
+      { url: regulationData.htmlLink, type: 'html', label: 'htmlLink' },
+      { url: regulationData.txtLink, type: 'text', label: 'txtLink' },
+      { url: regulationData.xmlLink, type: 'xml', label: 'xmlLink' },
+      { url: regulationData.detailsLink, type: 'html', label: 'detailsLink' }
+    ].filter(source => source.url); // Only include sources that have URLs
+
+    if (urlSources.length === 0) {
+      throw new Error(`No download URL available for ${type} ${id}. Available links: htmlLink=${!!regulationData.htmlLink}, txtLink=${!!regulationData.txtLink}, xmlLink=${!!regulationData.xmlLink}, detailsLink=${!!regulationData.detailsLink}`);
     }
 
-    // Download HTML content
+    // Try each URL source until one works
     let htmlContent;
     let extractionMethod = 'html';
-    try {
-      console.log(`Attempting to download from: ${downloadUrl}`);
-      htmlContent = await downloadHTMLContent(downloadUrl);
-      console.log(`Successfully downloaded ${htmlContent.length} characters`);
-    } catch (error) {
-      console.error(`Download failed from ${downloadUrl}:`, error.message);
-      // Try fallback URL if htmlLink failed
-      if (regulationData.htmlLink && regulationData.detailsLink && downloadUrl === regulationData.htmlLink) {
-        console.log(`htmlLink failed, trying detailsLink as fallback: ${regulationData.detailsLink}`);
-        downloadUrl = regulationData.detailsLink;
-        try {
-          htmlContent = await downloadHTMLContent(downloadUrl);
-          console.log(`Successfully downloaded ${htmlContent.length} characters from fallback URL`);
-        } catch (fallbackError) {
-          console.error(`Fallback download also failed:`, fallbackError.message);
-          throw new Error(`Failed to download from both URLs. htmlLink: ${error.message}, detailsLink: ${fallbackError.message}`);
+    let downloadUrl;
+    let lastError;
+    
+    for (const source of urlSources) {
+      downloadUrl = source.url;
+      extractionMethod = source.type;
+      
+      try {
+        console.log(`Attempting to download from ${source.label}: ${downloadUrl}`);
+        htmlContent = await downloadHTMLContent(downloadUrl);
+        console.log(`Successfully downloaded ${htmlContent.length} characters from ${source.label}`);
+        
+        // For text/XML sources, we got the content directly
+        if (source.type === 'text' || source.type === 'xml') {
+          // Text/XML content is already plain text, no need to extract
+          break;
         }
-      } else {
-        throw error;
+        
+        // For HTML, check if it's actually an error page
+        const lowerContent = htmlContent.toLowerCase();
+        // More specific error page detection - look for error page patterns, not just keywords
+        const isErrorPage = (
+          (lowerContent.includes('<title>') && (
+            lowerContent.includes('access denied') ||
+            lowerContent.includes('forbidden') ||
+            lowerContent.includes('error 403') ||
+            lowerContent.includes('error 404') ||
+            lowerContent.includes('page not found')
+          )) ||
+          lowerContent.includes('http status 403') ||
+          lowerContent.includes('http status 404') ||
+          (lowerContent.includes('403 forbidden') && lowerContent.length < 5000) ||
+          (lowerContent.includes('404 not found') && lowerContent.length < 5000)
+        );
+        
+        if (isErrorPage) {
+          console.warn(`⚠️ ${source.label} appears to be an error page, trying next source...`);
+          lastError = new Error(`Downloaded page appears to be an error or access denied page`);
+          continue; // Try next source
+        }
+        
+        // If we got here and have content, use it
+        break;
+      } catch (error) {
+        console.warn(`⚠️ Download failed from ${source.label}: ${error.message}`);
+        lastError = error;
+        // Continue to next source
+        continue;
       }
     }
-
-    // Extract text from HTML
-    console.log(`Extracting text from HTML (${htmlContent.length} chars)...`);
-    console.log(`HTML preview (first 500 chars):`, htmlContent.substring(0, 500));
     
-    // Check if this looks like an error page or redirect
-    if (htmlContent.toLowerCase().includes('access denied') || 
-        htmlContent.toLowerCase().includes('forbidden') ||
-        htmlContent.toLowerCase().includes('403') ||
-        htmlContent.toLowerCase().includes('404') ||
-        htmlContent.toLowerCase().includes('not found')) {
-      throw new Error(`Downloaded page appears to be an error or access denied page`);
+    // If we exhausted all sources, throw the last error
+    if (!htmlContent) {
+      throw new Error(`Failed to download from all available sources. Last error: ${lastError?.message || 'Unknown error'}. Tried: ${urlSources.map(s => s.label).join(', ')}`);
     }
     
-    let extractedText = extractTextFromHTMLStructured(htmlContent);
-    console.log(`Extracted text length: ${extractedText?.length || 0} characters`);
-    console.log(`Extracted text preview (first 500 chars):`, extractedText?.substring(0, 500) || 'empty');
+    // Extract text based on content type
+    let extractedText;
+    console.log(`Extracting text from ${extractionMethod} content (${htmlContent.length} chars)...`);
+    console.log(`Content preview (first 500 chars):`, htmlContent.substring(0, 500));
     
-    if (!extractedText || extractedText.trim().length < 100) {
-      console.error(`Extracted text too short:`, {
-        length: extractedText?.length || 0,
-        trimmedLength: extractedText?.trim().length || 0,
-        preview: extractedText?.substring(0, 500) || 'empty',
-        htmlLength: htmlContent.length,
-        htmlPreview: htmlContent.substring(0, 500)
-      });
+    if (extractionMethod === 'text') {
+      // Plain text - use as-is, just clean it up
+      extractedText = htmlContent
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+      console.log(`Using plain text content directly: ${extractedText.length} characters`);
+    } else if (extractionMethod === 'xml') {
+      // XML - try to extract text, but XML might need special handling
+      // For now, try basic extraction
+      extractedText = htmlContent
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      console.log(`Extracted text from XML: ${extractedText.length} characters`);
+    } else {
+      // HTML - use structured extraction
+      extractedText = extractTextFromHTMLStructured(htmlContent);
+      console.log(`Extracted text length: ${extractedText?.length || 0} characters`);
+      console.log(`Extracted text preview (first 500 chars):`, extractedText?.substring(0, 500) || 'empty');
       
-      // If extraction failed but we have HTML, try a more aggressive extraction
-      if (htmlContent.length > 1000 && (!extractedText || extractedText.trim().length < 100)) {
-        console.log('Trying fallback extraction method...');
+      if (!extractedText || extractedText.trim().length < 100) {
+        console.warn(`⚠️ Structured extraction produced short text, trying fallback extraction...`);
         // Fallback: remove all tags and get all text
         const fallbackText = htmlContent
           .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
@@ -392,15 +432,24 @@ async function indexRegulation(item, granuleData, pool, batchId) {
           .replace(/\s+/g, ' ')
           .trim();
         
-        if (fallbackText.length > 100) {
-          console.log(`Fallback extraction successful: ${fallbackText.length} chars`);
+        if (fallbackText.length > (extractedText?.length || 0)) {
+          console.log(`Fallback extraction produced ${fallbackText.length} chars (vs ${extractedText?.length || 0} from structured)`);
           extractedText = fallbackText;
         }
       }
-      
-      if (!extractedText || extractedText.trim().length < 100) {
-        throw new Error(`Extracted text too short or empty (${extractedText?.length || 0} chars, trimmed: ${extractedText?.trim().length || 0} chars). HTML length: ${htmlContent.length}. This may indicate the page requires authentication or JavaScript rendering.`);
-      }
+    }
+    
+    if (!extractedText || extractedText.trim().length < 100) {
+      console.error(`Extracted text too short:`, {
+        length: extractedText?.length || 0,
+        trimmedLength: extractedText?.trim().length || 0,
+        preview: extractedText?.substring(0, 500) || 'empty',
+        contentLength: htmlContent.length,
+        contentPreview: htmlContent.substring(0, 500),
+        extractionMethod: extractionMethod,
+        sourceUrl: downloadUrl
+      });
+      throw new Error(`Extracted text too short or empty (${extractedText?.length || 0} chars, trimmed: ${extractedText?.trim().length || 0} chars). Content length: ${htmlContent.length}, Method: ${extractionMethod}. This may indicate the page requires authentication or JavaScript rendering.`);
     }
 
     console.log(`Successfully extracted ${extractedText.length} characters from ${type} ${id}`);
