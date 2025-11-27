@@ -28,10 +28,16 @@ export default function CfrTitle21() {
     try {
       const data = await getIndexedCfrRegulations();
       if (data.success && data.regulations) {
-        // Create a Set of regulation IDs that have chunks
-        const indexedSet = new Set(data.regulations.map(r => r.regulationId));
+        // Create a Set of all possible IDs that could match (regulationId, granuleId, title)
+        const indexedSet = new Set();
+        data.regulations.forEach(r => {
+          if (r.regulationId) indexedSet.add(r.regulationId);
+          if (r.granuleId) indexedSet.add(r.granuleId);
+          if (r.title) indexedSet.add(r.title);
+        });
         setIndexedRegulations(indexedSet);
-        console.log(`Loaded ${indexedSet.size} indexed CFR regulations`);
+        console.log(`Loaded ${data.regulations.length} indexed CFR regulations (${indexedSet.size} unique IDs)`);
+        console.log('Indexed regulation IDs:', Array.from(indexedSet).slice(0, 10));
       }
     } catch (err) {
       console.error("Failed to load indexed CFR regulations", err);
@@ -105,8 +111,14 @@ export default function CfrTitle21() {
   useEffect(() => {
     if (indexedRegulations.size === 0) return; // Don't run if we don't have indexed regulations yet
     
+    console.log('Checking indexed regulations for checkboxes...', {
+      indexedCount: indexedRegulations.size,
+      indexedRegulations: Array.from(indexedRegulations).slice(0, 10) // Log first 10 for debugging
+    });
+    
     setSelectedSubchapters(prev => {
       const newSelectedSubchapters = new Set(prev);
+      let checkedCount = 0;
       
       Object.keys(packageDetails).forEach(packageId => {
         const details = packageDetails[packageId];
@@ -120,19 +132,26 @@ export default function CfrTitle21() {
               const subchapterKey = `${packageId}:${granule.granuleId}:${subchapterId}`;
               
               // Check if this subchapter is indexed (has chunks)
-              if (indexedRegulations.has(subchapterId)) {
+              // Try both granuleId and title formats
+              if (indexedRegulations.has(subchapterId) || 
+                  (subchapter.granuleId && indexedRegulations.has(subchapter.granuleId)) ||
+                  (subchapter.title && indexedRegulations.has(subchapter.title))) {
                 newSelectedSubchapters.add(subchapterKey);
+                checkedCount++;
+                console.log(`✓ Checking subchapter: ${subchapterKey} (ID: ${subchapterId})`);
               }
             });
           }
         });
       });
       
+      console.log(`Checked ${checkedCount} subchapters`);
       return newSelectedSubchapters;
     });
     
     setSelectedParts(prev => {
       const newSelectedParts = new Set(prev);
+      let checkedCount = 0;
       
       Object.keys(packageDetails).forEach(packageId => {
         const details = packageDetails[packageId];
@@ -149,8 +168,14 @@ export default function CfrTitle21() {
                 subchapter.parts.forEach(part => {
                   const partId = part.granuleId || part.title;
                   const partKey = `${subchapterKey}:${partId}`;
-                  if (indexedRegulations.has(partId)) {
+                  
+                  // Try multiple matching strategies
+                  if (indexedRegulations.has(partId) || 
+                      (part.granuleId && indexedRegulations.has(part.granuleId)) ||
+                      (part.title && indexedRegulations.has(part.title))) {
                     newSelectedParts.add(partKey);
+                    checkedCount++;
+                    console.log(`✓ Checking part: ${partKey} (ID: ${partId})`);
                   }
                 });
               }
@@ -162,14 +187,21 @@ export default function CfrTitle21() {
             granule.parts.forEach(part => {
               const partId = part.granuleId || part.title;
               const partKey = `${packageId}:${granule.granuleId}::${partId}`;
-              if (indexedRegulations.has(partId)) {
+              
+              // Try multiple matching strategies
+              if (indexedRegulations.has(partId) || 
+                  (part.granuleId && indexedRegulations.has(part.granuleId)) ||
+                  (part.title && indexedRegulations.has(part.title))) {
                 newSelectedParts.add(partKey);
+                checkedCount++;
+                console.log(`✓ Checking part (direct): ${partKey} (ID: ${partId})`);
               }
             });
           }
         });
       });
       
+      console.log(`Checked ${checkedCount} parts`);
       return newSelectedParts;
     });
   }, [indexedRegulations, packageDetails]); // Run when indexedRegulations or packageDetails change
