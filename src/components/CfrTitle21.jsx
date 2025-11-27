@@ -201,7 +201,10 @@ export default function CfrTitle21() {
         });
       });
       
-      console.log(`Checked ${checkedCount} parts`);
+      console.log(`Checked ${checkedCount} parts`, {
+        totalInSet: newSelectedParts.size,
+        sampleKeys: Array.from(newSelectedParts).slice(0, 5)
+      });
       return newSelectedParts;
     });
   }, [indexedRegulations, packageDetails]); // Run when indexedRegulations or packageDetails change
@@ -651,7 +654,16 @@ export default function CfrTitle21() {
 }
 
 function GranuleItem({ granule, packageId, selectedSubchapters, selectedParts, indexedRegulations, onToggleSubchapter, onTogglePart }) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Auto-expand if this granule has indexed subchapters or parts
+  const hasIndexedSubchapters = granule.subchapters?.some(sc => {
+    const scId = sc.granuleId || sc.title;
+    return indexedRegulations.has(scId) || (sc.granuleId && indexedRegulations.has(sc.granuleId)) || (sc.title && indexedRegulations.has(sc.title));
+  });
+  const hasIndexedParts = granule.parts?.some(p => {
+    const pId = p.granuleId || p.title;
+    return indexedRegulations.has(pId) || (p.granuleId && indexedRegulations.has(p.granuleId)) || (p.title && indexedRegulations.has(p.title));
+  });
+  const [isExpanded, setIsExpanded] = useState(hasIndexedSubchapters || false);
   const hasSubchapters = granule.subchapters && granule.subchapters.length > 0;
   const hasParts = granule.parts && granule.parts.length > 0;
 
@@ -739,6 +751,14 @@ function GranuleItem({ granule, packageId, selectedSubchapters, selectedParts, i
               const subchapterKey = `${packageId}:${granule.granuleId}:${subchapterId}`;
               const isChecked = selectedSubchapters.has(subchapterKey);
               const isIndexed = indexedRegulations.has(subchapterId);
+              
+              // Count how many parts in this subchapter are indexed
+              const indexedPartsCount = subchapter.parts?.filter(part => {
+                const partId = part.granuleId || part.title;
+                return indexedRegulations.has(partId) || 
+                       (part.granuleId && indexedRegulations.has(part.granuleId)) ||
+                       (part.title && indexedRegulations.has(part.title));
+              }).length || 0;
               return (
                 <div
                   key={subchapterId}
@@ -772,6 +792,18 @@ function GranuleItem({ granule, packageId, selectedSubchapters, selectedParts, i
                           fontWeight: "600"
                         }}>
                           ✓ Indexed
+                        </span>
+                      )}
+                      {indexedPartsCount > 0 && (
+                        <span style={{
+                          fontSize: "9px",
+                          backgroundColor: "#dbeafe",
+                          color: "#1e40af",
+                          padding: "2px 6px",
+                          borderRadius: "10px",
+                          fontWeight: "600"
+                        }}>
+                          {indexedPartsCount} part{indexedPartsCount !== 1 ? 's' : ''} indexed
                         </span>
                       )}
                     </div>
