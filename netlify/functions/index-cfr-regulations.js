@@ -100,7 +100,8 @@ async function downloadHTMLContent(url) {
 
 // Function to chunk and embed regulation text
 async function chunkAndEmbedRegulation(regulationText, regulationId, pool, startTime = Date.now()) {
-  const MAX_CHUNK_PROCESSING_TIME = 20000; // 20 seconds
+  // Allow up to 50 seconds for chunk processing (function timeout is 60s, leave buffer)
+  const MAX_CHUNK_PROCESSING_TIME = 50000;
   try {
     // Validate input text
     if (!regulationText || typeof regulationText !== 'string') {
@@ -744,7 +745,8 @@ async function indexRegulation(item, granuleData, pool, batchId) {
 
 export const handler = async (event) => {
   const startTime = Date.now();
-  const MAX_EXECUTION_TIME = 25000; // 25 seconds
+  // Netlify function timeout is 60 seconds, leave 5 second buffer
+  const MAX_EXECUTION_TIME = 55000; // 25 seconds
 
   console.log('=== CFR REGULATION INDEXING STARTED ===');
   console.log('Event method:', event.httpMethod);
@@ -874,16 +876,22 @@ export const handler = async (event) => {
     // Process each item
     console.log(`Starting to process ${itemsToIndex.length} items...`);
     for (let i = 0; i < itemsToIndex.length; i++) {
-      // Check timeout
+      // Check timeout - calculate remaining time per item
       const elapsedTime = Date.now() - startTime;
-      if (elapsedTime > MAX_EXECUTION_TIME) {
-        console.warn(`⏰ Approaching timeout, stopping processing`);
+      const remainingTime = MAX_EXECUTION_TIME - elapsedTime;
+      const avgTimePerItem = elapsedTime / Math.max(i, 1);
+      const estimatedTimeForRemaining = avgTimePerItem * (itemsToIndex.length - i);
+      
+      // Stop if we're out of time or if remaining items would exceed timeout
+      if (elapsedTime > MAX_EXECUTION_TIME || (remainingTime < 10000 && estimatedTimeForRemaining > remainingTime)) {
+        console.warn(`⏰ Approaching timeout (${elapsedTime}ms elapsed, ${remainingTime}ms remaining), stopping processing`);
+        console.warn(`   Processed ${i}/${itemsToIndex.length} items. Estimated time for remaining: ${estimatedTimeForRemaining}ms`);
         results.push({
           success: false,
           regulationId: itemsToIndex[i].id,
           regulationType: itemsToIndex[i].type,
           title: itemsToIndex[i].title || itemsToIndex[i].id,
-          error: 'Processing timeout - not all items were processed',
+          error: `Processing timeout - not all items were processed (${i}/${itemsToIndex.length} completed)`,
           chunksCreated: 0
         });
         break;

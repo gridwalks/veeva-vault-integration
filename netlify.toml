@@ -29,6 +29,9 @@
 [functions."accept-regenerated-summary"]
   timeout = 10
 
+[functions."index-cfr-regulations"]
+  timeout = 60
+
 [build.environment]
   NODE_VERSION = "18"
 
