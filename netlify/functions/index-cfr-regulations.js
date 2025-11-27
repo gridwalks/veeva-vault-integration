@@ -3,6 +3,11 @@ import { OpenAI } from "openai";
 import { chunkText, validateChunks } from './chunking-utils.js';
 import { extractTextFromHTMLStructured } from './html-extraction-utils.js';
 
+// Validate OpenAI API key
+if (!process.env.OPENAI_API_KEY) {
+  console.warn('⚠️ OPENAI_API_KEY environment variable is not set. Embeddings will fail.');
+}
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -97,13 +102,36 @@ async function downloadHTMLContent(url) {
 async function chunkAndEmbedRegulation(regulationText, regulationId, pool, startTime = Date.now()) {
   const MAX_CHUNK_PROCESSING_TIME = 20000; // 20 seconds
   try {
+    // Validate input text
+    if (!regulationText || typeof regulationText !== 'string') {
+      const errorMsg = `Invalid regulation text: ${regulationText === null ? 'null' : regulationText === undefined ? 'undefined' : typeof regulationText}`;
+      console.error(`❌ ${errorMsg} for regulation ${regulationId}`);
+      return { 
+        success: false, 
+        chunksCreated: 0,
+        error: errorMsg
+      };
+    }
+
+    const trimmedText = regulationText.trim();
+    if (trimmedText.length < 20) {
+      const errorMsg = `Regulation text too short (${trimmedText.length} chars after trimming). Minimum 20 characters required.`;
+      console.error(`❌ ${errorMsg} for regulation ${regulationId}`);
+      return { 
+        success: false, 
+        chunksCreated: 0,
+        error: errorMsg
+      };
+    }
+
     console.log(`Starting chunking process for regulation ${regulationId}...`, {
-      textLength: regulationText?.length || 0,
-      textPreview: regulationText?.substring(0, 100) || 'No text'
+      textLength: regulationText.length,
+      trimmedLength: trimmedText.length,
+      textPreview: trimmedText.substring(0, 100)
     });
     
     // Chunk the regulation text
-    const chunks = chunkText(regulationText, 512, 50); // 512 tokens per chunk with 50 token overlap
+    const chunks = chunkText(trimmedText, 512, 50); // 512 tokens per chunk with 50 token overlap
     console.log(`Initial chunking created ${chunks.length} chunks`);
     
     const validChunks = validateChunks(chunks);
@@ -137,6 +165,11 @@ async function chunkAndEmbedRegulation(regulationText, regulationId, pool, start
       const batchChunks = validChunks.slice(i, Math.min(i + batchSize, validChunks.length));
       
       try {
+        // Check if API key is configured
+        if (!process.env.OPENAI_API_KEY) {
+          throw new Error('OPENAI_API_KEY environment variable is not set. Please configure it in Netlify environment variables.');
+        }
+
         // Generate embeddings for the batch
         const embeddingResponse = await openai.embeddings.create({
           model: "text-embedding-ada-002",
@@ -149,34 +182,77 @@ async function chunkAndEmbedRegulation(regulationText, regulationId, pool, start
           const embedding = embeddingResponse.data[j].embedding;
           const embeddingStr = '[' + embedding.join(',') + ']';
 
-          await pool.query(`
-            INSERT INTO cfr_title21_regulation_chunks 
-            (regulation_id, chunk_index, chunk_text, embedding, token_count)
-            VALUES ($1, $2, $3, $4::vector, $5)
-            ON CONFLICT (regulation_id, chunk_index) 
-            DO UPDATE SET chunk_text = $3, embedding = $4::vector, token_count = $5, created_at = CURRENT_TIMESTAMP
-          `, [
-            regulationId,
-            chunk.index,
-            chunk.text,
-            embeddingStr,
-            chunk.tokenCount
-          ]);
+          try {
+            const insertResult = await pool.query(`
+              INSERT INTO cfr_title21_regulation_chunks 
+              (regulation_id, chunk_index, chunk_text, embedding, token_count)
+              VALUES ($1, $2, $3, $4::vector, $5)
+              ON CONFLICT (regulation_id, chunk_index) 
+              DO UPDATE SET chunk_text = $3, embedding = $4::vector, token_count = $5, created_at = CURRENT_TIMESTAMP
+            `, [
+              regulationId,
+              chunk.index,
+              chunk.text,
+              embeddingStr,
+              chunk.tokenCount
+            ]);
 
-          chunksCreated++;
+            if (insertResult.rowCount === 0) {
+              console.warn(`⚠️ No rows affected when inserting chunk ${chunk.index} for regulation ${regulationId}`);
+            }
+
+            chunksCreated++;
+            console.log(`✓ Created chunk ${chunk.index} for regulation ${regulationId} (${chunk.text.length} chars, ${chunk.tokenCount} tokens)`);
+          } catch (dbError) {
+            console.error(`❌ Database error inserting chunk ${chunk.index} for regulation ${regulationId}:`, dbError);
+            console.error(`   Chunk text preview: ${chunk.text.substring(0, 100)}`);
+            // Continue with next chunk instead of failing entire batch
+          }
         }
       } catch (batchError) {
         console.error(`Error processing embedding batch:`, batchError);
-        // Continue with next batch
+        
+        // Check if it's an API key error
+        if (batchError.code === 'invalid_api_key' || batchError.message?.includes('API key')) {
+          const errorMsg = 'Invalid OpenAI API key. Please check your OPENAI_API_KEY environment variable in Netlify settings.';
+          console.error(`❌ ${errorMsg}`);
+          // Return error immediately instead of continuing
+          return { 
+            success: false, 
+            chunksCreated, 
+            error: errorMsg 
+          };
+        }
+        
+        // For other errors, continue with next batch but log the error
+        console.warn(`Continuing with next batch after error: ${batchError.message}`);
       }
     }
 
+    if (chunksCreated === 0 && validChunks.length > 0) {
+      // If we have chunks but none were created, it means all batches failed
+      const errorMsg = 'Failed to create embeddings for any chunks. Check OpenAI API key configuration.';
+      console.error(`❌ ${errorMsg}`);
+      return { success: false, chunksCreated: 0, error: errorMsg };
+    }
+
     console.log(`Successfully created ${chunksCreated} chunks with embeddings for regulation ${regulationId}`);
-    return { success: true, chunksCreated };
+    return { 
+      success: chunksCreated > 0, 
+      chunksCreated,
+      error: chunksCreated === 0 && validChunks.length > 0 ? 'Failed to create embeddings' : undefined
+    };
 
   } catch (error) {
     console.error(`Error in chunkAndEmbedRegulation for ${regulationId}:`, error);
-    return { success: false, chunksCreated: 0, error: error.message };
+    
+    // Provide more helpful error messages
+    let errorMessage = error.message;
+    if (error.code === 'invalid_api_key' || error.message?.includes('API key')) {
+      errorMessage = 'Invalid OpenAI API key. Please check your OPENAI_API_KEY environment variable in Netlify settings.';
+    }
+    
+    return { success: false, chunksCreated: 0, error: errorMessage };
   }
 }
 
@@ -380,8 +456,29 @@ async function indexRegulation(item, granuleData, pool, batchId) {
       }
     }
 
+    // Validate that we have text to chunk before proceeding
+    if (!extractedText || extractedText.trim().length === 0) {
+      const errorMsg = `Cannot chunk regulation ${id}: extracted text is empty (${extractedText?.length || 0} chars)`;
+      console.error(`❌ ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+
+    if (extractedText.trim().length < 20) {
+      console.warn(`⚠️ Warning: Regulation ${id} has very short text (${extractedText.trim().length} chars). Chunking may produce no valid chunks.`);
+    }
+
     // Chunk and embed the regulation
+    console.log(`Starting chunking for regulation ${id} (DB ID: ${regulationDbId}) with ${extractedText.length} characters of text`);
     const chunkResult = await chunkAndEmbedRegulation(extractedText, regulationDbId, pool, startTime);
+    
+    if (!chunkResult.success || chunkResult.chunksCreated === 0) {
+      const errorDetails = chunkResult.error || 'Unknown error';
+      console.error(`❌ Chunking failed for regulation ${id} (DB ID: ${regulationDbId}):`, errorDetails);
+      console.error(`   Text length: ${extractedText.length}, Text preview: ${extractedText.substring(0, 200)}`);
+      // Don't throw - we still want to save the regulation, but log the error clearly
+    } else {
+      console.log(`✅ Successfully chunked regulation ${id}: ${chunkResult.chunksCreated} chunks created`);
+    }
 
     const processingDuration = Date.now() - startTime;
 
