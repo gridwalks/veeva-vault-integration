@@ -472,8 +472,34 @@ async function indexRegulation(item, granuleData, pool, batchId) {
       }
     }
     
-    // If we exhausted all sources, throw the last error
+    // If we exhausted all sources, check if we can skip based on existing data
     if (!htmlContent) {
+      // If regulation exists with chunks, we can skip reindexing even if download fails
+      if (existingReg.rows.length > 0) {
+        const chunkCheck = await pool.query(
+          'SELECT COUNT(*) as count FROM cfr_title21_regulation_chunks WHERE regulation_id = $1',
+          [existingReg.rows[0].id]
+        );
+        const chunkCount = parseInt(chunkCheck.rows[0].count);
+        
+        if (chunkCount > 0) {
+          console.warn(`⚠️ Download failed for regulation ${id}, but ${chunkCount} chunks already exist. Skipping reindexing.`);
+          console.warn(`   Download error: ${lastError?.message || 'Unknown error'}`);
+          console.warn(`   Tried sources: ${urlSources.map(s => s.label).join(', ')}`);
+          return {
+            success: true,
+            regulationId: id,
+            regulationType: type,
+            title: regulationData.title || id,
+            chunksCreated: chunkCount,
+            skipped: true,
+            warning: `Download failed but regulation already indexed (${chunkCount} chunks exist)`,
+            processingDuration: Date.now() - startTime
+          };
+        }
+      }
+      
+      // If we get here, either regulation doesn't exist or has no chunks, so we need to fail
       throw new Error(`Failed to download from all available sources. Last error: ${lastError?.message || 'Unknown error'}. Tried: ${urlSources.map(s => s.label).join(', ')}`);
     }
     
