@@ -130,6 +130,17 @@ async function chunkAndEmbedRegulation(regulationText, regulationId, pool, start
       textPreview: trimmedText.substring(0, 100)
     });
     
+    // Check if API key is configured early
+    if (!process.env.OPENAI_API_KEY) {
+      const errorMsg = 'OPENAI_API_KEY environment variable is not set. Please configure it in Netlify environment variables to enable chunking with embeddings.';
+      console.error(`❌ ${errorMsg} for regulation ${regulationId}`);
+      return { 
+        success: false, 
+        chunksCreated: 0,
+        error: errorMsg
+      };
+    }
+    
     // Chunk the regulation text
     const chunks = chunkText(trimmedText, 512, 50); // 512 tokens per chunk with 50 token overlap
     console.log(`Initial chunking created ${chunks.length} chunks`);
@@ -165,12 +176,8 @@ async function chunkAndEmbedRegulation(regulationText, regulationId, pool, start
       const batchChunks = validChunks.slice(i, Math.min(i + batchSize, validChunks.length));
       
       try {
-        // Check if API key is configured
-        if (!process.env.OPENAI_API_KEY) {
-          throw new Error('OPENAI_API_KEY environment variable is not set. Please configure it in Netlify environment variables.');
-        }
-
         // Generate embeddings for the batch
+        // Note: API key is already checked earlier in the function
         const embeddingResponse = await openai.embeddings.create({
           model: "text-embedding-ada-002",
           input: batchChunks.map(chunk => chunk.text),
@@ -210,11 +217,14 @@ async function chunkAndEmbedRegulation(regulationText, regulationId, pool, start
           }
         }
       } catch (batchError) {
-        console.error(`Error processing embedding batch:`, batchError);
+        console.error(`Error processing embedding batch ${Math.floor(i / batchSize) + 1} for regulation ${regulationId}:`, batchError);
         
         // Check if it's an API key error
-        if (batchError.code === 'invalid_api_key' || batchError.message?.includes('API key')) {
-          const errorMsg = 'Invalid OpenAI API key. Please check your OPENAI_API_KEY environment variable in Netlify settings.';
+        if (batchError.code === 'invalid_api_key' || 
+            batchError.message?.includes('API key') || 
+            batchError.message?.includes('authentication') ||
+            batchError.status === 401) {
+          const errorMsg = 'Invalid or missing OpenAI API key. Please check your OPENAI_API_KEY environment variable in Netlify settings.';
           console.error(`❌ ${errorMsg}`);
           // Return error immediately instead of continuing
           return { 
