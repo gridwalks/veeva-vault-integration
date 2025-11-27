@@ -182,6 +182,7 @@ export async function initDatabase() {
         full_text TEXT,
         ai_summary TEXT,
         extraction_method VARCHAR(100),
+        source_date VARCHAR(255),
         indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -209,6 +210,26 @@ export async function initDatabase() {
     `);
 
     console.log('CFR Title 21 regulations table created or already exists');
+
+    // Add source_date column if it doesn't exist (migration for existing databases)
+    try {
+      await client.query(`
+        DO $$ 
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'cfr_title21_regulations' 
+            AND column_name = 'source_date'
+          ) THEN
+            ALTER TABLE cfr_title21_regulations ADD COLUMN source_date VARCHAR(255);
+            RAISE NOTICE 'Added source_date column to cfr_title21_regulations';
+          END IF;
+        END $$;
+      `);
+      console.log('Verified source_date column exists in cfr_title21_regulations');
+    } catch (migrationError) {
+      console.warn('Error checking/adding source_date column (may already exist):', migrationError.message);
+    }
 
     // Create CFR Title 21 regulation chunks table
     await client.query(`

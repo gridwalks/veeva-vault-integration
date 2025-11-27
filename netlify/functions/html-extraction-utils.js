@@ -160,3 +160,108 @@ export function extractTextFromHTMLStructured(htmlContent) {
   }
 }
 
+/**
+ * Extract date/version from HTML content (eCFR.gov specific)
+ * Looks for date information in meta tags, headers, and content
+ * @param {string} htmlContent - The HTML content to extract date from
+ * @returns {string|null} Extracted date string in whatever format found, or null if not found
+ */
+export function extractDateFromHTML(htmlContent) {
+  if (!htmlContent || typeof htmlContent !== 'string') {
+    return null;
+  }
+
+  try {
+    // Try meta tags first (common in eCFR.gov)
+    const metaDatePatterns = [
+      /<meta[^>]*name=["']?(date|datePublished|dateModified|effectiveDate|lastModified|versionDate)["']?[^>]*content=["']?([^"']+)["']?/gi,
+      /<meta[^>]*property=["']?(og:updated_time|article:published_time|article:modified_time)["']?[^>]*content=["']?([^"']+)["']?/gi,
+      /<meta[^>]*content=["']?([^"']*date[^"']*)["']?[^>]*/gi
+    ];
+
+    for (const pattern of metaDatePatterns) {
+      const matches = [...htmlContent.matchAll(pattern)];
+      for (const match of matches) {
+        const dateValue = match[2] || match[1];
+        if (dateValue && dateValue.trim().length > 0) {
+          const cleaned = dateValue.trim();
+          if (cleaned.length > 0 && cleaned.length < 100) { // Reasonable date length
+            console.log(`Found date in meta tag: ${cleaned}`);
+            return cleaned;
+          }
+        }
+      }
+    }
+
+    // Try data attributes
+    const dataDatePatterns = [
+      /data-date=["']?([^"']+)["']?/gi,
+      /data-version=["']?([^"']+)["']?/gi,
+      /data-effective-date=["']?([^"']+)["']?/gi
+    ];
+
+    for (const pattern of dataDatePatterns) {
+      const matches = [...htmlContent.matchAll(pattern)];
+      for (const match of matches) {
+        const dateValue = match[1];
+        if (dateValue && dateValue.trim().length > 0) {
+          const cleaned = dateValue.trim();
+          if (cleaned.length > 0 && cleaned.length < 100) {
+            console.log(`Found date in data attribute: ${cleaned}`);
+            return cleaned;
+          }
+        }
+      }
+    }
+
+    // Try common eCFR.gov text patterns
+    const textDatePatterns = [
+      /(?:Effective|Last updated|Published|Modified|Version|Date)[\s:]+(?:as of|on)?[\s:]*([A-Za-z]+\s+\d{1,2},?\s+\d{4})/gi,
+      /(?:Effective|Last updated|Published|Modified|Version|Date)[\s:]+(?:as of|on)?[\s:]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/gi,
+      /(?:Effective|Last updated|Published|Modified|Version|Date)[\s:]+(?:as of|on)?[\s:]*(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/gi,
+      /<time[^>]*datetime=["']?([^"']+)["']?/gi,
+      /<time[^>]*>([^<]+)<\/time>/gi
+    ];
+
+    for (const pattern of textDatePatterns) {
+      const matches = [...htmlContent.matchAll(pattern)];
+      for (const match of matches) {
+        const dateValue = match[1];
+        if (dateValue && dateValue.trim().length > 0) {
+          const cleaned = dateValue.trim();
+          if (cleaned.length > 0 && cleaned.length < 100) {
+            console.log(`Found date in text pattern: ${cleaned}`);
+            return cleaned;
+          }
+        }
+      }
+    }
+
+    // Try looking for date-like strings in the first 5000 characters (header area)
+    const headerSection = htmlContent.substring(0, 5000);
+    const dateLikePatterns = [
+      /\b(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})\b/g,
+      /\b([A-Za-z]+\s+\d{1,2},?\s+\d{4})\b/g
+    ];
+
+    for (const pattern of dateLikePatterns) {
+      const matches = [...headerSection.matchAll(pattern)];
+      if (matches.length > 0) {
+        // Take the first match that looks like a date
+        const dateValue = matches[0][1];
+        if (dateValue && dateValue.trim().length > 0) {
+          const cleaned = dateValue.trim();
+          console.log(`Found date-like string in header: ${cleaned}`);
+          return cleaned;
+        }
+      }
+    }
+
+    console.log('No date found in HTML content');
+    return null;
+  } catch (error) {
+    console.error('Error extracting date from HTML:', error);
+    return null;
+  }
+}
+

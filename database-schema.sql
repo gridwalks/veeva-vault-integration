@@ -399,6 +399,7 @@ CREATE TABLE IF NOT EXISTS cfr_title21_regulations (
   full_text TEXT, -- extracted regulation content
   ai_summary TEXT,
   extraction_method VARCHAR(100),
+  source_date VARCHAR(255), -- date/version from eCFR source to track changes
   indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

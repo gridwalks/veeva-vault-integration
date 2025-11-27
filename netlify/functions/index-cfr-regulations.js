@@ -1,7 +1,7 @@
 import { getPool, initDatabase } from "./db.js";
 import { OpenAI } from "openai";
 import { chunkText, validateChunks } from './chunking-utils.js';
-import { extractTextFromHTMLStructured } from './html-extraction-utils.js';
+import { extractTextFromHTMLStructured, extractDateFromHTML } from './html-extraction-utils.js';
 
 // Validate OpenAI API key
 if (!process.env.OPENAI_API_KEY) {
@@ -321,8 +321,55 @@ async function indexRegulation(item, granuleData, pool, batchId) {
       title: regulationData.title,
       granuleId: regulationData.granuleId,
       htmlLink: regulationData.htmlLink,
-      detailsLink: regulationData.detailsLink
+      detailsLink: regulationData.detailsLink,
+      dateIssued: regulationData.dateIssued
     });
+
+    // Extract source_date - try API data first, will fallback to HTML extraction later if needed
+    let sourceDate = regulationData.dateIssued || regulationData.issueDate || null;
+    if (sourceDate) {
+      console.log(`Source date from API data: ${sourceDate}`);
+    }
+
+    // Check if regulation already exists and get stored source_date
+    console.log(`Checking if regulation ${id} already exists in database...`);
+    const existingReg = await pool.query(
+      'SELECT id, source_date FROM cfr_title21_regulations WHERE regulation_id = $1',
+      [id]
+    );
+    console.log(`Existing regulation check: ${existingReg.rows.length > 0 ? 'found' : 'not found'}`);
+
+    // If regulation exists and we have a source_date, check if we can skip reindexing
+    if (existingReg.rows.length > 0 && sourceDate) {
+      const storedSourceDate = existingReg.rows[0].source_date;
+      if (storedSourceDate && storedSourceDate === sourceDate) {
+        // Check if chunks exist
+        const chunkCheck = await pool.query(
+          'SELECT COUNT(*) as count FROM cfr_title21_regulation_chunks WHERE regulation_id = $1',
+          [existingReg.rows[0].id]
+        );
+        const chunkCount = parseInt(chunkCheck.rows[0].count);
+        
+        if (chunkCount > 0) {
+          console.log(`⏭️ Skipping reindexing for regulation ${id}: source_date unchanged (${sourceDate}) and ${chunkCount} chunks exist`);
+          return {
+            success: true,
+            regulationId: id,
+            regulationType: type,
+            title: regulationData.title || id,
+            chunksCreated: chunkCount,
+            skipped: true,
+            processingDuration: Date.now() - startTime
+          };
+        } else {
+          console.log(`Source date matches but no chunks exist, will reindex`);
+        }
+      } else if (storedSourceDate && storedSourceDate !== sourceDate) {
+        console.log(`Source date changed: stored="${storedSourceDate}", new="${sourceDate}". Will reindex.`);
+      } else if (!storedSourceDate) {
+        console.log(`No stored source_date found, will extract and store date`);
+      }
+    }
 
     // Determine download URL - try multiple sources in order of preference
     const urlSources = [
@@ -454,13 +501,43 @@ async function indexRegulation(item, granuleData, pool, batchId) {
 
     console.log(`Successfully extracted ${extractedText.length} characters from ${type} ${id}`);
 
-    // Check if regulation already exists
-    console.log(`Checking if regulation ${id} already exists in database...`);
-    const existingReg = await pool.query(
-      'SELECT id FROM cfr_title21_regulations WHERE regulation_id = $1',
-      [id]
-    );
-    console.log(`Existing regulation check: ${existingReg.rows.length > 0 ? 'found' : 'not found'}`);
+    // Extract source_date from HTML if we don't have it from API
+    if (!sourceDate && htmlContent && (extractionMethod === 'html' || extractionMethod === 'xml')) {
+      console.log(`Attempting to extract source_date from ${extractionMethod} content...`);
+      const extractedDate = extractDateFromHTML(htmlContent);
+      if (extractedDate) {
+        sourceDate = extractedDate;
+        console.log(`Extracted source_date from ${extractionMethod}: ${sourceDate}`);
+      } else {
+        console.log(`Could not extract source_date from ${extractionMethod} content`);
+      }
+    }
+
+    // If we now have a source_date and regulation exists, check again before reindexing
+    if (existingReg.rows.length > 0 && sourceDate) {
+      const storedSourceDate = existingReg.rows[0].source_date;
+      if (storedSourceDate && storedSourceDate === sourceDate) {
+        // Check if chunks exist
+        const chunkCheck = await pool.query(
+          'SELECT COUNT(*) as count FROM cfr_title21_regulation_chunks WHERE regulation_id = $1',
+          [existingReg.rows[0].id]
+        );
+        const chunkCount = parseInt(chunkCheck.rows[0].count);
+        
+        if (chunkCount > 0) {
+          console.log(`⏭️ Skipping reindexing for regulation ${id}: source_date unchanged (${sourceDate}) and ${chunkCount} chunks exist`);
+          return {
+            success: true,
+            regulationId: id,
+            regulationType: type,
+            title: regulationData.title || id,
+            chunksCreated: chunkCount,
+            skipped: true,
+            processingDuration: Date.now() - startTime
+          };
+        }
+      }
+    }
 
     let regulationDbId;
     if (existingReg.rows.length > 0) {
@@ -471,8 +548,8 @@ async function indexRegulation(item, granuleData, pool, batchId) {
         UPDATE cfr_title21_regulations 
         SET title = $1, granule_id = $2, chapter_id = $3, subchapter_id = $4,
             html_link = $5, details_link = $6, full_text = $7, 
-            extraction_method = $8, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $9
+            extraction_method = $8, source_date = $9, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $10
         RETURNING id
       `, [
         regulationData.title || id,
@@ -483,17 +560,18 @@ async function indexRegulation(item, granuleData, pool, batchId) {
         regulationData.detailsLink || null,
         extractedText,
         extractionMethod,
+        sourceDate || null,
         regulationDbId
       ]);
-      console.log(`Updated existing regulation record: ${id} (DB ID: ${regulationDbId}), rows affected: ${updateResult.rowCount}`);
+      console.log(`Updated existing regulation record: ${id} (DB ID: ${regulationDbId}), source_date: ${sourceDate || 'null'}, rows affected: ${updateResult.rowCount}`);
     } else {
       // Create new record
       console.log(`Creating new regulation record for ${id}...`);
       const insertResult = await pool.query(`
         INSERT INTO cfr_title21_regulations 
         (regulation_id, regulation_type, title, granule_id, chapter_id, subchapter_id,
-         html_link, details_link, full_text, extraction_method)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         html_link, details_link, full_text, extraction_method, source_date)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING id
       `, [
         id,
@@ -505,10 +583,11 @@ async function indexRegulation(item, granuleData, pool, batchId) {
         regulationData.htmlLink || null,
         regulationData.detailsLink || null,
         extractedText,
-        extractionMethod
+        extractionMethod,
+        sourceDate || null
       ]);
       regulationDbId = insertResult.rows[0]?.id;
-      console.log(`Created new regulation record: ${id} (DB ID: ${regulationDbId}), rows inserted: ${insertResult.rowCount}`);
+      console.log(`Created new regulation record: ${id} (DB ID: ${regulationDbId}), source_date: ${sourceDate || 'null'}, rows inserted: ${insertResult.rowCount}`);
       
       if (!regulationDbId) {
         throw new Error('Failed to get database ID after insert');
