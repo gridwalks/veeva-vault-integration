@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getCfrTitle21, indexCfrRegulations } from "../api";
+import { getCfrTitle21, indexCfrRegulations, getIndexedCfrRegulations } from "../api";
 
 export default function CfrTitle21() {
   const [isLoading, setIsLoading] = useState(false);
@@ -17,10 +17,27 @@ export default function CfrTitle21() {
   const [selectedParts, setSelectedParts] = useState(new Set());
   const [isIndexing, setIsIndexing] = useState(false);
   const [indexingStatus, setIndexingStatus] = useState(null);
+  const [indexedRegulations, setIndexedRegulations] = useState(new Set()); // Set of regulation IDs that have chunks
 
   useEffect(() => {
     loadPackages();
+    loadIndexedRegulations();
   }, []);
+
+  async function loadIndexedRegulations() {
+    try {
+      const data = await getIndexedCfrRegulations();
+      if (data.success && data.regulations) {
+        // Create a Set of regulation IDs that have chunks
+        const indexedSet = new Set(data.regulations.map(r => r.regulationId));
+        setIndexedRegulations(indexedSet);
+        console.log(`Loaded ${indexedSet.size} indexed CFR regulations`);
+      }
+    } catch (err) {
+      console.error("Failed to load indexed CFR regulations", err);
+      // Don't show error to user, just log it
+    }
+  }
 
   async function loadPackages() {
     console.log("Loading CFR Title 21 packages...");
@@ -67,6 +84,9 @@ export default function CfrTitle21() {
             retrievedAt: data.retrievedAt
           }
         }));
+        
+        // After loading package details, check which regulations are indexed and pre-check them
+        // This will be handled by useEffect when indexedRegulations is available
       } catch (err) {
         console.error("Failed to load CFR granules", { packageId, error: err });
         setPackageDetails(prev => ({
@@ -80,6 +100,79 @@ export default function CfrTitle21() {
       }
     }
   }
+
+  // Effect to check indexed regulations when package details or indexedRegulations change
+  useEffect(() => {
+    if (indexedRegulations.size === 0) return; // Don't run if we don't have indexed regulations yet
+    
+    setSelectedSubchapters(prev => {
+      const newSelectedSubchapters = new Set(prev);
+      
+      Object.keys(packageDetails).forEach(packageId => {
+        const details = packageDetails[packageId];
+        if (!details || !details.granules || details.error) return;
+        
+        details.granules.forEach(granule => {
+          // Check subchapters
+          if (granule.subchapters) {
+            granule.subchapters.forEach(subchapter => {
+              const subchapterId = subchapter.granuleId || subchapter.title;
+              const subchapterKey = `${packageId}:${granule.granuleId}:${subchapterId}`;
+              
+              // Check if this subchapter is indexed (has chunks)
+              if (indexedRegulations.has(subchapterId)) {
+                newSelectedSubchapters.add(subchapterKey);
+              }
+            });
+          }
+        });
+      });
+      
+      return newSelectedSubchapters;
+    });
+    
+    setSelectedParts(prev => {
+      const newSelectedParts = new Set(prev);
+      
+      Object.keys(packageDetails).forEach(packageId => {
+        const details = packageDetails[packageId];
+        if (!details || !details.granules || details.error) return;
+        
+        details.granules.forEach(granule => {
+          // Check subchapters' parts
+          if (granule.subchapters) {
+            granule.subchapters.forEach(subchapter => {
+              const subchapterId = subchapter.granuleId || subchapter.title;
+              const subchapterKey = `${packageId}:${granule.granuleId}:${subchapterId}`;
+              
+              if (subchapter.parts) {
+                subchapter.parts.forEach(part => {
+                  const partId = part.granuleId || part.title;
+                  const partKey = `${subchapterKey}:${partId}`;
+                  if (indexedRegulations.has(partId)) {
+                    newSelectedParts.add(partKey);
+                  }
+                });
+              }
+            });
+          }
+          
+          // Check parts directly under chapter (not in subchapters)
+          if (granule.parts) {
+            granule.parts.forEach(part => {
+              const partId = part.granuleId || part.title;
+              const partKey = `${packageId}:${granule.granuleId}::${partId}`;
+              if (indexedRegulations.has(partId)) {
+                newSelectedParts.add(partKey);
+              }
+            });
+          }
+        });
+      });
+      
+      return newSelectedParts;
+    });
+  }, [indexedRegulations, packageDetails]); // Run when indexedRegulations or packageDetails change
 
   const filteredPackages = useMemo(() => {
     if (!query.trim()) {
@@ -281,6 +374,7 @@ export default function CfrTitle21() {
                             packageId={pkg.packageId}
                             selectedSubchapters={selectedSubchapters}
                             selectedParts={selectedParts}
+                            indexedRegulations={indexedRegulations}
                             onToggleSubchapter={(key) => {
                               const newSet = new Set(selectedSubchapters);
                               if (newSet.has(key)) {
@@ -411,10 +505,16 @@ export default function CfrTitle21() {
                                 
                                 setIndexingStatus(result);
                                 
-                                // Clear selections after successful indexing
+                                // Reload indexed regulations after successful indexing
+                                if (result.success && result.totalChunksCreated > 0) {
+                                  await loadIndexedRegulations();
+                                  // The useEffect will automatically update checkboxes when indexedRegulations updates
+                                }
+                                
+                                // Clear selections after successful indexing (but keep pre-checked indexed ones)
                                 if (result.success) {
-                                  setSelectedSubchapters(new Set());
-                                  setSelectedParts(new Set());
+                                  // Don't clear - let the checkIndexedRegulations function handle it
+                                  // This way indexed regulations stay checked
                                 }
                               } catch (err) {
                                 console.error('Indexing error:', err);
@@ -518,7 +618,7 @@ export default function CfrTitle21() {
   );
 }
 
-function GranuleItem({ granule, packageId, selectedSubchapters, selectedParts, onToggleSubchapter, onTogglePart }) {
+function GranuleItem({ granule, packageId, selectedSubchapters, selectedParts, indexedRegulations, onToggleSubchapter, onTogglePart }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const hasSubchapters = granule.subchapters && granule.subchapters.length > 0;
   const hasParts = granule.parts && granule.parts.length > 0;
@@ -606,6 +706,7 @@ function GranuleItem({ granule, packageId, selectedSubchapters, selectedParts, o
               const subchapterId = subchapter.granuleId || subchapter.title;
               const subchapterKey = `${packageId}:${granule.granuleId}:${subchapterId}`;
               const isChecked = selectedSubchapters.has(subchapterKey);
+              const isIndexed = indexedRegulations.has(subchapterId);
               return (
                 <div
                   key={subchapterId}
@@ -627,8 +728,20 @@ function GranuleItem({ granule, packageId, selectedSubchapters, selectedParts, o
                         cursor: "pointer"
                       }}
                     />
-                    <div style={{ fontSize: "12px", fontWeight: 600, color: "#1f2937" }}>
+                    <div style={{ fontSize: "12px", fontWeight: 600, color: "#1f2937", display: "flex", alignItems: "center", gap: "6px" }}>
                       {subchapter.title || subchapter.granuleId}
+                      {isIndexed && (
+                        <span style={{
+                          fontSize: "9px",
+                          backgroundColor: "#d1fae5",
+                          color: "#065f46",
+                          padding: "2px 6px",
+                          borderRadius: "10px",
+                          fontWeight: "600"
+                        }}>
+                          ✓ Indexed
+                        </span>
+                      )}
                     </div>
                   </div>
                 <div style={{ display: "flex", gap: "8px", fontSize: "10px", color: "#6b7280", flexWrap: "wrap" }}>
@@ -659,6 +772,7 @@ function GranuleItem({ granule, packageId, selectedSubchapters, selectedParts, o
                         const partId = part.granuleId || part.title;
                         const partKey = `${subchapterKey}:${partId}`;
                         const isPartChecked = selectedParts.has(partKey);
+                        const isPartIndexed = indexedRegulations.has(partId);
                         return (
                           <div
                             key={partId}
@@ -680,8 +794,20 @@ function GranuleItem({ granule, packageId, selectedSubchapters, selectedParts, o
                                   cursor: "pointer"
                                 }}
                               />
-                              <div style={{ fontSize: "11px", fontWeight: 600, color: "#1f2937" }}>
+                              <div style={{ fontSize: "11px", fontWeight: 600, color: "#1f2937", display: "flex", alignItems: "center", gap: "4px" }}>
                                 {part.title || part.granuleId}
+                                {isPartIndexed && (
+                                  <span style={{
+                                    fontSize: "8px",
+                                    backgroundColor: "#d1fae5",
+                                    color: "#065f46",
+                                    padding: "1px 4px",
+                                    borderRadius: "8px",
+                                    fontWeight: "600"
+                                  }}>
+                                    ✓
+                                  </span>
+                                )}
                               </div>
                             </div>
                           <div style={{ display: "flex", gap: "6px", fontSize: "9px", color: "#6b7280", flexWrap: "wrap" }}>

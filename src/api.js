@@ -171,6 +171,16 @@ export async function getCfrTitle21({ packageId = null, fromDate = null } = {}) 
   return data;
 }
 
+export async function getIndexedCfrRegulations() {
+  const data = await apiRequest({
+    url: '/api/get-indexed-cfr-regulations',
+    successMessage: 'Fetching indexed CFR regulations...',
+    errorMessage: 'Failed to load indexed CFR regulations'
+  });
+  
+  return data;
+}
+
 export async function getIndexingLogs({ limit = 50, offset = 0, operationType = null, sourceType = null, status = null, batchId = null, startDate = null, endDate = null } = {}) {
   const params = { limit, offset };
   if (operationType) params.operationType = operationType;
