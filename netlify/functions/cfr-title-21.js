@@ -229,9 +229,9 @@ function formatGovInfoTimestamp(value) {
   return isoString.replace(/\.\d{3}Z$/, 'Z');
 }
 
-async function fetchPackageGranules(apiKey, packageId) {
-  // For CFR Title 21, return comprehensive structure with chapters, subchapters, and parts
-  const granules = [
+// Hardcoded fallback data - comprehensive structure of CFR Title 21
+function getHardcodedGranules() {
+  return [
     {
       granuleId: 'chapter-1',
       title: 'Chapter I - Food and Drug Administration, Department of Health and Human Services',
@@ -990,6 +990,54 @@ async function fetchPackageGranules(apiKey, packageId) {
               dateIssued: '2024-01-01',
               detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-210',
               htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-210'
+            },
+            {
+              granuleId: 'part-211',
+              title: 'Part 211 - Current Good Manufacturing Practice for Finished Pharmaceuticals',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-211',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-211'
+            },
+            {
+              granuleId: 'part-212',
+              title: 'Part 212 - Current Good Manufacturing Practice for Positron Emission Tomography Drugs',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-212',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-212'
+            },
+            {
+              granuleId: 'part-225',
+              title: 'Part 225 - Current Good Manufacturing Practice for Medicated Feeds',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-225',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-225'
+            },
+            {
+              granuleId: 'part-226',
+              title: 'Part 226 - Current Good Manufacturing Practice for Type A Medicated Articles',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-226',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-226'
+            },
+            {
+              granuleId: 'part-250',
+              title: 'Part 250 - Special Requirements for Specific Human Drugs',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-250',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-250'
+            },
+            {
+              granuleId: 'part-290',
+              title: 'Part 290 - Controlled Drugs',
+              granuleClass: 'part',
+              dateIssued: '2024-01-01',
+              detailsLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-290',
+              htmlLink: 'https://www.ecfr.gov/current/title-21/chapter-I/subchapter-C/part-290'
             }
           ]
         },
@@ -1100,12 +1148,84 @@ async function fetchPackageGranules(apiKey, packageId) {
       ]
     }
   ];
+}
+
+// Attempt to fetch granules dynamically from eCFR API
+async function fetchGranulesFromAPI(apiKey, packageId) {
+  try {
+    // Try to fetch the current structure from eCFR
+    // Note: eCFR API returns XML which requires parsing
+    // For now, we'll attempt a simple fetch and parse approach
+    // This can be enhanced with proper XML parsing libraries if needed
+    
+    const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    const apiUrl = `${API_BASE_URL}/versioner/v1/full/${currentDate}/title-21.xml`;
+    
+    console.log('Attempting to fetch CFR Title 21 structure from eCFR API:', apiUrl);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    const response = await fetch(apiUrl, {
+      headers: {
+        'User-Agent': 'veeva-vault-integration/1.0 (+https://github.com/)'
+      },
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`eCFR API returned status ${response.status}`);
+    }
+    
+    const xmlText = await response.text();
+    
+    if (!xmlText || xmlText.length < 1000) {
+      throw new Error('eCFR API returned insufficient data');
+    }
+    
+    // Parse XML to extract structure
+    // Note: This is a simplified parser - for production, consider using a proper XML parser
+    // The eCFR XML structure is complex, so we'll use regex-based extraction as a fallback
+    // For now, return null to trigger fallback to hardcoded data
+    // TODO: Implement proper XML parsing when XML parsing library is available
+    // TODO: When parsing XML, extract dateIssued from XML elements rather than using hardcoded dates
+    // The date extraction from HTML (in index-cfr-regulations.js) will still work as a fallback,
+    // but extracting from XML would be more efficient and accurate
+    
+    console.log('eCFR API response received, but XML parsing not yet implemented. Using fallback.');
+    return null;
+    
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      console.warn('eCFR API request timed out, using hardcoded fallback');
+    } else {
+      console.warn('Failed to fetch from eCFR API, using hardcoded fallback:', error.message);
+    }
+    return null;
+  }
+}
+
+async function fetchPackageGranules(apiKey, packageId) {
+  // Try to fetch dynamically from API first
+  const dynamicGranules = await fetchGranulesFromAPI(apiKey, packageId);
+  
+  // Use dynamic data if available, otherwise fall back to hardcoded
+  const granules = dynamicGranules || getHardcodedGranules();
+  
+  // Extract date from current timestamp for dynamic data, or use hardcoded date
+  const currentDate = new Date().toISOString().split('T')[0];
+  
+  // If using hardcoded data, we could still update dates, but for now keep as-is
+  // to maintain compatibility
 
   return {
     packageId,
     totalGranules: granules.length,
     granulesRetrieved: granules.length,
-    granules
+    granules,
+    source: dynamicGranules ? 'api' : 'hardcoded'
   };
 }
 
