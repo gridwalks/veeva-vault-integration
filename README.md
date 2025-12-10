@@ -123,6 +123,26 @@ Netlify CLI will read `.env` for local dev. In production, set these in **Netlif
 5. In **Environment variables**, add all the variables shown above (including `DATABASE_URL` and `OPENAI_API_KEY`).
 6. Deploy. (Functions are under `netlify/functions/*` and are auto-built by Netlify.)
 
+## Security
+
+### React Version Security Status
+
+**Current Status: NOT AFFECTED** by CVE-2025-55182 and CVE-2025-66478
+
+- **React Version**: 18.3.1 (pinned to `^18.3.1` in `package.json`)
+- **React DOM Version**: 18.3.1
+- **Vulnerability Scope**: The React Server Components (RSC) vulnerability (CVE-2025-55182) only affects React 19.0, 19.1, and 19.2
+- **Framework**: This project uses Vite + React (not Next.js), and does not use React Server Components
+
+**Security Hardening**:
+- React is pinned to `^18.3.1` to prevent accidental upgrades to React 19.x
+- Before upgrading React, verify that any security vulnerabilities in React 19.x have been fully resolved
+- To verify React version: `npm list react react-dom`
+
+**References**:
+- [Netlify Security Response](https://www.netlify.com/changelog/2025-12-03-react-security-vulnerability-response/)
+- [React Security Advisory](https://react.dev/blog/security)
+
 ## Notes
 
 - All Vault calls are made server‑side with the Session ID in `Authorization` header.
