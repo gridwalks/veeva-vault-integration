@@ -186,6 +186,27 @@ export async function getCertificates(userId, { course_id } = {}, accessToken = 
   });
 }
 
+export async function getLesson(lessonId, accessToken = null) {
+  return await apiRequest({
+    url: `/.netlify/functions/course-management/lessons/${lessonId}`,
+    method: 'GET',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Fetching lesson details...',
+    errorMessage: 'Failed to fetch lesson details'
+  });
+}
+
+export async function updateLesson(lessonId, lessonData, accessToken) {
+  return await apiRequest({
+    url: `/.netlify/functions/course-management/lessons/${lessonId}`,
+    method: 'PUT',
+    body: lessonData,
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Updating lesson...',
+    errorMessage: 'Failed to update lesson'
+  });
+}
+
 /**
  * Learning Paths APIs
  */

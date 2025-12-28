@@ -42,6 +42,21 @@ export const handler = async (event) => {
       return await getCertificates(pool, targetUserId, queryParams, corsHeaders);
     }
 
+    // Check if this is a lesson endpoint
+    if (pathParts[pathParts.length - 2] === 'lessons' && pathParts[pathParts.length - 1] && !isNaN(pathParts[pathParts.length - 1])) {
+      const lessonId = parseInt(pathParts[pathParts.length - 1]);
+      if (event.httpMethod === 'PUT') {
+        // PUT /api/course-management/lessons/:id - Update lesson (admin only)
+        if (!isAdmin) {
+          return createErrorResponse(403, 'Admin access required', corsHeaders);
+        }
+        return await updateLesson(pool, lessonId, event.body, corsHeaders);
+      } else if (event.httpMethod === 'GET') {
+        // GET /api/course-management/lessons/:id - Get lesson details
+        return await getLessonDetails(pool, lessonId, corsHeaders);
+      }
+    }
+
     if (event.httpMethod === 'GET') {
       if (courseId) {
         // GET /api/course-management/:id - Get course details with modules and lessons
@@ -376,6 +391,124 @@ async function deleteCourse(pool, courseId, corsHeaders) {
     return createSuccessResponse({ message: 'Course deleted successfully' }, 200);
   } catch (error) {
     console.error('Error deleting course:', error);
+    throw error;
+  }
+}
+
+// Get lesson details
+async function getLessonDetails(pool, lessonId, corsHeaders) {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        l.*,
+        c.title as course_title,
+        m.title as module_title,
+        cfr.title as cfr_regulation_title,
+        cfr.regulation_id as cfr_regulation_identifier,
+        d.document_name,
+        d.document_number,
+        w.name as workflow_template_name
+      FROM gxp_lessons l
+      INNER JOIN gxp_modules m ON l.module_id = m.id
+      INNER JOIN gxp_courses c ON m.course_id = c.id
+      LEFT JOIN cfr_title21_regulations cfr ON l.cfr_regulation_id = cfr.id
+      LEFT JOIN Veeva_Doc_Chat_document_index d ON l.document_id = d.id
+      LEFT JOIN qms_chat_workflow_templates w ON l.workflow_template_id = w.id
+      WHERE l.id = $1`,
+      [lessonId]
+    );
+
+    if (result.rows.length === 0) {
+      return createErrorResponse(404, 'Lesson not found', corsHeaders);
+    }
+
+    return createSuccessResponse({ lesson: result.rows[0] }, 200);
+  } catch (error) {
+    console.error('Error getting lesson details:', error);
+    throw error;
+  }
+}
+
+// Update a lesson (for linking resources)
+async function updateLesson(pool, lessonId, body, corsHeaders) {
+  try {
+    const data = parseRequestBody(body, corsHeaders);
+    if (!data) {
+      return getJsonParseErrorResponse(corsHeaders);
+    }
+
+    // Check if lesson exists
+    const existing = await pool.query('SELECT id FROM gxp_lessons WHERE id = $1', [lessonId]);
+    if (existing.rows.length === 0) {
+      return createErrorResponse(404, 'Lesson not found', corsHeaders);
+    }
+
+    const { 
+      title, 
+      description, 
+      content_type, 
+      content_data, 
+      estimated_minutes,
+      cfr_regulation_id,
+      document_id,
+      workflow_template_id
+    } = data;
+
+    const updateFields = [];
+    const params = [];
+    let paramIndex = 1;
+
+    if (title !== undefined) {
+      updateFields.push(`title = $${paramIndex++}`);
+      params.push(title);
+    }
+    if (description !== undefined) {
+      updateFields.push(`description = $${paramIndex++}`);
+      params.push(description);
+    }
+    if (content_type !== undefined) {
+      updateFields.push(`content_type = $${paramIndex++}`);
+      params.push(content_type);
+    }
+    if (content_data !== undefined) {
+      updateFields.push(`content_data = $${paramIndex++}`);
+      params.push(JSON.stringify(content_data));
+    }
+    if (estimated_minutes !== undefined) {
+      updateFields.push(`estimated_minutes = $${paramIndex++}`);
+      params.push(estimated_minutes);
+    }
+    if (cfr_regulation_id !== undefined) {
+      updateFields.push(`cfr_regulation_id = $${paramIndex++}`);
+      params.push(cfr_regulation_id || null);
+    }
+    if (document_id !== undefined) {
+      updateFields.push(`document_id = $${paramIndex++}`);
+      params.push(document_id || null);
+    }
+    if (workflow_template_id !== undefined) {
+      updateFields.push(`workflow_template_id = $${paramIndex++}`);
+      params.push(workflow_template_id || null);
+    }
+
+    if (updateFields.length === 0) {
+      return createErrorResponse(400, 'No fields to update', corsHeaders);
+    }
+
+    updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+    params.push(lessonId);
+
+    const result = await pool.query(
+      `UPDATE gxp_lessons 
+        SET ${updateFields.join(', ')}
+        WHERE id = $${paramIndex}
+        RETURNING *`,
+      params
+    );
+
+    return createSuccessResponse({ lesson: result.rows[0] }, 200);
+  } catch (error) {
+    console.error('Error updating lesson:', error);
     throw error;
   }
 }
