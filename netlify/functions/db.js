@@ -253,6 +253,417 @@ export async function initDatabase() {
 
     console.log('CFR Title 21 regulation chunks table created or already exists');
 
+    // ============================================================================
+    // GxP Educational Platform Tables
+    // ============================================================================
+
+    // Create courses table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gxp_courses (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        category VARCHAR(100),
+        difficulty VARCHAR(50) DEFAULT 'beginner',
+        estimated_hours DECIMAL(5,2),
+        instructor_id VARCHAR(255),
+        is_published BOOLEAN DEFAULT false,
+        thumbnail_url TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_courses_category 
+      ON gxp_courses(category)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_courses_difficulty 
+      ON gxp_courses(difficulty)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_courses_instructor_id 
+      ON gxp_courses(instructor_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_courses_is_published 
+      ON gxp_courses(is_published)
+    `);
+
+    console.log('GxP courses table created or already exists');
+
+    // Create learning paths table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gxp_learning_paths (
+        id SERIAL PRIMARY KEY,
+        path_name VARCHAR(255) NOT NULL,
+        description TEXT,
+        category VARCHAR(100),
+        course_ids INTEGER[],
+        estimated_total_hours DECIMAL(5,2),
+        is_published BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_learning_paths_category 
+      ON gxp_learning_paths(category)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_learning_paths_is_published 
+      ON gxp_learning_paths(is_published)
+    `);
+
+    console.log('GxP learning paths table created or already exists');
+
+    // Create modules table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gxp_modules (
+        id SERIAL PRIMARY KEY,
+        course_id INTEGER NOT NULL REFERENCES gxp_courses(id) ON DELETE CASCADE,
+        module_order INTEGER NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(course_id, module_order)
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_modules_course_id 
+      ON gxp_modules(course_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_modules_course_order 
+      ON gxp_modules(course_id, module_order)
+    `);
+
+    console.log('GxP modules table created or already exists');
+
+    // Create lessons table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gxp_lessons (
+        id SERIAL PRIMARY KEY,
+        module_id INTEGER NOT NULL REFERENCES gxp_modules(id) ON DELETE CASCADE,
+        lesson_order INTEGER NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        content_type VARCHAR(50) DEFAULT 'text',
+        content_data JSONB,
+        estimated_minutes INTEGER,
+        cfr_regulation_id INTEGER REFERENCES cfr_title21_regulations(id) ON DELETE SET NULL,
+        document_id INTEGER REFERENCES Veeva_Doc_Chat_document_index(id) ON DELETE SET NULL,
+        workflow_template_id INTEGER REFERENCES qms_chat_workflow_templates(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(module_id, lesson_order)
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_lessons_module_id 
+      ON gxp_lessons(module_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_lessons_module_order 
+      ON gxp_lessons(module_id, lesson_order)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_lessons_content_type 
+      ON gxp_lessons(content_type)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_lessons_cfr_regulation_id 
+      ON gxp_lessons(cfr_regulation_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_lessons_document_id 
+      ON gxp_lessons(document_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_lessons_workflow_template_id 
+      ON gxp_lessons(workflow_template_id)
+    `);
+
+    console.log('GxP lessons table created or already exists');
+
+    // Create lesson content table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gxp_lesson_content (
+        id SERIAL PRIMARY KEY,
+        lesson_id INTEGER NOT NULL REFERENCES gxp_lessons(id) ON DELETE CASCADE,
+        content_type VARCHAR(50) NOT NULL,
+        content_json JSONB NOT NULL,
+        content_order INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_lesson_content_lesson_id 
+      ON gxp_lesson_content(lesson_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_lesson_content_lesson_order 
+      ON gxp_lesson_content(lesson_id, content_order)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_lesson_content_type 
+      ON gxp_lesson_content(content_type)
+    `);
+
+    console.log('GxP lesson content table created or already exists');
+
+    // Create assessments table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gxp_assessments (
+        id SERIAL PRIMARY KEY,
+        lesson_id INTEGER REFERENCES gxp_lessons(id) ON DELETE CASCADE,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        questions_json JSONB NOT NULL,
+        passing_score DECIMAL(5,2) DEFAULT 70.00,
+        time_limit_minutes INTEGER,
+        max_attempts INTEGER DEFAULT 3,
+        shuffle_questions BOOLEAN DEFAULT false,
+        show_correct_answers BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_assessments_lesson_id 
+      ON gxp_assessments(lesson_id)
+    `);
+
+    console.log('GxP assessments table created or already exists');
+
+    // Create student progress table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gxp_student_progress (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        lesson_id INTEGER NOT NULL REFERENCES gxp_lessons(id) ON DELETE CASCADE,
+        status VARCHAR(50) DEFAULT 'not_started',
+        progress_percentage DECIMAL(5,2) DEFAULT 0.00,
+        time_spent_minutes INTEGER DEFAULT 0,
+        completed_at TIMESTAMP,
+        last_accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, lesson_id)
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_student_progress_user_id 
+      ON gxp_student_progress(user_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_student_progress_lesson_id 
+      ON gxp_student_progress(lesson_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_student_progress_status 
+      ON gxp_student_progress(status)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_student_progress_user_status 
+      ON gxp_student_progress(user_id, status)
+    `);
+
+    console.log('GxP student progress table created or already exists');
+
+    // Create assessment submissions table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gxp_assessment_submissions (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        assessment_id INTEGER NOT NULL REFERENCES gxp_assessments(id) ON DELETE CASCADE,
+        attempt_number INTEGER NOT NULL DEFAULT 1,
+        answers_json JSONB NOT NULL,
+        score DECIMAL(5,2),
+        passed BOOLEAN,
+        time_taken_minutes INTEGER,
+        submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        feedback_json JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_assessment_submissions_user_id 
+      ON gxp_assessment_submissions(user_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_assessment_submissions_assessment_id 
+      ON gxp_assessment_submissions(assessment_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_assessment_submissions_user_assessment 
+      ON gxp_assessment_submissions(user_id, assessment_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_assessment_submissions_submitted_at 
+      ON gxp_assessment_submissions(submitted_at)
+    `);
+
+    console.log('GxP assessment submissions table created or already exists');
+
+    // Create certificates table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gxp_certificates (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        course_id INTEGER NOT NULL REFERENCES gxp_courses(id) ON DELETE CASCADE,
+        certificate_number VARCHAR(100) UNIQUE NOT NULL,
+        certificate_data JSONB,
+        pdf_url TEXT,
+        issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP,
+        is_verified BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_certificates_user_id 
+      ON gxp_certificates(user_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_certificates_course_id 
+      ON gxp_certificates(course_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_certificates_certificate_number 
+      ON gxp_certificates(certificate_number)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_certificates_user_course 
+      ON gxp_certificates(user_id, course_id)
+    `);
+
+    console.log('GxP certificates table created or already exists');
+
+    // Create badges table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gxp_badges (
+        id SERIAL PRIMARY KEY,
+        badge_name VARCHAR(255) NOT NULL UNIQUE,
+        description TEXT,
+        icon_url TEXT,
+        category VARCHAR(100),
+        criteria_json JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_badges_category 
+      ON gxp_badges(category)
+    `);
+
+    console.log('GxP badges table created or already exists');
+
+    // Create student badges table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gxp_student_badges (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        badge_id INTEGER NOT NULL REFERENCES gxp_badges(id) ON DELETE CASCADE,
+        earned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        context_json JSONB,
+        UNIQUE(user_id, badge_id)
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_student_badges_user_id 
+      ON gxp_student_badges(user_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_student_badges_badge_id 
+      ON gxp_student_badges(badge_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_student_badges_earned_at 
+      ON gxp_student_badges(earned_at)
+    `);
+
+    console.log('GxP student badges table created or already exists');
+
+    // Create educational Q&A table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gxp_educational_qa (
+        id SERIAL PRIMARY KEY,
+        qa_interaction_id INTEGER REFERENCES qms_chat_qa_interactions(id) ON DELETE CASCADE,
+        user_id VARCHAR(255) NOT NULL,
+        course_id INTEGER REFERENCES gxp_courses(id) ON DELETE SET NULL,
+        lesson_id INTEGER REFERENCES gxp_lessons(id) ON DELETE SET NULL,
+        context_type VARCHAR(50),
+        is_tutoring_session BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_educational_qa_qa_interaction_id 
+      ON gxp_educational_qa(qa_interaction_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_educational_qa_user_id 
+      ON gxp_educational_qa(user_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_educational_qa_course_id 
+      ON gxp_educational_qa(course_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_educational_qa_lesson_id 
+      ON gxp_educational_qa(lesson_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gxp_educational_qa_is_tutoring 
+      ON gxp_educational_qa(is_tutoring_session)
+    `);
+
+    console.log('GxP educational Q&A table created or already exists');
+
     const duration = Date.now() - startTime;
     console.log(`Database schema initialized successfully in ${duration}ms`);
   } catch (error) {

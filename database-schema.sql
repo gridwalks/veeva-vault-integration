@@ -441,3 +441,301 @@ ON cfr_title21_regulation_chunks(regulation_id);
 -- Sample data insertion (optional)
 -- INSERT INTO Veeva_Doc_Chat_document_index (veeva_document_id, document_number, document_name, major_version, minor_version, document_type, status, summary) 
 -- VALUES ('sample-id', 'DOC-001', 'Sample Document', 1, 0, 'Standard Operating Procedure', 'STEADYSTATE', 'This is a sample document summary.');
+
+-- ============================================================================
+-- GxP Educational Platform Tables
+-- ============================================================================
+
+-- Table for storing courses
+CREATE TABLE IF NOT EXISTS gxp_courses (
+  id SERIAL PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  category VARCHAR(100), -- e.g., 'Regulatory Compliance', 'Document Management', 'Workflow Practices'
+  difficulty VARCHAR(50) DEFAULT 'beginner', -- 'beginner', 'intermediate', 'advanced'
+  estimated_hours DECIMAL(5,2), -- Estimated time to complete in hours
+  instructor_id VARCHAR(255), -- Auth0 user ID of the instructor
+  is_published BOOLEAN DEFAULT false, -- Only published courses are visible to students
+  thumbnail_url TEXT, -- Optional course thumbnail image URL
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for courses
+CREATE INDEX IF NOT EXISTS idx_gxp_courses_category 
+ON gxp_courses(category);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_courses_difficulty 
+ON gxp_courses(difficulty);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_courses_instructor_id 
+ON gxp_courses(instructor_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_courses_is_published 
+ON gxp_courses(is_published);
+
+-- Table for storing learning paths (structured sequences of courses)
+CREATE TABLE IF NOT EXISTS gxp_learning_paths (
+  id SERIAL PRIMARY KEY,
+  path_name VARCHAR(255) NOT NULL,
+  description TEXT,
+  category VARCHAR(100),
+  course_ids INTEGER[], -- Array of course IDs in order
+  estimated_total_hours DECIMAL(5,2),
+  is_published BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for learning paths
+CREATE INDEX IF NOT EXISTS idx_gxp_learning_paths_category 
+ON gxp_learning_paths(category);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_learning_paths_is_published 
+ON gxp_learning_paths(is_published);
+
+-- Table for storing course modules
+CREATE TABLE IF NOT EXISTS gxp_modules (
+  id SERIAL PRIMARY KEY,
+  course_id INTEGER NOT NULL REFERENCES gxp_courses(id) ON DELETE CASCADE,
+  module_order INTEGER NOT NULL, -- Order within the course
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(course_id, module_order)
+);
+
+-- Create indexes for modules
+CREATE INDEX IF NOT EXISTS idx_gxp_modules_course_id 
+ON gxp_modules(course_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_modules_course_order 
+ON gxp_modules(course_id, module_order);
+
+-- Table for storing lessons within modules
+CREATE TABLE IF NOT EXISTS gxp_lessons (
+  id SERIAL PRIMARY KEY,
+  module_id INTEGER NOT NULL REFERENCES gxp_modules(id) ON DELETE CASCADE,
+  lesson_order INTEGER NOT NULL, -- Order within the module
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  content_type VARCHAR(50) DEFAULT 'text', -- 'text', 'video', 'interactive', 'document', 'assessment'
+  content_data JSONB, -- Flexible content storage (varies by content_type)
+  estimated_minutes INTEGER, -- Estimated time to complete in minutes
+  cfr_regulation_id INTEGER REFERENCES cfr_title21_regulations(id) ON DELETE SET NULL, -- Link to CFR regulation if applicable
+  document_id INTEGER REFERENCES Veeva_Doc_Chat_document_index(id) ON DELETE SET NULL, -- Link to indexed document if applicable
+  workflow_template_id INTEGER REFERENCES qms_chat_workflow_templates(id) ON DELETE SET NULL, -- Link to workflow exercise if applicable
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(module_id, lesson_order)
+);
+
+-- Create indexes for lessons
+CREATE INDEX IF NOT EXISTS idx_gxp_lessons_module_id 
+ON gxp_lessons(module_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_lessons_module_order 
+ON gxp_lessons(module_id, lesson_order);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_lessons_content_type 
+ON gxp_lessons(content_type);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_lessons_cfr_regulation_id 
+ON gxp_lessons(cfr_regulation_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_lessons_document_id 
+ON gxp_lessons(document_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_lessons_workflow_template_id 
+ON gxp_lessons(workflow_template_id);
+
+-- Table for storing lesson content (rich content storage)
+CREATE TABLE IF NOT EXISTS gxp_lesson_content (
+  id SERIAL PRIMARY KEY,
+  lesson_id INTEGER NOT NULL REFERENCES gxp_lessons(id) ON DELETE CASCADE,
+  content_type VARCHAR(50) NOT NULL, -- 'text', 'markdown', 'video', 'interactive', 'document', 'assessment'
+  content_json JSONB NOT NULL, -- Structured content data
+  content_order INTEGER DEFAULT 1, -- Order of content blocks within lesson
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for lesson content
+CREATE INDEX IF NOT EXISTS idx_gxp_lesson_content_lesson_id 
+ON gxp_lesson_content(lesson_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_lesson_content_lesson_order 
+ON gxp_lesson_content(lesson_id, content_order);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_lesson_content_type 
+ON gxp_lesson_content(content_type);
+
+-- Table for storing assessments (quizzes/tests)
+CREATE TABLE IF NOT EXISTS gxp_assessments (
+  id SERIAL PRIMARY KEY,
+  lesson_id INTEGER REFERENCES gxp_lessons(id) ON DELETE CASCADE, -- Optional: assessment can be standalone or part of lesson
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  questions_json JSONB NOT NULL, -- Array of question objects
+  passing_score DECIMAL(5,2) DEFAULT 70.00, -- Percentage required to pass
+  time_limit_minutes INTEGER, -- Optional time limit
+  max_attempts INTEGER DEFAULT 3, -- Maximum number of attempts allowed
+  shuffle_questions BOOLEAN DEFAULT false, -- Whether to randomize question order
+  show_correct_answers BOOLEAN DEFAULT true, -- Whether to show correct answers after submission
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for assessments
+CREATE INDEX IF NOT EXISTS idx_gxp_assessments_lesson_id 
+ON gxp_assessments(lesson_id);
+
+-- Table for storing student progress
+CREATE TABLE IF NOT EXISTS gxp_student_progress (
+  id SERIAL PRIMARY KEY,
+  user_id VARCHAR(255) NOT NULL, -- Auth0 user ID
+  lesson_id INTEGER NOT NULL REFERENCES gxp_lessons(id) ON DELETE CASCADE,
+  status VARCHAR(50) DEFAULT 'not_started', -- 'not_started', 'in_progress', 'completed', 'skipped'
+  progress_percentage DECIMAL(5,2) DEFAULT 0.00, -- Percentage of lesson completed
+  time_spent_minutes INTEGER DEFAULT 0, -- Time spent on lesson in minutes
+  completed_at TIMESTAMP, -- When lesson was marked as completed
+  last_accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Last time user accessed this lesson
+  notes TEXT, -- Student's personal notes for this lesson
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, lesson_id)
+);
+
+-- Create indexes for student progress
+CREATE INDEX IF NOT EXISTS idx_gxp_student_progress_user_id 
+ON gxp_student_progress(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_student_progress_lesson_id 
+ON gxp_student_progress(lesson_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_student_progress_status 
+ON gxp_student_progress(status);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_student_progress_user_status 
+ON gxp_student_progress(user_id, status);
+
+-- Table for storing assessment submissions
+CREATE TABLE IF NOT EXISTS gxp_assessment_submissions (
+  id SERIAL PRIMARY KEY,
+  user_id VARCHAR(255) NOT NULL,
+  assessment_id INTEGER NOT NULL REFERENCES gxp_assessments(id) ON DELETE CASCADE,
+  attempt_number INTEGER NOT NULL DEFAULT 1,
+  answers_json JSONB NOT NULL, -- Student's answers
+  score DECIMAL(5,2), -- Calculated score percentage
+  passed BOOLEAN, -- Whether student passed (score >= passing_score)
+  time_taken_minutes INTEGER, -- Time taken to complete assessment
+  submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  feedback_json JSONB, -- Detailed feedback per question (if enabled)
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for assessment submissions
+CREATE INDEX IF NOT EXISTS idx_gxp_assessment_submissions_user_id 
+ON gxp_assessment_submissions(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_assessment_submissions_assessment_id 
+ON gxp_assessment_submissions(assessment_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_assessment_submissions_user_assessment 
+ON gxp_assessment_submissions(user_id, assessment_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_assessment_submissions_submitted_at 
+ON gxp_assessment_submissions(submitted_at);
+
+-- Table for storing certificates
+CREATE TABLE IF NOT EXISTS gxp_certificates (
+  id SERIAL PRIMARY KEY,
+  user_id VARCHAR(255) NOT NULL,
+  course_id INTEGER NOT NULL REFERENCES gxp_courses(id) ON DELETE CASCADE,
+  certificate_number VARCHAR(100) UNIQUE NOT NULL, -- Unique certificate identifier
+  certificate_data JSONB, -- Certificate details (name, date, etc.)
+  pdf_url TEXT, -- URL to generated PDF certificate
+  issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP, -- Optional expiration date
+  is_verified BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for certificates
+CREATE INDEX IF NOT EXISTS idx_gxp_certificates_user_id 
+ON gxp_certificates(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_certificates_course_id 
+ON gxp_certificates(course_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_certificates_certificate_number 
+ON gxp_certificates(certificate_number);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_certificates_user_course 
+ON gxp_certificates(user_id, course_id);
+
+-- Table for storing badges
+CREATE TABLE IF NOT EXISTS gxp_badges (
+  id SERIAL PRIMARY KEY,
+  badge_name VARCHAR(255) NOT NULL UNIQUE,
+  description TEXT,
+  icon_url TEXT, -- URL to badge icon/image
+  category VARCHAR(100), -- e.g., 'achievement', 'milestone', 'expertise'
+  criteria_json JSONB, -- Criteria for earning the badge (e.g., complete X courses, score Y on assessment)
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for badges
+CREATE INDEX IF NOT EXISTS idx_gxp_badges_category 
+ON gxp_badges(category);
+
+-- Table for storing student badges (earned badges)
+CREATE TABLE IF NOT EXISTS gxp_student_badges (
+  id SERIAL PRIMARY KEY,
+  user_id VARCHAR(255) NOT NULL,
+  badge_id INTEGER NOT NULL REFERENCES gxp_badges(id) ON DELETE CASCADE,
+  earned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  context_json JSONB, -- Context about how badge was earned (course_id, assessment_id, etc.)
+  UNIQUE(user_id, badge_id)
+);
+
+-- Create indexes for student badges
+CREATE INDEX IF NOT EXISTS idx_gxp_student_badges_user_id 
+ON gxp_student_badges(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_student_badges_badge_id 
+ON gxp_student_badges(badge_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_student_badges_earned_at 
+ON gxp_student_badges(earned_at);
+
+-- Table for tracking educational Q&A interactions (extends existing qms_chat_qa_interactions)
+-- This table links Q&A interactions to educational context
+CREATE TABLE IF NOT EXISTS gxp_educational_qa (
+  id SERIAL PRIMARY KEY,
+  qa_interaction_id INTEGER REFERENCES qms_chat_qa_interactions(id) ON DELETE CASCADE,
+  user_id VARCHAR(255) NOT NULL,
+  course_id INTEGER REFERENCES gxp_courses(id) ON DELETE SET NULL,
+  lesson_id INTEGER REFERENCES gxp_lessons(id) ON DELETE SET NULL,
+  context_type VARCHAR(50), -- 'course', 'lesson', 'general'
+  is_tutoring_session BOOLEAN DEFAULT false, -- Whether this was a tutoring session vs general Q&A
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for educational Q&A
+CREATE INDEX IF NOT EXISTS idx_gxp_educational_qa_qa_interaction_id 
+ON gxp_educational_qa(qa_interaction_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_educational_qa_user_id 
+ON gxp_educational_qa(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_educational_qa_course_id 
+ON gxp_educational_qa(course_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_educational_qa_lesson_id 
+ON gxp_educational_qa(lesson_id);
+
+CREATE INDEX IF NOT EXISTS idx_gxp_educational_qa_is_tutoring 
+ON gxp_educational_qa(is_tutoring_session);
