@@ -243,75 +243,107 @@ export default function CourseAuthoring() {
 
         {/* Middle - Course/Module Editor */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          {selectedCourse ? (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Course Details</h2>
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                {selectedCourse ? 'Course Details' : 'Create New Course'}
+              </h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                  <input
+                    type="text"
+                    value={courseForm.title}
+                    onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    disabled={previewMode}
+                    placeholder="Enter course title"
+                  />
+                </div>
                 
-                <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    value={courseForm.description}
+                    onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    rows={3}
+                    disabled={previewMode}
+                    placeholder="Enter course description"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                     <input
                       type="text"
-                      value={courseForm.title}
-                      onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })}
+                      value={courseForm.category}
+                      onChange={(e) => setCourseForm({ ...courseForm, category: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       disabled={previewMode}
+                      placeholder="e.g., Quality, Regulatory"
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                    <textarea
-                      value={courseForm.description}
-                      onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })}
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Difficulty</label>
+                    <select
+                      value={courseForm.difficulty}
+                      onChange={(e) => setCourseForm({ ...courseForm, difficulty: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      rows={3}
                       disabled={previewMode}
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                      <input
-                        type="text"
-                        value={courseForm.category}
-                        onChange={(e) => setCourseForm({ ...courseForm, category: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                        disabled={previewMode}
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Difficulty</label>
-                      <select
-                        value={courseForm.difficulty}
-                        onChange={(e) => setCourseForm({ ...courseForm, difficulty: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                        disabled={previewMode}
-                      >
-                        <option value="beginner">Beginner</option>
-                        <option value="intermediate">Intermediate</option>
-                        <option value="advanced">Advanced</option>
-                      </select>
-                    </div>
-                  </div>
-                  
-                  {!previewMode && (
-                    <button
-                      onClick={handleSaveCourse}
-                      className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2"
                     >
-                      <Save className="w-4 h-4" />
-                      Save Course
-                    </button>
-                  )}
+                      <option value="beginner">Beginner</option>
+                      <option value="intermediate">Intermediate</option>
+                      <option value="advanced">Advanced</option>
+                    </select>
+                  </div>
                 </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Hours</label>
+                  <input
+                    type="number"
+                    value={courseForm.estimated_hours || ''}
+                    onChange={(e) => setCourseForm({ ...courseForm, estimated_hours: e.target.value ? parseFloat(e.target.value) : null })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    disabled={previewMode}
+                    placeholder="e.g., 8"
+                    min="0"
+                    step="0.5"
+                  />
+                </div>
+                
+                <div>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={courseForm.is_published}
+                      onChange={(e) => setCourseForm({ ...courseForm, is_published: e.target.checked })}
+                      disabled={previewMode}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Published (visible to students)</span>
+                  </label>
+                </div>
+                
+                {!previewMode && (
+                  <button
+                    onClick={handleSaveCourse}
+                    disabled={!courseForm.title.trim()}
+                    className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    {selectedCourse ? 'Update Course' : 'Create Course'}
+                  </button>
+                )}
               </div>
+            </div>
 
-              {/* Modules */}
-              {selectedCourse.modules && selectedCourse.modules.length > 0 && (
+            {/* Modules */}
+            {selectedCourse && selectedCourse.modules && selectedCourse.modules.length > 0 && (
                 <div>
                   <h3 className="text-md font-semibold text-gray-900 mb-2">Modules</h3>
                   <div className="space-y-2">
@@ -330,12 +362,7 @@ export default function CourseAuthoring() {
                   </div>
                 </div>
               )}
-            </div>
-          ) : (
-            <div className="text-center text-gray-500 py-12">
-              Select a course to edit or create a new one
-            </div>
-          )}
+          </div>
         </div>
 
         {/* Right - Lesson Editor */}
