@@ -19,9 +19,12 @@ export const handler = async (event) => {
     }
 
     // Only admins can view analytics
+    // Note: verifyAdminRole expects event object, not token
     const adminCheck = await verifyAdminRole(event);
-    if (!adminCheck.authorized) {
-      return createErrorResponse(403, 'Admin access required', corsHeaders);
+    console.log('Admin check result:', JSON.stringify(adminCheck));
+    if (!adminCheck || !adminCheck.authorized) {
+      console.log('Admin access denied:', adminCheck?.error || 'No admin check result');
+      return createErrorResponse(403, adminCheck?.error || 'Admin access required', corsHeaders);
     }
 
     // Initialize database
