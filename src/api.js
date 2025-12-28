@@ -346,6 +346,35 @@ export async function getEducationalAnalytics({ time_range = '30' } = {}, access
   });
 }
 
+/**
+ * Adaptive Learning API
+ */
+export async function getLearningRecommendations({ course_id, limit = 5 } = {}, accessToken = null) {
+  const params = {};
+  if (course_id) params.course_id = course_id;
+  if (limit) params.limit = limit;
+
+  return await apiRequest({
+    url: '/.netlify/functions/adaptive-learning',
+    params,
+    method: 'GET',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Fetching learning recommendations...',
+    errorMessage: 'Failed to fetch learning recommendations'
+  });
+}
+
+export async function analyzePerformance({ course_id, lesson_id } = {}, accessToken = null) {
+  return await apiRequest({
+    url: '/.netlify/functions/adaptive-learning',
+    method: 'POST',
+    body: { course_id, lesson_id },
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Analyzing performance...',
+    errorMessage: 'Failed to analyze performance'
+  });
+}
+
 // ============================================================================
 // Document listing functions
 // ============================================================================

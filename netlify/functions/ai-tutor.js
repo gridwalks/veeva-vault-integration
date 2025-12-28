@@ -134,25 +134,61 @@ async function handleTutoringRequest(pool, userId, body, corsHeaders) {
       });
     }
 
-    // Build tutoring prompt
+    // Get student progress for adaptive learning context
+    let studentProgressContext = '';
+    if (userId && lesson_id) {
+      try {
+        const progressResult = await pool.query(
+          `SELECT status, progress_percentage, score FROM gxp_student_progress 
+           WHERE user_id = $1 AND lesson_id = $2`,
+          [userId, lesson_id]
+        );
+        if (progressResult.rows.length > 0) {
+          const progress = progressResult.rows[0];
+          studentProgressContext = `\n\nStudent Progress: ${progress.status}, ${progress.progress_percentage}% complete`;
+          if (progress.score) {
+            studentProgressContext += `, Score: ${progress.score}%`;
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching student progress:', err);
+      }
+    }
+
+    // Build tutoring prompt with enhanced Socratic method
     const systemPrompt = `You are an expert GxP (Good Practice) Quality Assurance tutor specializing in regulatory compliance, particularly 21 CFR regulations and ICH guidelines. Your role is to:
 
 1. **Educate, not just answer**: Provide explanations that help students understand concepts deeply
-2. **Use Socratic method**: Guide students to discover answers through thoughtful questions when appropriate
-3. **Reference regulations**: When discussing regulatory topics, cite specific CFR parts or ICH guidelines
+2. **Use Socratic method**: Guide students to discover answers through thoughtful questions when appropriate. Instead of immediately giving answers:
+   - Ask probing questions that lead students to think through the problem
+   - Help them identify what they already know
+   - Guide them to connect concepts
+   - Only provide direct answers after they've attempted to reason through it
+3. **Reference regulations**: When discussing regulatory topics, cite specific CFR parts (e.g., "21 CFR Part 11") or ICH guidelines with section numbers
 4. **Provide examples**: Use real-world scenarios relevant to pharmaceutical/biotech quality assurance
 5. **Encourage critical thinking**: Help students understand the "why" behind regulations and practices
 6. **Be patient and supportive**: Learning GxP can be challenging, so be encouraging
+7. **Generate practice questions**: When appropriate, suggest practice questions to reinforce learning
+8. **Explain in accessible language**: Break down regulatory jargon into understandable terms
 
 ${educationalContext}
 ${materialsContext}
+${studentProgressContext}
 
 When answering questions:
 - Break down complex concepts into understandable parts
-- Use analogies when helpful
+- Use analogies when helpful (e.g., "Think of it like...")
 - Reference the course/lesson context when relevant
 - Suggest related topics or next steps for learning
-- If the student seems confused, ask clarifying questions before providing a detailed answer`;
+- If the student seems confused, ask clarifying questions before providing a detailed answer
+- At the end of explanations, optionally offer: "Would you like me to generate a practice question on this topic?"
+
+Response format:
+- Start with a brief acknowledgment of the question
+- Use the Socratic method when appropriate (ask guiding questions)
+- Provide clear, structured explanations
+- End with a summary or key takeaway
+- Optionally suggest practice questions or next learning steps`;
 
     // Build conversation messages
     const messages = [
@@ -161,15 +197,66 @@ When answering questions:
       { role: 'user', content: message }
     ];
 
-    // Call OpenAI
+    // Call OpenAI with enhanced parameters for educational responses
     const completion = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-4',
       messages: messages,
-      temperature: 0.7,
-      max_tokens: 2000
+      temperature: 0.7, // Balanced creativity and accuracy
+      max_tokens: 2500, // Increased for more detailed explanations
+      presence_penalty: 0.3, // Encourage diverse explanations
+      frequency_penalty: 0.1 // Reduce repetition
     });
 
-    const response = completion.choices[0]?.message?.content || 'I apologize, but I could not generate a response. Please try again.';
+    let response = completion.choices[0]?.message?.content || 'I apologize, but I could not generate a response. Please try again.';
+    
+    // Detect if student might benefit from practice questions
+    const needsPractice = message.toLowerCase().includes('practice') || 
+                         message.toLowerCase().includes('quiz') ||
+                         message.toLowerCase().includes('test') ||
+                         message.toLowerCase().includes('question');
+    
+    // Optionally generate practice questions if requested or appropriate
+    let practiceQuestions = null;
+    if (needsPractice || lesson_id) {
+      try {
+        const practicePrompt = `Based on the lesson context and the student's question, generate 2-3 practice questions that would help reinforce understanding.
+
+Lesson context: ${educationalContext}
+Student question: ${message}
+
+Generate practice questions as a JSON object with a "questions" array. Each question should have:
+- "question": the question text
+- "type": "multiple_choice", "true_false", or "short_answer"
+- "options": array of options (for multiple choice)
+- "correct_answer": the correct answer
+- "explanation": brief explanation of the answer
+
+Return format: {"questions": [...]}`;
+        
+        const practiceCompletion = await openai.chat.completions.create({
+          model: process.env.OPENAI_MODEL || 'gpt-4',
+          messages: [
+            { role: 'system', content: 'You are an educational content generator. Generate practice questions in valid JSON format only. Always return a JSON object with a "questions" array.' },
+            { role: 'user', content: practicePrompt }
+          ],
+          temperature: 0.8,
+          max_tokens: 1000,
+          response_format: { type: "json_object" }
+        });
+        
+        try {
+          const practiceJson = JSON.parse(practiceCompletion.choices[0]?.message?.content || '{}');
+          if (practiceJson.questions && Array.isArray(practiceJson.questions) && practiceJson.questions.length > 0) {
+            practiceQuestions = practiceJson.questions;
+          }
+        } catch (parseErr) {
+          console.error('Error parsing practice questions:', parseErr);
+        }
+      } catch (practiceErr) {
+        console.error('Error generating practice questions:', practiceErr);
+        // Don't fail the main response if practice questions fail
+      }
+    }
 
     // Save tutoring interaction to educational Q&A table
     try {
@@ -220,6 +307,7 @@ When answering questions:
     return createSuccessResponse({
       response,
       conversation_history: updatedHistory,
+      practice_questions: practiceQuestions,
       context: {
         course_id: course_id || null,
         lesson_id: lesson_id || null,

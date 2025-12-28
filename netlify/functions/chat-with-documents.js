@@ -584,7 +584,10 @@ export const handler = async (event) => {
       };
     }
 
-    const { message, documentIds, conversationHistory = [], userId, attachments = [] } = body;
+    const { message, documentIds, conversationHistory = [], userId, attachments = [], course_id, lesson_id, isLearningMode } = body;
+    
+    // Detect educational context
+    const hasEducationalContext = !!(course_id || lesson_id || isLearningMode);
     
     // Validate and sanitize input
     if (!message || !message.trim()) {
@@ -778,6 +781,7 @@ export const handler = async (event) => {
     const embeddingStartTime = Date.now();
     let queryEmbedding = null;
     let vectorSearchFailed = false;
+    let educationalContext = ''; // Initialize educational context for use in system prompt
 
     try {
       const embeddingResponse = await openai.embeddings.create({
@@ -1109,6 +1113,29 @@ export const handler = async (event) => {
         `;
         const cfrDocResult = await pool.query(cfrDocQuery, uniqueCfrRegulationIds);
         relevantDocuments.push(...cfrDocResult.rows);
+      }
+      
+      // If in educational context, fetch linked course/lesson materials
+      if (hasEducationalContext && lesson_id) {
+        try {
+          const lessonQuery = `
+            SELECT 
+              l.title as lesson_title, l.description as lesson_description,
+              c.title as course_title, c.description as course_description,
+              l.cfr_regulation_id, l.document_id
+            FROM gxp_lessons l
+            INNER JOIN gxp_modules m ON l.module_id = m.id
+            INNER JOIN gxp_courses c ON m.course_id = c.id
+            WHERE l.id = $1
+          `;
+          const lessonResult = await pool.query(lessonQuery, [lesson_id]);
+          if (lessonResult.rows.length > 0) {
+            const lesson = lessonResult.rows[0];
+            educationalContext = `\n\nEducational Context:\nCourse: ${lesson.course_title}\nLesson: ${lesson.lesson_title}\n${lesson.lesson_description ? `Description: ${lesson.lesson_description}` : ''}`;
+          }
+        } catch (eduErr) {
+          console.error('Error fetching educational context:', eduErr);
+        }
       }
     }
     
@@ -1768,6 +1795,7 @@ Relevant Document Sections:
 ${documentContext}${externalResourcesContext}${securityGuardrails}`
       : relevantDocuments.length > 0
       ? `You are an AI assistant that helps users understand and work with pharmaceutical documents from Veeva Vault. You have access to both AI-generated summaries and user-added manual summaries from an indexed document collection, as well as related external resources.
+${hasEducationalContext ? `\n**EDUCATIONAL MODE**: You are assisting a student in a learning context. Provide educational explanations, break down complex concepts, and help them understand regulatory compliance principles.` : ''}
 
 When answering questions:
 1. Use the provided document context to give accurate, helpful answers
@@ -1775,13 +1803,15 @@ When answering questions:
 3. If the answer isn't in the provided documents, say so clearly
 4. Provide actionable insights based on the document content
 5. Maintain a professional, helpful tone appropriate for the pharmaceutical industry
+${hasEducationalContext ? '5a. In educational mode: Explain concepts clearly, use examples, and help students understand the "why" behind regulations' : ''}
 6. If asked about processes, procedures, or compliance topics, focus on what the documents actually say
 7. When both AI and manual summaries are available, consider both perspectives and note any differences
 8. Prioritize manual summaries when they provide additional context or corrections to AI summaries
 9. When discussing regulatory standards or practices, use "Good Clinical Practices (GCP)" instead of "Good Manufacturing Practices (GMP)"
 10. When relevant external resources are available, mention them and suggest users check them for additional information
 11. Always provide the external resource titles and URLs when referencing them
-
+${hasEducationalContext ? '12. When referencing CFR regulations, cite specific parts and sections (e.g., "21 CFR Part 11, Section 11.10")' : ''}
+${educationalContext || ''}
 Document Context:
 ${documentContext}${externalResourcesContext}${securityGuardrails}`
       : `You are an AI assistant that helps users understand and work with pharmaceutical documents from Veeva Vault. 
