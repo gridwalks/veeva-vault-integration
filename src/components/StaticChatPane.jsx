@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { useAuth0 } from '@auth0/auth0-react';
 import DocumentViewer from './DocumentViewer.jsx';
 import ChatPromptBox from './ChatPromptBox.jsx';
-import { createQAInteraction, getUploadedDocuments, downloadUploadedDocumentUrl, updateQAFeedback, pauseWorkflow, resumeWorkflow, saveChatSession, getChatSession } from '../api';
+import { createQAInteraction, getUploadedDocuments, downloadUploadedDocumentUrl, updateQAFeedback, pauseWorkflow, resumeWorkflow, saveChatSession, getChatSession, chatWithAITutor } from '../api';
 
 // Helper function to estimate token count (rough approximation)
 const estimateTokens = (text) => {
@@ -21,7 +21,7 @@ const estimateConversationTokens = (conversationHistory) => {
   }, 0);
 };
 
-export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane, userId, resumeWorkflowId, onResumeWorkflowComplete, loadChatSessionId, onLoadChatSessionComplete, onReferencedDocumentsUpdate, onClearWorkspace }) {
+export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentInPane, userId, resumeWorkflowId, onResumeWorkflowComplete, loadChatSessionId, onLoadChatSessionComplete, onReferencedDocumentsUpdate, onClearWorkspace, tutoringMode = false, courseId = null, lessonId = null }) {
   const { user, getAccessTokenSilently } = useAuth0();
   const [conversationHistory, setConversationHistory] = useState([]);
   const [attachedDocuments, setAttachedDocuments] = useState([]);
@@ -1794,7 +1794,7 @@ The documents will be automatically included in the comparison analysis.
                   fontWeight: '600',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
-                  Document Chat Agent
+                  {tutoringMode ? '🎓 AI Tutor' : 'Document Chat Agent'}
                 </h3>
                 {selectedDocuments.length > 0 || attachedDocuments.length > 0 || uploadedBlobs.length > 0 ? (
                   <p style={{
@@ -1842,6 +1842,21 @@ The documents will be automatically included in the comparison analysis.
                   }}>
                     No documents selected • Click + to attach files for comparison
                   </p>
+                )}
+                {tutoringMode && (
+                  <div style={{
+                    marginTop: '4px',
+                    padding: '3px 6px',
+                    backgroundColor: '#10b981',
+                    color: '#ffffff',
+                    borderRadius: '3px',
+                    fontSize: '10px',
+                    fontWeight: '500',
+                    display: 'inline-block',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    🎓 Learning Mode - AI Tutor
+                  </div>
                 )}
                 {workflowState.isActive && workflowState.template && (
                   <div style={{

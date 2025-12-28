@@ -7,6 +7,10 @@ import SelectedDocumentViewer from "./components/SelectedDocumentViewer.jsx";
 import AuthScreen from "./components/AuthScreen.jsx";
 import UserProfile from "./components/UserProfile.jsx";
 import MyNotebook from "./components/MyNotebook.jsx";
+import StudentDashboard from "./components/StudentDashboard.jsx";
+import CourseCatalog from "./components/CourseCatalog.jsx";
+import CourseDetail from "./components/CourseDetail.jsx";
+import LearningPathView from "./components/LearningPathView.jsx";
 import { useInactivityLogout } from "./hooks/useInactivityLogout.js";
 import { useAdminRole } from "./hooks/useAdminRole.js";
 // import StatusPanel from "./components/StatusPanel.jsx";
@@ -23,6 +27,10 @@ export default function App() {
   const [resumeWorkflowId, setResumeWorkflowId] = useState(null);
   const [loadChatSessionId, setLoadChatSessionId] = useState(null);
   const documentViewerRef = useRef(null);
+  
+  // Educational platform state
+  const [selectedCourseId, setSelectedCourseId] = useState(null);
+  const [selectedLearningPathId, setSelectedLearningPathId] = useState(null);
   
   // Resizable panel state
   const [leftPanelWidth, setLeftPanelWidth] = useState(() => {
@@ -266,7 +274,27 @@ useEffect(() => {
       />
       
       {/* Main Content Area */}
-      {currentScreen === "main" ? (
+      {currentScreen === "education" ? (
+        /* Educational Platform */
+        <div style={{ margin: '0 16px', padding: '16px 0' }}>
+          {selectedLearningPathId ? (
+            <LearningPathView
+              pathId={selectedLearningPathId}
+              onBack={() => setSelectedLearningPathId(null)}
+            />
+          ) : selectedCourseId ? (
+            <CourseDetail
+              courseId={selectedCourseId}
+              onBack={() => setSelectedCourseId(null)}
+            />
+          ) : (
+            <StudentDashboard
+              onOpenCourse={(courseId) => setSelectedCourseId(courseId)}
+              onOpenLearningPath={(pathId) => setSelectedLearningPathId(pathId)}
+            />
+          )}
+        </div>
+      ) : currentScreen === "main" ? (
         /* Main Chat Interface */
         <div 
           ref={containerRef}

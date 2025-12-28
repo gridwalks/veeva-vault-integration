@@ -96,7 +96,223 @@ function extractData(data, path = 'data') {
   return path ? data?.[path] : data;
 }
 
+// ============================================================================
+// Educational Platform API Functions
+// ============================================================================
+
+/**
+ * Get access token for authenticated requests
+ */
+async function getAccessToken() {
+  // This will be called from components that use useAuth0
+  // For now, return null - components will handle auth
+  return null;
+}
+
+/**
+ * Course Management APIs
+ */
+export async function listCourses({ category, difficulty, is_published, instructor_id, search } = {}, accessToken = null) {
+  const params = {};
+  if (category) params.category = category;
+  if (difficulty) params.difficulty = difficulty;
+  if (is_published !== undefined) params.is_published = is_published;
+  if (instructor_id) params.instructor_id = instructor_id;
+  if (search) params.search = search;
+
+  return await apiRequest({
+    url: '/.netlify/functions/course-management',
+    params,
+    method: 'GET',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Fetching courses...',
+    errorMessage: 'Failed to fetch courses'
+  });
+}
+
+export async function getCourse(courseId, accessToken = null) {
+  return await apiRequest({
+    url: `/.netlify/functions/course-management/${courseId}`,
+    method: 'GET',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Fetching course details...',
+    errorMessage: 'Failed to fetch course details'
+  });
+}
+
+export async function createCourse(courseData, accessToken) {
+  return await apiRequest({
+    url: '/.netlify/functions/course-management',
+    method: 'POST',
+    body: courseData,
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Creating course...',
+    errorMessage: 'Failed to create course'
+  });
+}
+
+export async function updateCourse(courseId, courseData, accessToken) {
+  return await apiRequest({
+    url: `/.netlify/functions/course-management/${courseId}`,
+    method: 'PUT',
+    body: courseData,
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Updating course...',
+    errorMessage: 'Failed to update course'
+  });
+}
+
+export async function deleteCourse(courseId, accessToken) {
+  return await apiRequest({
+    url: `/.netlify/functions/course-management/${courseId}`,
+    method: 'DELETE',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Deleting course...',
+    errorMessage: 'Failed to delete course'
+  });
+}
+
+export async function getCertificates(userId, { course_id } = {}, accessToken = null) {
+  const params = { user_id: userId };
+  if (course_id) params.course_id = course_id;
+
+  return await apiRequest({
+    url: '/.netlify/functions/course-management/certificates',
+    params,
+    method: 'GET',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Fetching certificates...',
+    errorMessage: 'Failed to fetch certificates'
+  });
+}
+
+/**
+ * Learning Paths APIs
+ */
+export async function listLearningPaths({ category, is_published, search } = {}, accessToken = null) {
+  const params = {};
+  if (category) params.category = category;
+  if (is_published !== undefined) params.is_published = is_published;
+  if (search) params.search = search;
+
+  return await apiRequest({
+    url: '/.netlify/functions/learning-paths',
+    params,
+    method: 'GET',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Fetching learning paths...',
+    errorMessage: 'Failed to fetch learning paths'
+  });
+}
+
+export async function getLearningPath(pathId, accessToken = null) {
+  return await apiRequest({
+    url: `/.netlify/functions/learning-paths/${pathId}`,
+    method: 'GET',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Fetching learning path details...',
+    errorMessage: 'Failed to fetch learning path details'
+  });
+}
+
+export async function createLearningPath(pathData, accessToken) {
+  return await apiRequest({
+    url: '/.netlify/functions/learning-paths',
+    method: 'POST',
+    body: pathData,
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Creating learning path...',
+    errorMessage: 'Failed to create learning path'
+  });
+}
+
+/**
+ * Student Progress APIs
+ */
+export async function getStudentProgress(userId, { course_id, status, limit, offset } = {}, accessToken = null) {
+  const params = {};
+  if (course_id) params.course_id = course_id;
+  if (status) params.status = status;
+  if (limit) params.limit = limit;
+  if (offset) params.offset = offset;
+
+  return await apiRequest({
+    url: `/.netlify/functions/student-progress/${userId}`,
+    params,
+    method: 'GET',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Fetching student progress...',
+    errorMessage: 'Failed to fetch student progress'
+  });
+}
+
+export async function updateLessonProgress(progressData, accessToken) {
+  return await apiRequest({
+    url: '/.netlify/functions/student-progress',
+    method: 'POST',
+    body: progressData,
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Updating lesson progress...',
+    errorMessage: 'Failed to update lesson progress'
+  });
+}
+
+/**
+ * Assessments APIs
+ */
+export async function listAssessments({ lesson_id, search } = {}, accessToken = null) {
+  const params = {};
+  if (lesson_id) params.lesson_id = lesson_id;
+  if (search) params.search = search;
+
+  return await apiRequest({
+    url: '/.netlify/functions/assessments',
+    params,
+    method: 'GET',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Fetching assessments...',
+    errorMessage: 'Failed to fetch assessments'
+  });
+}
+
+export async function getAssessment(assessmentId, accessToken = null) {
+  return await apiRequest({
+    url: `/.netlify/functions/assessments/${assessmentId}`,
+    method: 'GET',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Fetching assessment...',
+    errorMessage: 'Failed to fetch assessment'
+  });
+}
+
+export async function submitAssessment(assessmentData, accessToken = null) {
+  return await apiRequest({
+    url: '/.netlify/functions/assessments/submit',
+    method: 'POST',
+    body: assessmentData,
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Submitting assessment...',
+    errorMessage: 'Failed to submit assessment'
+  });
+}
+
+/**
+ * AI Tutor API
+ */
+export async function chatWithAITutor({ message, course_id, lesson_id, conversation_history }, accessToken = null) {
+  return await apiRequest({
+    url: '/.netlify/functions/ai-tutor',
+    method: 'POST',
+    body: { message, course_id, lesson_id, conversation_history },
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Sending message to AI tutor...',
+    errorMessage: 'Failed to send message to AI tutor'
+  });
+}
+
+// ============================================================================
 // Document listing functions
+// ============================================================================
 export async function listApproved({ name = "", limit = 50, offset = 0 } = {}) {
   const data = await apiRequest({
     url: '/api/list-approved',
