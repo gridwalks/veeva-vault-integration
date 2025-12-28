@@ -64,7 +64,7 @@ async function getStudentProgress(pool, userId, queryParams, corsHeaders) {
     const { course_id, status, limit = 50, offset = 0 } = queryParams;
 
     // Get overall progress statistics
-    const statsQuery = `
+    let statsQuery = `
       SELECT 
         COUNT(DISTINCT l.id) as total_lessons,
         COUNT(DISTINCT CASE WHEN sp.status = 'completed' THEN l.id END) as completed_lessons,
@@ -158,7 +158,7 @@ async function getStudentProgress(pool, userId, queryParams, corsHeaders) {
     const progressResult = await pool.query(progressQuery, progressParams);
 
     // Get course progress summary
-    const courseProgressQuery = `
+    let courseProgressQuery = `
       SELECT 
         c.id,
         c.title,
@@ -180,8 +180,6 @@ async function getStudentProgress(pool, userId, queryParams, corsHeaders) {
       INNER JOIN gxp_lessons l ON m.id = l.module_id
       LEFT JOIN gxp_student_progress sp ON l.id = sp.lesson_id AND sp.user_id = $1
       WHERE c.is_published = true
-      GROUP BY c.id, c.title, c.category, c.estimated_hours
-      ORDER BY c.title
     `;
 
     const courseProgressParams = [userId];
@@ -189,6 +187,8 @@ async function getStudentProgress(pool, userId, queryParams, corsHeaders) {
       courseProgressQuery += ` AND c.id = $2`;
       courseProgressParams.push(course_id);
     }
+    
+    courseProgressQuery += ` GROUP BY c.id, c.title, c.category, c.estimated_hours ORDER BY c.title`;
 
     const courseProgressResult = await pool.query(courseProgressQuery, courseProgressParams);
 
