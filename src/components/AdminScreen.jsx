@@ -11,6 +11,8 @@ import IndexingLogs from "./IndexingLogs.jsx";
 import CfrTitle21 from "./CfrTitle21.jsx";
 import UserManagement from "./UserManagement.jsx";
 import VeevaDocumentList from "./VeevaDocumentList.jsx";
+import CourseAuthoring from "./CourseAuthoring.jsx";
+import EducationalAnalytics from "./EducationalAnalytics.jsx";
 
 export default function AdminScreen({ userId }) {
   const { getAccessTokenSilently } = useAuth0();
@@ -252,6 +254,13 @@ export default function AdminScreen({ userId }) {
       header: "Workflow Management",
       items: [
         { id: "workflow", label: "Workflow Management", requiresVeeva: false }
+      ]
+    },
+    {
+      header: "Education Management",
+      items: [
+        { id: "course-authoring", label: "Course Authoring", requiresVeeva: false },
+        { id: "educational-analytics", label: "Educational Analytics", requiresVeeva: false }
       ]
     },
     {
@@ -556,6 +565,10 @@ export default function AdminScreen({ userId }) {
         <WorkflowManagement />
       ) : activeTab === "logs" ? (
         <IndexingLogs />
+      ) : activeTab === "course-authoring" ? (
+        <CourseAuthoring />
+      ) : activeTab === "educational-analytics" ? (
+        <EducationalAnalytics />
       ) : activeTab === "users" ? (
         <UserManagement />
       ) : activeTab === "settings" ? (

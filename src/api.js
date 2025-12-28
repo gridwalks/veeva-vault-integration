@@ -331,6 +331,21 @@ export async function chatWithAITutor({ message, course_id, lesson_id, conversat
   });
 }
 
+/**
+ * Educational Analytics API
+ */
+export async function getEducationalAnalytics({ time_range = '30' } = {}, accessToken = null) {
+  const params = { time_range };
+  return await apiRequest({
+    url: '/.netlify/functions/educational-analytics',
+    params,
+    method: 'GET',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Fetching educational analytics...',
+    errorMessage: 'Failed to fetch educational analytics'
+  });
+}
+
 // ============================================================================
 // Document listing functions
 // ============================================================================
