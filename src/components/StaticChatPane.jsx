@@ -29,6 +29,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
   const [uploadedBlobs, setUploadedBlobs] = useState([]);
   const [purgeUploadsOnClear, setPurgeUploadsOnClear] = useState(true);
   const [interactionIds, setInteractionIds] = useState(new Map()); // Track interaction IDs by message index
+  const [socraticMode, setSocraticMode] = useState(true); // Socratic mode toggle for AI tutor
   
   // Debug conversation history changes
   useEffect(() => {
@@ -399,6 +400,46 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
     }
 
     try {
+      // If in tutoring mode, use AI tutor API instead of regular chat
+      if (tutoringMode) {
+        try {
+          const accessToken = await getAccessTokenSilently();
+          if (!accessToken) {
+            throw new Error('Failed to retrieve access token');
+          }
+
+          const tutorResponse = await chatWithAITutor({
+            message: userMessage,
+            course_id: courseId,
+            lesson_id: lessonId,
+            conversation_history: newHistory,
+            socratic_mode: socraticMode
+          }, accessToken);
+
+          if (tutorResponse.error) {
+            throw new Error(tutorResponse.error);
+          }
+
+          // Update conversation with tutor response
+          if (tutorResponse.conversation_history && Array.isArray(tutorResponse.conversation_history)) {
+            setConversationHistory(tutorResponse.conversation_history);
+          } else if (tutorResponse.response) {
+            setConversationHistory(prev => [
+              ...prev,
+              { role: 'assistant', content: tutorResponse.response }
+            ]);
+          }
+
+          setIsLoading(false);
+          return;
+        } catch (tutorError) {
+          console.error('Error calling AI tutor:', tutorError);
+          setError(tutorError.message || 'Failed to get response from AI tutor');
+          setIsLoading(false);
+          return;
+        }
+      }
+
       // Proceed with normal chat (will detect workflow after answering)
       // Combine Veeva document IDs and attached document IDs (including newly uploaded ones)
       const veevaDocIds = selectedDocuments.map(doc => doc.veeva_document_id);
@@ -1876,6 +1917,38 @@ The documents will be automatically included in the comparison analysis.
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {tutoringMode && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '8px' }}>
+                  <label style={{ 
+                    fontSize: '11px', 
+                    color: '#374151',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    userSelect: 'none'
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={socraticMode}
+                      onChange={(e) => setSocraticMode(e.target.checked)}
+                      style={{
+                        cursor: 'pointer',
+                        width: '14px',
+                        height: '14px'
+                      }}
+                    />
+                    <span style={{ fontWeight: '500' }}>Socratic Mode</span>
+                  </label>
+                  <span style={{
+                    fontSize: '10px',
+                    color: '#6b7280',
+                    fontStyle: 'italic'
+                  }}>
+                    {socraticMode ? '(Guided questions)' : '(Direct answers)'}
+                  </span>
+                </div>
+              )}
               {conversationHistory.length > 0 && (
                 <button
                   onClick={clearConversation}
