@@ -1835,7 +1835,7 @@ The documents will be automatically included in the comparison analysis.
                   fontWeight: '600',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
-                  {tutoringMode ? '🎓 AI Tutor' : 'Document Chat Agent'}
+                  {tutoringMode ? '🎓 AI Tutor' : 'Learning Agent'}
                 </h3>
                 {selectedDocuments.length > 0 || attachedDocuments.length > 0 || uploadedBlobs.length > 0 ? (
                   <p style={{

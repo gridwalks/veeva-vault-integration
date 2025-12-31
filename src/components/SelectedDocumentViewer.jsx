@@ -515,7 +515,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
             color: '#374151',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}>
-            Workspace
+            Learning Resources
           </h3>
         </div>
 
