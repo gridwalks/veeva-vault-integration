@@ -297,11 +297,11 @@ async function updateLessonProgress(pool, userId, body, corsHeaders, lessonId = 
       }
       if (progress_percentage !== undefined) {
         updateFields.push(`progress_percentage = $${paramIndex++}`);
-        params.push(Math.max(0, Math.min(100, progress_percentage)));
+        params.push(Math.max(0, Math.min(100, parseFloat(progress_percentage) || 0)));
       }
       if (time_spent_minutes !== undefined) {
         updateFields.push(`time_spent_minutes = $${paramIndex++}`);
-        params.push(Math.max(0, time_spent_minutes));
+        params.push(Math.max(0, parseFloat(time_spent_minutes) || 0));
       }
       if (notes !== undefined) {
         updateFields.push(`notes = $${paramIndex++}`);
@@ -331,8 +331,8 @@ async function updateLessonProgress(pool, userId, body, corsHeaders, lessonId = 
           userId,
           targetLessonId,
           status || 'in_progress',
-          Math.max(0, Math.min(100, progress_percentage || 0)),
-          Math.max(0, time_spent_minutes || 0),
+          Math.max(0, Math.min(100, parseFloat(progress_percentage) || 0)),
+          Math.max(0, parseFloat(time_spent_minutes) || 0),
           notes || null
         ]
       );
