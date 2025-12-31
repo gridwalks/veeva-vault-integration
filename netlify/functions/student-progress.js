@@ -265,6 +265,22 @@ async function updateLessonProgress(pool, userId, body, corsHeaders, lessonId = 
 
     const { status, progress_percentage, time_spent_minutes, notes } = data;
 
+    // Convert numeric values to proper types
+    const progressValue = progress_percentage !== undefined && progress_percentage !== null
+      ? Number(progress_percentage)
+      : undefined;
+    const timeValue = time_spent_minutes !== undefined && time_spent_minutes !== null
+      ? Number(time_spent_minutes)
+      : undefined;
+
+    // Validate numeric values
+    if (progressValue !== undefined && (isNaN(progressValue) || !isFinite(progressValue))) {
+      return createErrorResponse(400, 'Invalid progress_percentage value', corsHeaders);
+    }
+    if (timeValue !== undefined && (isNaN(timeValue) || !isFinite(timeValue))) {
+      return createErrorResponse(400, 'Invalid time_spent_minutes value', corsHeaders);
+    }
+
     // Check if lesson exists
     const lessonCheck = await pool.query('SELECT id FROM gxp_lessons WHERE id = $1', [targetLessonId]);
     if (lessonCheck.rows.length === 0) {
@@ -295,13 +311,13 @@ async function updateLessonProgress(pool, userId, body, corsHeaders, lessonId = 
           updateFields.push(`completed_at = NULL`);
         }
       }
-      if (progress_percentage !== undefined) {
-        updateFields.push(`progress_percentage = $${paramIndex++}`);
-        params.push(Math.max(0, Math.min(100, parseFloat(progress_percentage) || 0)));
+      if (progressValue !== undefined) {
+        updateFields.push(`progress_percentage = $${paramIndex++}::numeric`);
+        params.push(Math.max(0, Math.min(100, progressValue)));
       }
-      if (time_spent_minutes !== undefined) {
-        updateFields.push(`time_spent_minutes = $${paramIndex++}`);
-        params.push(Math.max(0, parseFloat(time_spent_minutes) || 0));
+      if (timeValue !== undefined) {
+        updateFields.push(`time_spent_minutes = $${paramIndex++}::integer`);
+        params.push(Math.max(0, Math.floor(timeValue)));
       }
       if (notes !== undefined) {
         updateFields.push(`notes = $${paramIndex++}`);
@@ -331,8 +347,8 @@ async function updateLessonProgress(pool, userId, body, corsHeaders, lessonId = 
           userId,
           targetLessonId,
           status || 'in_progress',
-          Math.max(0, Math.min(100, parseFloat(progress_percentage) || 0)),
-          Math.max(0, parseFloat(time_spent_minutes) || 0),
+          progressValue !== undefined ? Math.max(0, Math.min(100, progressValue)) : 0,
+          timeValue !== undefined ? Math.max(0, Math.floor(timeValue)) : 0,
           notes || null
         ]
       );
