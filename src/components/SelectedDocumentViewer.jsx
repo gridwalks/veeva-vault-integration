@@ -15,13 +15,13 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
   const [workflowInstanceId, setWorkflowInstanceId] = React.useState(null);
   const [isRepolishing, setIsRepolishing] = React.useState(false);
   
-  // Collapsible sections state - default to all expanded
+  // Collapsible sections state - default to all expanded (uncollapsed)
   const [expandedGroups, setExpandedGroups] = React.useState({
-    veeva: true,
-    upload: true,
-    cfr_regulation: true,
-    attachment: true,
-    unknown: true
+    veeva: true,  // Expanded by default
+    upload: true,  // Expanded by default
+    cfr_regulation: true,  // Expanded by default
+    attachment: true,  // Expanded by default
+    unknown: true  // Expanded by default
   });
 
   // Helper functions for document display
