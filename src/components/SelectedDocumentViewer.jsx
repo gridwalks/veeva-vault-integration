@@ -975,7 +975,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                     📄 Documents referenced in response:
                     {referencedDocuments.length > 5 && (
                       <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: '4px', fontWeight: '400' }}>
-                        (showing {referencedDocuments.length} total)
+                        (showing 5 of {referencedDocuments.length} total)
                       </span>
                     )}
                   </div>
@@ -984,7 +984,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                     flexDirection: 'column',
                     gap: '12px'
                   }}>
-                    {referencedDocuments.map((doc, index) => {
+                    {referencedDocuments.slice(0, 5).map((doc, index) => {
                       const displayName = getDocumentDisplayName(doc);
                       const displayNumber = getDocumentDisplayNumber(doc);
 
