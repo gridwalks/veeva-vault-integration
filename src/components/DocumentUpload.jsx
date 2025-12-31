@@ -697,7 +697,19 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
             {uploadedDocuments.map((doc, index) => {
               // Use document_id if id is not available (for backwards compatibility)
               // Handle both null/undefined and ensure we get a valid ID
-              const documentId = doc.id ?? doc.document_id ?? null;
+              // Also handle cases where id might be a string "null" or empty string
+              let documentId = doc.id ?? doc.document_id ?? null;
+              
+              // Convert to number if it's a string representation of a number
+              if (documentId && typeof documentId === 'string' && !isNaN(documentId) && documentId.trim() !== '') {
+                documentId = parseInt(documentId, 10);
+              }
+              
+              // Final check - ensure it's a valid ID (not null, undefined, empty string, or NaN)
+              if (documentId === null || documentId === undefined || documentId === '' || (typeof documentId === 'number' && isNaN(documentId))) {
+                documentId = null;
+              }
+              
               const isEditing = editingDocumentId === documentId;
               
               // Debug logging for first document
@@ -707,7 +719,9 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                   id: doc.id,
                   document_id: doc.document_id,
                   documentId,
-                  hasDocumentId: documentId != null && documentId !== ''
+                  hasDocumentId: documentId != null && documentId !== '',
+                  idType: typeof doc.id,
+                  documentIdType: typeof doc.document_id
                 });
               }
               const uploadedDate = doc.created_at ? new Date(doc.created_at).toLocaleString() : 'N/A';

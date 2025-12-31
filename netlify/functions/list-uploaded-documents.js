@@ -151,26 +151,31 @@ export const handler = async (event) => {
     console.log('Executing documents query with params:', queryParams);
     const documentsResult = await pool.query(documentsQuery, queryParams);
     
-    const documents = documentsResult.rows.map(doc => ({
-      id: doc.id,
-      document_id: doc.id,
-      document_name: doc.document_name,
-      safe_file_name: doc.safe_file_name,
-      document_type: doc.document_type,
-      version: doc.version,
-      ai_summary: doc.ai_summary,
-      manual_summary: doc.manual_summary,
-      file_size: doc.file_size,
-      extraction_method: doc.extraction_method,
-      blob_url: doc.blob_url,
-      original_filename: doc.original_filename,
-      mime_type: doc.mime_type,
-      chunk_count: parseInt(doc.chunk_count, 10),
-      created_at: doc.created_at,
-      updated_at: doc.updated_at,
-      source_type: 'upload',
-      isUploaded: true
-    }));
+    const documents = documentsResult.rows.map(doc => {
+      // Ensure id is properly converted to number if it's a string
+      const docId = doc.id != null ? (typeof doc.id === 'string' ? parseInt(doc.id, 10) : doc.id) : null;
+      
+      return {
+        id: docId,
+        document_id: docId,
+        document_name: doc.document_name,
+        safe_file_name: doc.safe_file_name,
+        document_type: doc.document_type,
+        version: doc.version,
+        ai_summary: doc.ai_summary,
+        manual_summary: doc.manual_summary,
+        file_size: doc.file_size,
+        extraction_method: doc.extraction_method,
+        blob_url: doc.blob_url,
+        original_filename: doc.original_filename,
+        mime_type: doc.mime_type,
+        chunk_count: parseInt(doc.chunk_count, 10),
+        created_at: doc.created_at,
+        updated_at: doc.updated_at,
+        source_type: 'upload',
+        isUploaded: true
+      };
+    });
 
     const duration = Date.now() - startTime;
     console.log(`Query completed in ${duration}ms, returning ${documents.length} documents`);
