@@ -678,7 +678,7 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
           }}>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '1.6fr 1.2fr 1fr 1fr 1fr minmax(280px, auto)',
+              gridTemplateColumns: '1.6fr 1.2fr 1fr 1fr 1fr',
               gap: '16px',
               padding: '12px 16px',
               backgroundColor: '#f8fafc',
@@ -693,7 +693,6 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
               <div>Version</div>
               <div>Type</div>
               <div>Uploaded</div>
-              <div>Actions</div>
             </div>
             {uploadedDocuments.map((doc, index) => {
               // Use document_id if id is not available (for backwards compatibility)
@@ -763,7 +762,7 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '1.6fr 1.2fr 1fr 1fr 1fr minmax(280px, auto)',
+                      gridTemplateColumns: '1.6fr 1.2fr 1fr 1fr 1fr',
                       gap: '16px',
                       padding: '12px 16px',
                       alignItems: 'center',
@@ -861,118 +860,6 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                     <div style={{ fontSize: '13px', color: '#374151' }}>
                       <div>{uploadedDate}</div>
                       <div style={{ fontSize: '12px', color: '#6b7280' }}>Updated {updatedDate}</div>
-                    </div>
-
-                    <div style={{
-                      display: 'flex',
-                      gap: '8px',
-                      flexWrap: 'wrap',
-                      justifyContent: 'flex-end',
-                      alignItems: 'center',
-                      minWidth: '280px',
-                      overflow: 'visible'
-                    }}>
-                      {isEditing ? (
-                        <>
-                          <button
-                            onClick={saveMetadataChanges}
-                            disabled={metadataSaving}
-                            style={{
-                              padding: '8px 16px',
-                              backgroundColor: metadataSaving ? '#9ca3af' : '#16a34a',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              fontWeight: '500',
-                              cursor: metadataSaving ? 'not-allowed' : 'pointer'
-                            }}
-                          >
-                            {metadataSaving ? 'Saving...' : 'Save Changes'}
-                          </button>
-                          <button
-                            onClick={cancelEditingDocument}
-                            disabled={metadataSaving}
-                            style={{
-                              padding: '8px 16px',
-                              backgroundColor: '#e5e7eb',
-                              color: '#374151',
-                              border: 'none',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              fontWeight: '500',
-                              cursor: metadataSaving ? 'not-allowed' : 'pointer'
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                          <>
-                            {documentId != null && documentId !== '' ? (
-                              <>
-                                <a
-                                  href={downloadUploadedDocumentUrl({ documentId: documentId })}
-                                  download
-                                  style={{
-                                    padding: '8px 16px',
-                                    backgroundColor: '#4338ca',
-                                    color: '#ffffff',
-                                    textDecoration: 'none',
-                                    borderRadius: '4px',
-                                    fontSize: '12px',
-                                    fontWeight: '500',
-                                    whiteSpace: 'nowrap',
-                                    minWidth: 'fit-content',
-                                    display: 'inline-block'
-                                  }}
-                                >
-                                  Download
-                                </a>
-                                <button
-                                  onClick={() => startEditingDocument(doc)}
-                                  style={{
-                                    padding: '8px 16px',
-                                    backgroundColor: '#2563eb',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    fontSize: '12px',
-                                    fontWeight: '500',
-                                    cursor: 'pointer',
-                                    whiteSpace: 'nowrap',
-                                    minWidth: 'fit-content'
-                                  }}
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteUploadedDocument(doc)}
-                                  disabled={deletingDocumentId === documentId}
-                                  style={{
-                                    padding: '8px 16px',
-                                    backgroundColor: '#dc2626',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    fontSize: '12px',
-                                    fontWeight: '500',
-                                    cursor: deletingDocumentId === documentId ? 'not-allowed' : 'pointer',
-                                    opacity: deletingDocumentId === documentId ? 0.7 : 1,
-                                    whiteSpace: 'nowrap',
-                                    minWidth: 'fit-content'
-                                  }}
-                                >
-                                  {deletingDocumentId === documentId ? 'Deleting...' : 'Delete'}
-                                </button>
-                              </>
-                            ) : (
-                              <span style={{ fontSize: '12px', color: '#6b7280', fontStyle: 'italic' }}>
-                                Loading...
-                              </span>
-                            )}
-                          </>
-                      )}
                     </div>
                   </div>
 
