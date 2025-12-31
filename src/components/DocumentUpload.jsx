@@ -950,55 +950,122 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                     <div style={{
                       marginTop: '10px',
                       fontSize: '12px',
-                      color: '#6b7280'
+                      color: '#6b7280',
+                      marginBottom: '16px'
                     }}>
                       {formatFileSize(Number(doc.file_size) || 0)} • {doc.mime_type || 'Unknown MIME type'}
                     </div>
-                    {isEditing && (
-                      <div
-                        style={{
-                          marginTop: '16px',
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          gap: '8px',
-                          justifyContent: 'flex-end'
-                        }}
-                      >
-                        <button
-                          onClick={saveMetadataChanges}
-                          disabled={metadataSaving}
-                          style={{
-                            padding: '10px 18px',
-                            backgroundColor: metadataSaving ? '#9ca3af' : '#16a34a',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '6px',
-                            fontSize: '13px',
-                            fontWeight: '600',
-                            cursor: metadataSaving ? 'not-allowed' : 'pointer',
-                            boxShadow: '0 1px 2px rgba(16, 185, 129, 0.25)'
-                          }}
-                        >
-                          {metadataSaving ? 'Saving…' : 'Save Metadata Changes'}
-                        </button>
-                        <button
-                          onClick={cancelEditingDocument}
-                          disabled={metadataSaving}
-                          style={{
-                            padding: '10px 18px',
-                            backgroundColor: '#f3f4f6',
-                            color: '#374151',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '6px',
-                            fontSize: '13px',
-                            fontWeight: '500',
-                            cursor: metadataSaving ? 'not-allowed' : 'pointer'
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    )}
+                    
+                    {/* Action Buttons */}
+                    <div style={{
+                      marginTop: '16px',
+                      paddingTop: '16px',
+                      borderTop: '1px solid #e5e7eb',
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '8px',
+                      justifyContent: 'flex-start'
+                    }}>
+                      {isEditing ? (
+                        <>
+                          <button
+                            onClick={saveMetadataChanges}
+                            disabled={metadataSaving}
+                            style={{
+                              padding: '10px 18px',
+                              backgroundColor: metadataSaving ? '#9ca3af' : '#16a34a',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              fontWeight: '600',
+                              cursor: metadataSaving ? 'not-allowed' : 'pointer',
+                              boxShadow: '0 1px 2px rgba(16, 185, 129, 0.25)'
+                            }}
+                          >
+                            {metadataSaving ? 'Saving…' : 'Save Metadata Changes'}
+                          </button>
+                          <button
+                            onClick={cancelEditingDocument}
+                            disabled={metadataSaving}
+                            style={{
+                              padding: '10px 18px',
+                              backgroundColor: '#f3f4f6',
+                              color: '#374151',
+                              border: '1px solid #e5e7eb',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              cursor: metadataSaving ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          {documentId != null && documentId !== '' ? (
+                            <>
+                              <a
+                                href={downloadUploadedDocumentUrl({ documentId: documentId })}
+                                download
+                                style={{
+                                  padding: '10px 18px',
+                                  backgroundColor: '#4338ca',
+                                  color: '#ffffff',
+                                  textDecoration: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '13px',
+                                  fontWeight: '500',
+                                  whiteSpace: 'nowrap',
+                                  display: 'inline-block'
+                                }}
+                              >
+                                Download
+                              </a>
+                              <button
+                                onClick={() => startEditingDocument(doc)}
+                                style={{
+                                  padding: '10px 18px',
+                                  backgroundColor: '#2563eb',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '13px',
+                                  fontWeight: '500',
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUploadedDocument(doc)}
+                                disabled={deletingDocumentId === documentId}
+                                style={{
+                                  padding: '10px 18px',
+                                  backgroundColor: '#dc2626',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '13px',
+                                  fontWeight: '500',
+                                  cursor: deletingDocumentId === documentId ? 'not-allowed' : 'pointer',
+                                  opacity: deletingDocumentId === documentId ? 0.7 : 1,
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                {deletingDocumentId === documentId ? 'Deleting...' : 'Delete'}
+                              </button>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: '12px', color: '#6b7280', fontStyle: 'italic' }}>
+                              Loading...
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
