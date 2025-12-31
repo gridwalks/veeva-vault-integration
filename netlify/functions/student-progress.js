@@ -301,8 +301,9 @@ async function updateLessonProgress(pool, userId, body, corsHeaders, lessonId = 
       let paramIndex = 1;
 
       if (status !== undefined) {
-        updateFields.push(`status = $${paramIndex++}`);
+        updateFields.push(`status = $${paramIndex}`);
         params.push(status);
+        paramIndex++;
         
         // Set completed_at if status is 'completed'
         if (status === 'completed') {
@@ -312,34 +313,40 @@ async function updateLessonProgress(pool, userId, body, corsHeaders, lessonId = 
         }
       }
       if (progressValue !== undefined) {
-        updateFields.push(`progress_percentage = $${paramIndex++}::numeric`);
+        updateFields.push(`progress_percentage = $${paramIndex}`);
         params.push(Math.max(0, Math.min(100, progressValue)));
+        paramIndex++;
       }
       if (timeValue !== undefined) {
-        updateFields.push(`time_spent_minutes = $${paramIndex++}::integer`);
+        updateFields.push(`time_spent_minutes = $${paramIndex}`);
         params.push(Math.max(0, Math.floor(timeValue)));
+        paramIndex++;
       }
       if (notes !== undefined) {
-        updateFields.push(`notes = $${paramIndex++}`);
+        updateFields.push(`notes = $${paramIndex}`);
         params.push(notes);
+        paramIndex++;
       }
 
       updateFields.push(`last_accessed_at = CURRENT_TIMESTAMP`);
       updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
       
-      // Add userId and targetLessonId to params, then use their indices in WHERE clause
-      // paramIndex is the next available index, so userId will be at paramIndex and targetLessonId at paramIndex + 1
-      params.push(userId, targetLessonId);
+      // Add userId and targetLessonId to params for WHERE clause
+      // paramIndex is the next available index
       const userIdParamIndex = paramIndex;
       const lessonIdParamIndex = paramIndex + 1;
+      params.push(userId, targetLessonId);
 
-      result = await pool.query(
-        `UPDATE gxp_student_progress 
+      const query = `UPDATE gxp_student_progress 
           SET ${updateFields.join(', ')}
           WHERE user_id = $${userIdParamIndex} AND lesson_id = $${lessonIdParamIndex}
-          RETURNING *`,
-        params
-      );
+          RETURNING *`;
+
+      console.log('Update query:', query);
+      console.log('Params count:', params.length, 'Params:', params);
+      console.log('Expected param indices: userId=$' + userIdParamIndex + ', lessonId=$' + lessonIdParamIndex);
+
+      result = await pool.query(query, params);
     } else {
       // Create new progress record
       const completedAt = status === 'completed' ? 'CURRENT_TIMESTAMP' : 'NULL';
