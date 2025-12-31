@@ -326,12 +326,17 @@ async function updateLessonProgress(pool, userId, body, corsHeaders, lessonId = 
 
       updateFields.push(`last_accessed_at = CURRENT_TIMESTAMP`);
       updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+      
+      // Add userId and targetLessonId to params, then use their indices in WHERE clause
+      // paramIndex is the next available index, so userId will be at paramIndex and targetLessonId at paramIndex + 1
       params.push(userId, targetLessonId);
+      const userIdParamIndex = paramIndex;
+      const lessonIdParamIndex = paramIndex + 1;
 
       result = await pool.query(
         `UPDATE gxp_student_progress 
           SET ${updateFields.join(', ')}
-          WHERE user_id = $${paramIndex - 1} AND lesson_id = $${paramIndex}
+          WHERE user_id = $${userIdParamIndex} AND lesson_id = $${lessonIdParamIndex}
           RETURNING *`,
         params
       );
