@@ -273,7 +273,7 @@ async function getCourseDetails(pool, courseId, corsHeaders) {
 
     const course = courseResult.rows[0];
 
-    // Get modules with lessons
+    // Get modules with lessons and linked resource details
     const modulesResult = await pool.query(
       `SELECT 
         m.id,
@@ -291,14 +291,22 @@ async function getCourseDetails(pool, courseId, corsHeaders) {
             'content_type', l.content_type,
             'estimated_minutes', l.estimated_minutes,
             'cfr_regulation_id', l.cfr_regulation_id,
+            'cfr_regulation_title', cfr.title,
+            'cfr_regulation_identifier', cfr.regulation_id,
             'document_id', l.document_id,
+            'document_name', d.document_name,
+            'document_number', d.document_number,
             'workflow_template_id', l.workflow_template_id,
+            'workflow_template_name', w.name,
             'created_at', l.created_at,
             'updated_at', l.updated_at
           ) ORDER BY l.lesson_order
         ) FILTER (WHERE l.id IS NOT NULL) as lessons
       FROM gxp_modules m
       LEFT JOIN gxp_lessons l ON m.id = l.module_id
+      LEFT JOIN cfr_title21_regulations cfr ON l.cfr_regulation_id = cfr.id
+      LEFT JOIN Veeva_Doc_Chat_document_index d ON l.document_id = d.id
+      LEFT JOIN qms_chat_workflow_templates w ON l.workflow_template_id = w.id
       WHERE m.course_id = $1
       GROUP BY m.id, m.module_order, m.title, m.description, m.created_at, m.updated_at
       ORDER BY m.module_order`,

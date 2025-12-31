@@ -215,9 +215,94 @@ export default function LessonViewer({ lesson, course, module, onBack, onNextLes
               </div>
             )}
           </div>
+        ) : lesson.cfr_regulation_id || lesson.document_id || lesson.workflow_template_id ? (
+          <div className="space-y-4">
+            <div className="prose max-w-none">
+              {lesson.description && (
+                <div className="mb-6">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {lesson.description}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900">Linked Resources</h3>
+              
+              {lesson.cfr_regulation_id && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <BookOpen className="w-5 h-5 text-blue-600 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-medium text-blue-900">CFR Regulation</h4>
+                      <p className="text-sm text-blue-700 mt-1">
+                        {lesson.cfr_regulation_title || lesson.cfr_regulation_identifier || `Regulation ID: ${lesson.cfr_regulation_id}`}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-2">
+                        This lesson references a CFR Title 21 regulation. You can ask the AI Tutor about this regulation or explore it through the document chat interface.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {lesson.document_id && (
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <BookOpen className="w-5 h-5 text-green-600 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-medium text-green-900">Document</h4>
+                      <p className="text-sm text-green-700 mt-1">
+                        {lesson.document_name || `Document ID: ${lesson.document_id}`}
+                      </p>
+                      {lesson.document_number && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          Document Number: {lesson.document_number}
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-600 mt-2">
+                        This lesson references a document. You can access it through the document chat interface or ask the AI Tutor questions about it.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {lesson.workflow_template_id && (
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <BookOpen className="w-5 h-5 text-purple-600 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-medium text-purple-900">Workflow Exercise</h4>
+                      <p className="text-sm text-purple-700 mt-1">
+                        {lesson.workflow_template_name || `Workflow ID: ${lesson.workflow_template_id}`}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-2">
+                        This lesson includes a workflow exercise. Use the AI Tutor to work through the workflow steps and complete the exercise.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+              <p className="text-sm text-indigo-800">
+                <strong>Tip:</strong> Click "Ask AI Tutor" above to interact with the linked resources and get help with this lesson.
+              </p>
+            </div>
+          </div>
         ) : (
           <div className="text-center py-12 text-gray-600">
             <p>No content available for this lesson yet.</p>
+            {lesson.description && (
+              <div className="mt-4 prose max-w-none text-left">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {lesson.description}
+                </ReactMarkdown>
+              </div>
+            )}
           </div>
         )}
       </div>
