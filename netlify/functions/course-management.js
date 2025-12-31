@@ -535,8 +535,29 @@ async function updateLesson(pool, lessonId, body, corsHeaders) {
       params.push(cfr_regulation_id || null);
     }
     if (document_id !== undefined) {
+      let resolvedDocumentId = document_id;
+      
+      // If document_id is a UUID string (veeva_document_id), look up the integer id
+      if (document_id && typeof document_id === 'string' && document_id.includes('-')) {
+        const docLookup = await pool.query(
+          'SELECT id FROM Veeva_Doc_Chat_document_index WHERE veeva_document_id = $1',
+          [document_id]
+        );
+        if (docLookup.rows.length > 0) {
+          resolvedDocumentId = docLookup.rows[0].id;
+        } else {
+          return createErrorResponse(404, 'Document not found', corsHeaders);
+        }
+      } else if (document_id) {
+        // Try to parse as integer if it's a string number
+        resolvedDocumentId = parseInt(document_id);
+        if (isNaN(resolvedDocumentId)) {
+          return createErrorResponse(400, 'Invalid document ID format', corsHeaders);
+        }
+      }
+      
       updateFields.push(`document_id = $${paramIndex++}`);
-      params.push(document_id || null);
+      params.push(resolvedDocumentId || null);
     }
     if (workflow_template_id !== undefined) {
       updateFields.push(`workflow_template_id = $${paramIndex++}`);
@@ -702,6 +723,26 @@ async function createLesson(pool, moduleId, body, corsHeaders) {
       return createErrorResponse(400, 'Title is required', corsHeaders);
     }
 
+    // Resolve document_id if it's a UUID
+    let resolvedDocumentId = document_id;
+    if (document_id && typeof document_id === 'string' && document_id.includes('-')) {
+      const docLookup = await pool.query(
+        'SELECT id FROM Veeva_Doc_Chat_document_index WHERE veeva_document_id = $1',
+        [document_id]
+      );
+      if (docLookup.rows.length > 0) {
+        resolvedDocumentId = docLookup.rows[0].id;
+      } else {
+        return createErrorResponse(404, 'Document not found', corsHeaders);
+      }
+    } else if (document_id) {
+      // Try to parse as integer if it's a string number
+      resolvedDocumentId = parseInt(document_id);
+      if (isNaN(resolvedDocumentId)) {
+        return createErrorResponse(400, 'Invalid document ID format', corsHeaders);
+      }
+    }
+
     // Calculate next lesson_order
     const orderResult = await pool.query(
       `SELECT COALESCE(MAX(lesson_order), 0) + 1 as next_order 
@@ -724,7 +765,7 @@ async function createLesson(pool, moduleId, body, corsHeaders) {
         content_type || 'text',
         estimated_minutes || null,
         cfr_regulation_id || null,
-        document_id || null,
+        resolvedDocumentId || null,
         workflow_template_id || null
       ]
     );

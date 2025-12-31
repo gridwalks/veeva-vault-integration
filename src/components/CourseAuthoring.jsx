@@ -313,10 +313,14 @@ export default function CourseAuthoring() {
       
       const updateData = {};
       if (linkType === 'cfr') {
+        // CFR regulations use integer IDs
         updateData.cfr_regulation_id = parseInt(resourceId);
       } else if (linkType === 'document') {
-        updateData.document_id = parseInt(resourceId);
+        // Documents can be UUID (veeva_document_id) or integer (id)
+        // Backend will handle the conversion
+        updateData.document_id = resourceId;
       } else if (linkType === 'workflow') {
+        // Workflows use integer IDs
         updateData.workflow_template_id = parseInt(resourceId);
       }
       
