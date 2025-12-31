@@ -12,6 +12,7 @@ export const handler = async (event) => {
     // Get all regulations that have chunks
     const query = `
       SELECT DISTINCT
+        r.id,
         r.regulation_id,
         r.regulation_type,
         r.title,
@@ -21,7 +22,7 @@ export const handler = async (event) => {
         COUNT(c.id) as chunk_count
       FROM cfr_title21_regulations r
       INNER JOIN cfr_title21_regulation_chunks c ON r.id = c.regulation_id
-      GROUP BY r.regulation_id, r.regulation_type, r.title, r.granule_id, r.chapter_id, r.subchapter_id
+      GROUP BY r.id, r.regulation_id, r.regulation_type, r.title, r.granule_id, r.chapter_id, r.subchapter_id
       ORDER BY r.regulation_id
     `;
 
@@ -36,6 +37,7 @@ export const handler = async (event) => {
       body: JSON.stringify({
         success: true,
         regulations: result.rows.map(row => ({
+          id: row.id,
           regulationId: row.regulation_id,
           regulationType: row.regulation_type,
           title: row.title,

@@ -295,26 +295,64 @@ export default function CourseAuthoring() {
 
   async function handleSaveLessonLink(resourceId) {
     try {
+      if (!selectedLesson?.id) {
+        setError('Please select a lesson first');
+        setShowLinkModal(false);
+        return;
+      }
+
+      if (!resourceId) {
+        setError('Invalid resource ID');
+        setShowLinkModal(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
       const accessToken = await getAccessTokenSilently();
       
       const updateData = {};
       if (linkType === 'cfr') {
-        updateData.cfr_regulation_id = resourceId;
+        updateData.cfr_regulation_id = parseInt(resourceId);
       } else if (linkType === 'document') {
-        updateData.document_id = resourceId;
+        updateData.document_id = parseInt(resourceId);
       } else if (linkType === 'workflow') {
-        updateData.workflow_template_id = resourceId;
+        updateData.workflow_template_id = parseInt(resourceId);
       }
       
+      console.log('Linking resource:', { linkType, resourceId, updateData, lessonId: selectedLesson.id });
+      
       await updateLesson(selectedLesson.id, updateData, accessToken);
+      
+      // Reload course details to get updated lesson data
       await loadCourseDetails(selectedCourse.id);
+      
+      // Update selectedLesson with the refreshed data
+      const updatedCourse = await getCourse(selectedCourse.id, accessToken);
+      const updatedModule = updatedCourse.course.modules?.find(m => m.id === selectedModule.id);
+      if (updatedModule) {
+        setSelectedModule(updatedModule);
+        const updatedLesson = updatedModule.lessons?.find(l => l.id === selectedLesson.id);
+        if (updatedLesson) {
+          setSelectedLesson(updatedLesson);
+          setLessonForm({
+            title: updatedLesson.title,
+            description: updatedLesson.description || '',
+            content_type: updatedLesson.content_type || 'text',
+            estimated_minutes: updatedLesson.estimated_minutes,
+            cfr_regulation_id: updatedLesson.cfr_regulation_id,
+            document_id: updatedLesson.document_id,
+            workflow_template_id: updatedLesson.workflow_template_id
+          });
+        }
+      }
+      
       setShowLinkModal(false);
       alert('Resource linked successfully!');
     } catch (err) {
       console.error('Error linking resource:', err);
       setError(err.message || 'Failed to link resource');
+      setShowLinkModal(false);
     } finally {
       setLoading(false);
     }
@@ -961,20 +999,43 @@ export default function CourseAuthoring() {
             </div>
             
             <div className="space-y-2">
-              {availableResources.map(resource => (
-                <button
-                  key={resource.id || resource.regulationId}
-                  onClick={() => handleSaveLessonLink(resource.id || resource.regulationId)}
-                  className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50"
-                >
-                  <div className="font-medium text-gray-900">
-                    {resource.title || resource.document_name || resource.name}
-                  </div>
-                  {resource.regulation_id && (
-                    <div className="text-sm text-gray-500">{resource.regulation_id}</div>
-                  )}
-                </button>
-              ))}
+              {availableResources.length === 0 ? (
+                <div className="text-center text-gray-500 py-4 text-sm">
+                  No resources available
+                </div>
+              ) : (
+                availableResources.map(resource => {
+                  // For CFR regulations, use the database id (primary key)
+                  // For documents, use the id field
+                  const resourceId = linkType === 'cfr' 
+                    ? (resource.id || resource.regulationId) 
+                    : (resource.id || resource.document_id);
+                  
+                  return (
+                    <button
+                      key={resource.id || resource.regulationId || resource.document_id}
+                      onClick={() => {
+                        if (resourceId) {
+                          handleSaveLessonLink(resourceId);
+                        } else {
+                          setError('Invalid resource ID');
+                          setShowLinkModal(false);
+                        }
+                      }}
+                      className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50"
+                    >
+                      <div className="font-medium text-gray-900">
+                        {resource.title || resource.document_name || resource.name}
+                      </div>
+                      {(resource.regulation_id || resource.regulationId) && (
+                        <div className="text-sm text-gray-500">
+                          {resource.regulation_id || resource.regulationId}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
