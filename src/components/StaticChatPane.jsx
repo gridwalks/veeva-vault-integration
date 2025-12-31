@@ -1998,7 +1998,7 @@ The documents will be automatically included in the comparison analysis.
                 color: '#374151',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
-                What can I help you with today?
+                What do you want to learn today?
               </h4>
               {selectedDocuments.length > 0 && (
                 <div style={{ 
@@ -2079,7 +2079,7 @@ The documents will be automatically included in the comparison analysis.
             onFilesChange={(files) => {
               // Optional: Handle file changes if needed
             }}
-            placeholder={workflowState.isActive ? "Answer the workflow question above..." : "Ask a question about your documents or click + to attach files for comparison..."}
+            placeholder={workflowState.isActive ? "Answer the workflow question above..." : "Ask me a questions"}
             disabled={isLoading || isProcessingAttachments}
           />
           

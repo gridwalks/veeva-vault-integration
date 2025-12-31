@@ -1256,7 +1256,7 @@ The files will upload automatically and I'll be able to perform a detailed compa
               }}>
                 <div style={{ fontSize: '48px', marginBottom: '16px' }}>🚀</div>
                 <h4 style={{ margin: '0 0 8px 0', color: '#333' }}>
-                  What can I help you with today?
+                  What do you want to learn today?
                 </h4>
                 {selectedDocuments.length > 0 && (
                   <div style={{ 
@@ -1364,7 +1364,7 @@ The files will upload automatically and I'll be able to perform a detailed compa
               onFilesChange={(files) => {
                 // Optional: Handle file changes if needed
               }}
-              placeholder="Ask a question about your documents or click + to attach files for comparison..."
+              placeholder="Ask me a questions"
               disabled={isLoading || isProcessingAttachments}
             />
             
