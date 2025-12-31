@@ -182,7 +182,8 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
 
   const startEditingDocument = (doc) => {
     const fallbackName = doc.document_name || doc.original_filename || 'Untitled Document';
-    setEditingDocumentId(doc.id);
+    const documentId = doc.id || doc.document_id;
+    setEditingDocumentId(documentId);
     setMetadataForm({
       documentName: fallbackName,
       safeFileName: doc.safe_file_name || '',
@@ -262,13 +263,19 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
       return;
     }
 
+    const documentId = doc.id || doc.document_id;
+    if (!documentId) {
+      setMetadataError('Cannot delete document: missing document ID.');
+      return;
+    }
+
     setMetadataError(null);
     setMetadataMessage(null);
-    setDeletingDocumentId(doc.id);
+    setDeletingDocumentId(documentId);
 
     try {
       const response = await deleteDocument({
-        documentId: doc.id,
+        documentId: documentId,
         sourceType: 'upload'
       });
 
@@ -276,7 +283,7 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
         throw new Error(response?.error || 'Failed to delete document.');
       }
 
-      if (editingDocumentId === doc.id) {
+      if (editingDocumentId === documentId) {
         setEditingDocumentId(null);
         setMetadataForm(initialMetadataForm);
       }
@@ -671,7 +678,9 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
               <div>Actions</div>
             </div>
             {uploadedDocuments.map((doc, index) => {
-              const isEditing = editingDocumentId === doc.id;
+              // Use document_id if id is not available (for backwards compatibility)
+              const documentId = doc.id || doc.document_id;
+              const isEditing = editingDocumentId === documentId;
               const uploadedDate = doc.created_at ? new Date(doc.created_at).toLocaleString() : 'N/A';
               const updatedDate = doc.updated_at ? new Date(doc.updated_at).toLocaleString() : uploadedDate;
               const manualSummaryText = doc.manual_summary || 'No manual summary provided.';
@@ -679,7 +688,7 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
 
               return (
                 <div
-                  key={doc.id || index}
+                  key={documentId || index}
                   style={{
                     borderBottom: index < uploadedDocuments.length - 1 ? '1px solid #e5e7eb' : 'none',
                     backgroundColor: isEditing ? '#eef2ff' : 'transparent',
@@ -832,54 +841,62 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                         </>
                       ) : (
                           <>
-                            <a
-                              href={downloadUploadedDocumentUrl({ documentId: doc.id })}
-                            download
-                            style={{
-                              padding: '8px 16px',
-                              backgroundColor: '#4338ca',
-                              color: '#ffffff',
-                              textDecoration: 'none',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              fontWeight: '500'
-                            }}
-                          >
-                            Download
-                          </a>
-                          <button
-                            onClick={() => startEditingDocument(doc)}
-                            style={{
-                              padding: '8px 16px',
-                              backgroundColor: '#2563eb',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              fontWeight: '500',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUploadedDocument(doc)}
-                            disabled={deletingDocumentId === doc.id}
-                            style={{
-                              padding: '8px 16px',
-                              backgroundColor: '#dc2626',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              fontWeight: '500',
-                              cursor: deletingDocumentId === doc.id ? 'not-allowed' : 'pointer',
-                              opacity: deletingDocumentId === doc.id ? 0.7 : 1
-                            }}
-                          >
-                            {deletingDocumentId === doc.id ? 'Deleting...' : 'Delete'}
-                          </button>
-                        </>
+                            {documentId ? (
+                              <>
+                                <a
+                                  href={downloadUploadedDocumentUrl({ documentId: documentId })}
+                                  download
+                                  style={{
+                                    padding: '8px 16px',
+                                    backgroundColor: '#4338ca',
+                                    color: '#ffffff',
+                                    textDecoration: 'none',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    fontWeight: '500'
+                                  }}
+                                >
+                                  Download
+                                </a>
+                                <button
+                                  onClick={() => startEditingDocument(doc)}
+                                  style={{
+                                    padding: '8px 16px',
+                                    backgroundColor: '#2563eb',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    fontWeight: '500',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUploadedDocument(doc)}
+                                  disabled={deletingDocumentId === documentId}
+                                  style={{
+                                    padding: '8px 16px',
+                                    backgroundColor: '#dc2626',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    fontWeight: '500',
+                                    cursor: deletingDocumentId === documentId ? 'not-allowed' : 'pointer',
+                                    opacity: deletingDocumentId === documentId ? 0.7 : 1
+                                  }}
+                                >
+                                  {deletingDocumentId === documentId ? 'Deleting...' : 'Delete'}
+                                </button>
+                              </>
+                            ) : (
+                              <span style={{ fontSize: '12px', color: '#6b7280', fontStyle: 'italic' }}>
+                                Loading...
+                              </span>
+                            )}
+                          </>
                       )}
                     </div>
                   </div>
