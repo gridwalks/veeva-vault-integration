@@ -87,7 +87,18 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
     setMetadataError(null);
     try {
       const result = await getUploadedDocuments({ limit: 100, offset: 0, search: '', userId });
-      setUploadedDocuments(result.items || []);
+      const documents = result.items || [];
+      console.log('Loaded uploaded documents:', {
+        count: documents.length,
+        firstDocument: documents[0] ? {
+          id: documents[0].id,
+          document_id: documents[0].document_id,
+          document_name: documents[0].document_name,
+          hasId: !!documents[0].id,
+          hasDocumentId: !!documents[0].document_id
+        } : null
+      });
+      setUploadedDocuments(documents);
     } catch (error) {
       console.error('Error loading uploaded documents:', error);
       setMetadataError('Failed to load uploaded documents. Please try again.');
@@ -182,7 +193,12 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
 
   const startEditingDocument = (doc) => {
     const fallbackName = doc.document_name || doc.original_filename || 'Untitled Document';
-    const documentId = doc.id || doc.document_id;
+    const documentId = doc.id ?? doc.document_id ?? null;
+    if (!documentId) {
+      console.error('Cannot edit document: missing document ID', doc);
+      setMetadataError('Cannot edit document: missing document ID.');
+      return;
+    }
     setEditingDocumentId(documentId);
     setMetadataForm({
       documentName: fallbackName,
@@ -263,8 +279,9 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
       return;
     }
 
-    const documentId = doc.id || doc.document_id;
-    if (!documentId) {
+    const documentId = doc.id ?? doc.document_id ?? null;
+    if (documentId == null || documentId === '') {
+      console.error('Cannot delete document: missing document ID', doc);
       setMetadataError('Cannot delete document: missing document ID.');
       return;
     }
@@ -679,8 +696,20 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
             </div>
             {uploadedDocuments.map((doc, index) => {
               // Use document_id if id is not available (for backwards compatibility)
-              const documentId = doc.id || doc.document_id;
+              // Handle both null/undefined and ensure we get a valid ID
+              const documentId = doc.id ?? doc.document_id ?? null;
               const isEditing = editingDocumentId === documentId;
+              
+              // Debug logging for first document
+              if (index === 0) {
+                console.log('Rendering first document:', {
+                  doc,
+                  id: doc.id,
+                  document_id: doc.document_id,
+                  documentId,
+                  hasDocumentId: documentId != null && documentId !== ''
+                });
+              }
               const uploadedDate = doc.created_at ? new Date(doc.created_at).toLocaleString() : 'N/A';
               const updatedDate = doc.updated_at ? new Date(doc.updated_at).toLocaleString() : uploadedDate;
               const manualSummaryText = doc.manual_summary || 'No manual summary provided.';
@@ -841,7 +870,7 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                         </>
                       ) : (
                           <>
-                            {documentId ? (
+                            {documentId != null && documentId !== '' ? (
                               <>
                                 <a
                                   href={downloadUploadedDocumentUrl({ documentId: documentId })}
