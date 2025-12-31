@@ -14,6 +14,15 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
   const [currentVersionIndex, setCurrentVersionIndex] = React.useState(0);
   const [workflowInstanceId, setWorkflowInstanceId] = React.useState(null);
   const [isRepolishing, setIsRepolishing] = React.useState(false);
+  
+  // Collapsible sections state - default to all expanded
+  const [expandedGroups, setExpandedGroups] = React.useState({
+    veeva: true,
+    upload: true,
+    cfr_regulation: true,
+    attachment: true,
+    unknown: true
+  });
 
   // Helper functions for document display
   const getDocumentDisplayName = (doc) => {
@@ -22,6 +31,84 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
 
   const getDocumentDisplayNumber = (doc) => {
     return doc?.document_number || doc?.documentNumber || doc?.number || '';
+  };
+
+  // Group documents by source_type and sort by similarity
+  const groupAndSortDocuments = (documents) => {
+    const groups = {
+      veeva: [],
+      upload: [],
+      cfr_regulation: [],
+      attachment: [],
+      unknown: []
+    };
+
+    documents.forEach(doc => {
+      const sourceType = doc.source_type || 'unknown';
+      if (groups[sourceType]) {
+        groups[sourceType].push(doc);
+      } else {
+        groups.unknown.push(doc);
+      }
+    });
+
+    // Sort each group by maxSimilarity (descending), then alphabetically
+    Object.keys(groups).forEach(key => {
+      groups[key].sort((a, b) => {
+        const aScore = a.maxSimilarity ?? -1;
+        const bScore = b.maxSimilarity ?? -1;
+        if (aScore !== bScore) {
+          return bScore - aScore; // Higher similarity first
+        }
+        // Fallback to alphabetical
+        const aName = getDocumentDisplayName(a).toLowerCase();
+        const bName = getDocumentDisplayName(b).toLowerCase();
+        return aName.localeCompare(bName);
+      });
+    });
+
+    return groups;
+  };
+
+  const toggleGroup = (groupKey) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupKey]: !prev[groupKey]
+    }));
+  };
+
+  const toggleAllGroups = () => {
+    const allExpanded = Object.values(expandedGroups).every(v => v);
+    const newState = !allExpanded;
+    setExpandedGroups({
+      veeva: newState,
+      upload: newState,
+      cfr_regulation: newState,
+      attachment: newState,
+      unknown: newState
+    });
+  };
+
+  const getGroupLabel = (sourceType) => {
+    const labels = {
+      veeva: 'Veeva Documents',
+      upload: 'Uploaded Documents',
+      cfr_regulation: 'CFR Regulations',
+      attachment: 'Attachments',
+      unknown: 'Other Documents'
+    };
+    return labels[sourceType] || 'Documents';
+  };
+
+  const getGroupIcon = (sourceType) => {
+    const icons = {
+      veeva: '📋',
+      upload: '📤',
+      cfr_regulation: '📜',
+      attachment: '📎',
+      unknown: '📄'
+    };
+    return icons[sourceType] || '📄';
   };
 
   const handleOpenDocument = React.useCallback(async (document) => {
@@ -960,109 +1047,260 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
               gap: '16px'
             }}>
               {/* Referenced Documents Section */}
-              {referencedDocuments.length > 0 && (
-                <div>
-                  <div style={{
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: '#374151',
-                    marginBottom: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                  }}>
-                    📄 Documents referenced in response:
-                    {referencedDocuments.length > 5 && (
-                      <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: '4px', fontWeight: '400' }}>
-                        (showing 5 of {referencedDocuments.length} total)
-                      </span>
-                    )}
-                  </div>
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px'
-                  }}>
-                    {referencedDocuments.slice(0, 5).map((doc, index) => {
-                      const displayName = getDocumentDisplayName(doc);
-                      const displayNumber = getDocumentDisplayNumber(doc);
+              {referencedDocuments.length > 0 && (() => {
+                const groupedDocs = groupAndSortDocuments(referencedDocuments);
+                const groupKeys = ['veeva', 'upload', 'cfr_regulation', 'attachment', 'unknown'];
+                const hasMultipleGroups = groupKeys.filter(key => groupedDocs[key].length > 0).length > 1;
+                const totalDocs = referencedDocuments.length;
 
-                      return (
-                        <div key={doc.veeva_document_id || doc.id || index} style={{
-                          padding: '16px',
-                          backgroundColor: '#f8fafc',
-                          border: '1px solid #e5e7eb',
-                          borderRadius: '8px',
-                          transition: 'all 0.2s ease'
-                        }}>
-                          <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'flex-start',
-                            marginBottom: '8px'
+                return (
+                  <div>
+                    {/* Header with Expand/Collapse All */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '12px'
+                    }}>
+                      <div style={{
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        color: '#374151',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                      }}>
+                        📄 Documents referenced in response:
+                        <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: '400' }}>
+                          ({totalDocs} {totalDocs === 1 ? 'document' : 'documents'})
+                        </span>
+                      </div>
+                      {hasMultipleGroups && (
+                        <button
+                          onClick={toggleAllGroups}
+                          style={{
+                            padding: '4px 8px',
+                            fontSize: '11px',
+                            color: '#4338ca',
+                            backgroundColor: 'transparent',
+                            border: '1px solid #4338ca',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = '#4338ca';
+                            e.target.style.color = '#ffffff';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = 'transparent';
+                            e.target.style.color = '#4338ca';
+                          }}
+                        >
+                          {Object.values(expandedGroups).every(v => v) ? 'Collapse All' : 'Expand All'}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Grouped Document Sections */}
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px'
+                    }}>
+                      {groupKeys.map(groupKey => {
+                        const docs = groupedDocs[groupKey];
+                        if (docs.length === 0) return null;
+
+                        const isExpanded = expandedGroups[groupKey];
+                        const groupLabel = getGroupLabel(groupKey);
+                        const groupIcon = getGroupIcon(groupKey);
+
+                        return (
+                          <div key={groupKey} style={{
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            backgroundColor: '#ffffff'
                           }}>
-                            <div style={{ flex: 1 }}>
-                              <h4 style={{
-                                margin: '0 0 3px 0',
+                            {/* Group Header */}
+                            <button
+                              onClick={() => toggleGroup(groupKey)}
+                              style={{
+                                width: '100%',
+                                padding: '12px 16px',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                backgroundColor: '#f8fafc',
+                                border: 'none',
+                                borderBottom: isExpanded ? '1px solid #e5e7eb' : 'none',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s ease',
+                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                              }}
+                              onMouseEnter={(e) => e.target.style.backgroundColor = '#f1f5f9'}
+                              onMouseLeave={(e) => e.target.style.backgroundColor = '#f8fafc'}
+                            >
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
                                 fontSize: '13px',
                                 fontWeight: '600',
-                                color: '#374151',
-                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                                color: '#374151'
                               }}>
-                                {displayName}
-                              </h4>
-                              <div style={{
-                                fontSize: '11px',
-                                color: '#6b7280',
-                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                                marginBottom: '6px'
-                              }}>
-                                {displayNumber ? `${displayNumber} • ` : ''}Version {doc.version || '1.0'} • {doc.type || doc.document_type || 'Unknown'}
-                              </div>
-                              {doc.summary && (
-                                <p style={{
-                                  margin: 0,
-                                  fontSize: '12px',
+                                <span>{groupIcon}</span>
+                                <span>{groupLabel}</span>
+                                <span style={{
+                                  fontSize: '11px',
+                                  fontWeight: '400',
                                   color: '#6b7280',
-                                  lineHeight: '1.3',
-                                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                                  backgroundColor: '#e5e7eb',
+                                  padding: '2px 6px',
+                                  borderRadius: '10px'
                                 }}>
-                                  {doc.summary.length > 150 ? `${doc.summary.substring(0, 150)}...` : doc.summary}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <div style={{
-                            display: 'flex',
-                            gap: '8px'
-                          }}>
-                            <button
-                              onClick={() => handleOpenDocument(doc)}
-                              style={{
-                                padding: '6px 12px',
-                                backgroundColor: '#4338ca',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '6px',
+                                  {docs.length}
+                                </span>
+                              </div>
+                              <span style={{
                                 fontSize: '12px',
-                                cursor: 'pointer',
-                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                                transition: 'background-color 0.2s ease'
-                              }}
-                              onMouseEnter={(e) => e.target.style.backgroundColor = '#312e81'}
-                              onMouseLeave={(e) => e.target.style.backgroundColor = '#4338ca'}
-                            >
-                              📖 View Document
+                                color: '#6b7280',
+                                transition: 'transform 0.2s ease',
+                                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
+                              }}>
+                                ▼
+                              </span>
                             </button>
+
+                            {/* Group Content */}
+                            {isExpanded && (
+                              <div style={{
+                                padding: '12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '10px'
+                              }}>
+                                {docs.map((doc, index) => {
+                                  const displayName = getDocumentDisplayName(doc);
+                                  const displayNumber = getDocumentDisplayNumber(doc);
+                                  const similarityScore = doc.maxSimilarity;
+                                  const similarityPercent = similarityScore ? Math.round(similarityScore * 100) : null;
+
+                                  return (
+                                    <div key={doc.veeva_document_id || doc.id || doc.document_id || index} style={{
+                                      padding: '14px',
+                                      backgroundColor: '#f8fafc',
+                                      border: '1px solid #e5e7eb',
+                                      borderRadius: '6px',
+                                      transition: 'all 0.2s ease'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.borderColor = '#4338ca';
+                                      e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(67, 56, 202, 0.1)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.borderColor = '#e5e7eb';
+                                      e.currentTarget.style.boxShadow = 'none';
+                                    }}
+                                    >
+                                      <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'flex-start',
+                                        marginBottom: '8px',
+                                        gap: '12px'
+                                      }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                          <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            marginBottom: '4px',
+                                            flexWrap: 'wrap'
+                                          }}>
+                                            <h4 style={{
+                                              margin: 0,
+                                              fontSize: '13px',
+                                              fontWeight: '600',
+                                              color: '#374151',
+                                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                                            }}>
+                                              {displayName}
+                                            </h4>
+                                            {similarityPercent !== null && (
+                                              <span style={{
+                                                fontSize: '10px',
+                                                fontWeight: '600',
+                                                color: similarityPercent >= 80 ? '#16a34a' : similarityPercent >= 60 ? '#f59e0b' : '#6b7280',
+                                                backgroundColor: similarityPercent >= 80 ? '#dcfce7' : similarityPercent >= 60 ? '#fef3c7' : '#f3f4f6',
+                                                padding: '2px 6px',
+                                                borderRadius: '4px',
+                                                whiteSpace: 'nowrap'
+                                              }}>
+                                                {similarityPercent}% relevant
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div style={{
+                                            fontSize: '11px',
+                                            color: '#6b7280',
+                                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                            marginBottom: '6px'
+                                          }}>
+                                            {displayNumber ? `${displayNumber} • ` : ''}Version {doc.version || '1.0'} • {doc.type || doc.document_type || 'Unknown'}
+                                          </div>
+                                          {doc.summary && (
+                                            <p style={{
+                                              margin: 0,
+                                              fontSize: '12px',
+                                              color: '#6b7280',
+                                              lineHeight: '1.4',
+                                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                                            }}>
+                                              {doc.summary.length > 150 ? `${doc.summary.substring(0, 150)}...` : doc.summary}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                      
+                                      <div style={{
+                                        display: 'flex',
+                                        gap: '8px'
+                                      }}>
+                                        <button
+                                          onClick={() => handleOpenDocument(doc)}
+                                          style={{
+                                            padding: '6px 12px',
+                                            backgroundColor: '#4338ca',
+                                            color: '#ffffff',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            fontSize: '12px',
+                                            cursor: 'pointer',
+                                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                            transition: 'background-color 0.2s ease'
+                                          }}
+                                          onMouseEnter={(e) => e.target.style.backgroundColor = '#312e81'}
+                                          onMouseLeave={(e) => e.target.style.backgroundColor = '#4338ca'}
+                                        >
+                                          📖 View Document
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* External Resources Section */}
               {referencedExternalResources.length > 0 && (

@@ -358,11 +358,57 @@ async function processAttachments(attachments = []) {
   return processed;
 }
 
-function buildResponseDocuments(relevantDocuments, processedAttachments = []) {
+function buildResponseDocuments(relevantDocuments, processedAttachments = [], relevantChunks = []) {
+  // Create a map of document IDs to similarity scores from chunks
+  const docSimilarityMap = new Map();
+  
+  relevantChunks.forEach(chunk => {
+    let docId = null;
+    if (chunk.source_type === 'veeva' && chunk.veeva_document_id) {
+      docId = chunk.veeva_document_id;
+    } else if (chunk.source_type === 'upload' && chunk.upload_document_id) {
+      docId = chunk.upload_document_id;
+    } else if (chunk.source_type === 'cfr_regulation' && chunk.regulation_id) {
+      docId = chunk.regulation_id;
+    }
+    
+    if (docId && chunk.similarity !== undefined) {
+      if (!docSimilarityMap.has(docId)) {
+        docSimilarityMap.set(docId, []);
+      }
+      docSimilarityMap.get(docId).push(chunk.similarity);
+    }
+  });
+  
+  // Calculate max and avg similarity for each document
+  const getSimilarityScores = (doc) => {
+    let docId = null;
+    if (doc.source_type === 'veeva' && doc.veeva_document_id) {
+      docId = doc.veeva_document_id;
+    } else if (doc.source_type === 'upload' && (doc.document_id || doc.id)) {
+      docId = doc.document_id || doc.id;
+    } else if (doc.source_type === 'cfr_regulation' && doc.regulation_id) {
+      docId = doc.regulation_id;
+    } else {
+      docId = doc.veeva_document_id || doc.document_id || doc.id || doc.number || doc.name;
+    }
+    
+    const similarities = docSimilarityMap.get(docId) || [];
+    if (similarities.length === 0) {
+      return { maxSimilarity: null, avgSimilarity: null };
+    }
+    
+    const maxSimilarity = Math.max(...similarities);
+    const avgSimilarity = similarities.reduce((a, b) => a + b, 0) / similarities.length;
+    
+    return { maxSimilarity, avgSimilarity };
+  };
+
   return [
     ...relevantDocuments.map((doc) => {
       const isVeevaDoc = doc.source_type === "veeva";
       const isUploadedDoc = doc.source_type === "upload";
+      const similarityScores = getSimilarityScores(doc);
 
       if (isUploadedDoc) {
         const safeName =
@@ -394,6 +440,8 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = []) {
           safe_file_name: safeName,
           safeFileName: safeName,
           original_filename: doc.original_filename || null,
+          maxSimilarity: similarityScores.maxSimilarity,
+          avgSimilarity: similarityScores.avgSimilarity,
         };
       }
 
@@ -408,6 +456,8 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = []) {
           type: doc.document_type,
           status: doc.status,
           source_type: "veeva",
+          maxSimilarity: similarityScores.maxSimilarity,
+          avgSimilarity: similarityScores.avgSimilarity,
         };
       }
 
@@ -419,6 +469,8 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = []) {
         type: doc.document_type || doc.type || "unknown",
         status: doc.status || "unknown",
         source_type: doc.source_type || "unknown",
+        maxSimilarity: similarityScores.maxSimilarity,
+        avgSimilarity: similarityScores.avgSimilarity,
       };
     }),
     ...processedAttachments.map((attachment, index) => ({
@@ -432,6 +484,8 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = []) {
       isUploaded: true,
       isAttachment: true,
       extraction_method: attachment.extractionMethod,
+      maxSimilarity: null,
+      avgSimilarity: null,
     })),
   ];
 }
@@ -1872,7 +1926,7 @@ ${externalResourcesContext}${securityGuardrails}`;
         "I gathered the requested documents and attachments, but the request is too large to analyze within the current time limit. " +
         "Please narrow your question, remove some attachments, or try again with fewer documents.";
 
-      const responseDocuments = buildResponseDocuments(relevantDocuments, processedAttachments);
+      const responseDocuments = buildResponseDocuments(relevantDocuments, processedAttachments, relevantChunks);
       const responseDuration = Date.now() - startTime;
 
       return {
@@ -2158,7 +2212,7 @@ ${externalResourcesContext}${securityGuardrails}`;
       },
       body: JSON.stringify({
         response, // Keep for backward compatibility
-        documents: buildResponseDocuments(relevantDocuments, processedAttachments),
+        documents: buildResponseDocuments(relevantDocuments, processedAttachments, relevantChunks),
         externalResources: externalResourcesPayload,
         conversationHistory: [
           ...sanitizedHistory.slice(-9), // Keep last 9 to make room for new messages
