@@ -172,6 +172,41 @@ export async function deleteCourse(courseId, accessToken) {
   });
 }
 
+/**
+ * Module APIs
+ */
+export async function createModule(courseId, moduleData, accessToken) {
+  return await apiRequest({
+    url: `/.netlify/functions/course-management/courses/${courseId}/modules`,
+    method: 'POST',
+    body: moduleData,
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Creating module...',
+    errorMessage: 'Failed to create module'
+  });
+}
+
+export async function updateModule(moduleId, moduleData, accessToken) {
+  return await apiRequest({
+    url: `/.netlify/functions/course-management/modules/${moduleId}`,
+    method: 'PUT',
+    body: moduleData,
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Updating module...',
+    errorMessage: 'Failed to update module'
+  });
+}
+
+export async function deleteModule(moduleId, accessToken) {
+  return await apiRequest({
+    url: `/.netlify/functions/course-management/modules/${moduleId}`,
+    method: 'DELETE',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Deleting module...',
+    errorMessage: 'Failed to delete module'
+  });
+}
+
 export async function getCertificates(userId, { course_id } = {}, accessToken = null) {
   const params = { user_id: userId };
   if (course_id) params.course_id = course_id;
@@ -204,6 +239,27 @@ export async function updateLesson(lessonId, lessonData, accessToken) {
     headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
     successMessage: 'Updating lesson...',
     errorMessage: 'Failed to update lesson'
+  });
+}
+
+export async function createLesson(moduleId, lessonData, accessToken) {
+  return await apiRequest({
+    url: `/.netlify/functions/course-management/modules/${moduleId}/lessons`,
+    method: 'POST',
+    body: lessonData,
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Creating lesson...',
+    errorMessage: 'Failed to create lesson'
+  });
+}
+
+export async function deleteLesson(lessonId, accessToken) {
+  return await apiRequest({
+    url: `/.netlify/functions/course-management/lessons/${lessonId}`,
+    method: 'DELETE',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    successMessage: 'Deleting lesson...',
+    errorMessage: 'Failed to delete lesson'
   });
 }
 

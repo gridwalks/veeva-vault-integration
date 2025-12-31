@@ -42,6 +42,24 @@ export const handler = async (event) => {
       return await getCertificates(pool, targetUserId, queryParams, corsHeaders);
     }
 
+    // Check if this is a module endpoint
+    if (pathParts[pathParts.length - 2] === 'modules' && pathParts[pathParts.length - 1] && !isNaN(pathParts[pathParts.length - 1])) {
+      const moduleId = parseInt(pathParts[pathParts.length - 1]);
+      if (event.httpMethod === 'PUT') {
+        // PUT /api/course-management/modules/:id - Update module (admin only)
+        if (!isAdmin) {
+          return createErrorResponse(403, 'Admin access required', corsHeaders);
+        }
+        return await updateModule(pool, moduleId, event.body, corsHeaders);
+      } else if (event.httpMethod === 'DELETE') {
+        // DELETE /api/course-management/modules/:id - Delete module (admin only)
+        if (!isAdmin) {
+          return createErrorResponse(403, 'Admin access required', corsHeaders);
+        }
+        return await deleteModule(pool, moduleId, corsHeaders);
+      }
+    }
+
     // Check if this is a lesson endpoint
     if (pathParts[pathParts.length - 2] === 'lessons' && pathParts[pathParts.length - 1] && !isNaN(pathParts[pathParts.length - 1])) {
       const lessonId = parseInt(pathParts[pathParts.length - 1]);
@@ -54,7 +72,33 @@ export const handler = async (event) => {
       } else if (event.httpMethod === 'GET') {
         // GET /api/course-management/lessons/:id - Get lesson details
         return await getLessonDetails(pool, lessonId, corsHeaders);
+      } else if (event.httpMethod === 'DELETE') {
+        // DELETE /api/course-management/lessons/:id - Delete lesson (admin only)
+        if (!isAdmin) {
+          return createErrorResponse(403, 'Admin access required', corsHeaders);
+        }
+        return await deleteLesson(pool, lessonId, corsHeaders);
       }
+    }
+
+    // Check if this is a create module endpoint: POST /api/course-management/courses/:courseId/modules
+    if (pathParts[pathParts.length - 1] === 'modules' && pathParts[pathParts.length - 2] && !isNaN(pathParts[pathParts.length - 2]) && 
+        pathParts[pathParts.length - 3] === 'courses' && event.httpMethod === 'POST') {
+      const courseId = parseInt(pathParts[pathParts.length - 2]);
+      if (!isAdmin) {
+        return createErrorResponse(403, 'Admin access required', corsHeaders);
+      }
+      return await createModule(pool, courseId, event.body, corsHeaders);
+    }
+
+    // Check if this is a create lesson endpoint: POST /api/course-management/modules/:moduleId/lessons
+    if (pathParts[pathParts.length - 1] === 'lessons' && pathParts[pathParts.length - 2] && !isNaN(pathParts[pathParts.length - 2]) && 
+        pathParts[pathParts.length - 3] === 'modules' && event.httpMethod === 'POST') {
+      const moduleId = parseInt(pathParts[pathParts.length - 2]);
+      if (!isAdmin) {
+        return createErrorResponse(403, 'Admin access required', corsHeaders);
+      }
+      return await createLesson(pool, moduleId, event.body, corsHeaders);
     }
 
     if (event.httpMethod === 'GET') {
@@ -509,6 +553,195 @@ async function updateLesson(pool, lessonId, body, corsHeaders) {
     return createSuccessResponse({ lesson: result.rows[0] }, 200);
   } catch (error) {
     console.error('Error updating lesson:', error);
+    throw error;
+  }
+}
+
+// Create a new module
+async function createModule(pool, courseId, body, corsHeaders) {
+  try {
+    const data = parseRequestBody(body, corsHeaders);
+    if (!data) {
+      return getJsonParseErrorResponse(corsHeaders);
+    }
+
+    // Verify course exists
+    const courseCheck = await pool.query('SELECT id FROM gxp_courses WHERE id = $1', [courseId]);
+    if (courseCheck.rows.length === 0) {
+      return createErrorResponse(404, 'Course not found', corsHeaders);
+    }
+
+    const { title, description } = data;
+
+    if (!title) {
+      return createErrorResponse(400, 'Title is required', corsHeaders);
+    }
+
+    // Calculate next module_order
+    const orderResult = await pool.query(
+      `SELECT COALESCE(MAX(module_order), 0) + 1 as next_order 
+       FROM gxp_modules 
+       WHERE course_id = $1`,
+      [courseId]
+    );
+    const moduleOrder = orderResult.rows[0].next_order;
+
+    const result = await pool.query(
+      `INSERT INTO gxp_modules 
+        (course_id, module_order, title, description)
+        VALUES ($1, $2, $3, $4)
+        RETURNING *`,
+      [courseId, moduleOrder, title, description || null]
+    );
+
+    return createSuccessResponse({ module: result.rows[0] }, 201);
+  } catch (error) {
+    console.error('Error creating module:', error);
+    throw error;
+  }
+}
+
+// Update a module
+async function updateModule(pool, moduleId, body, corsHeaders) {
+  try {
+    const data = parseRequestBody(body, corsHeaders);
+    if (!data) {
+      return getJsonParseErrorResponse(corsHeaders);
+    }
+
+    // Check if module exists
+    const existing = await pool.query('SELECT id FROM gxp_modules WHERE id = $1', [moduleId]);
+    if (existing.rows.length === 0) {
+      return createErrorResponse(404, 'Module not found', corsHeaders);
+    }
+
+    const { title, description, module_order } = data;
+
+    const updateFields = [];
+    const params = [];
+    let paramIndex = 1;
+
+    if (title !== undefined) {
+      updateFields.push(`title = $${paramIndex++}`);
+      params.push(title);
+    }
+    if (description !== undefined) {
+      updateFields.push(`description = $${paramIndex++}`);
+      params.push(description);
+    }
+    if (module_order !== undefined) {
+      updateFields.push(`module_order = $${paramIndex++}`);
+      params.push(module_order);
+    }
+
+    if (updateFields.length === 0) {
+      return createErrorResponse(400, 'No fields to update', corsHeaders);
+    }
+
+    updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+    params.push(moduleId);
+
+    const result = await pool.query(
+      `UPDATE gxp_modules 
+        SET ${updateFields.join(', ')}
+        WHERE id = $${paramIndex}
+        RETURNING *`,
+      params
+    );
+
+    return createSuccessResponse({ module: result.rows[0] }, 200);
+  } catch (error) {
+    console.error('Error updating module:', error);
+    throw error;
+  }
+}
+
+// Delete a module (cascade will delete lessons via DB constraint)
+async function deleteModule(pool, moduleId, corsHeaders) {
+  try {
+    // Check if module exists
+    const existing = await pool.query('SELECT id FROM gxp_modules WHERE id = $1', [moduleId]);
+    if (existing.rows.length === 0) {
+      return createErrorResponse(404, 'Module not found', corsHeaders);
+    }
+
+    await pool.query('DELETE FROM gxp_modules WHERE id = $1', [moduleId]);
+
+    return createSuccessResponse({ message: 'Module deleted successfully' }, 200);
+  } catch (error) {
+    console.error('Error deleting module:', error);
+    throw error;
+  }
+}
+
+// Create a new lesson
+async function createLesson(pool, moduleId, body, corsHeaders) {
+  try {
+    const data = parseRequestBody(body, corsHeaders);
+    if (!data) {
+      return getJsonParseErrorResponse(corsHeaders);
+    }
+
+    // Verify module exists
+    const moduleCheck = await pool.query('SELECT id FROM gxp_modules WHERE id = $1', [moduleId]);
+    if (moduleCheck.rows.length === 0) {
+      return createErrorResponse(404, 'Module not found', corsHeaders);
+    }
+
+    const { title, description, content_type, estimated_minutes, cfr_regulation_id, document_id, workflow_template_id } = data;
+
+    if (!title) {
+      return createErrorResponse(400, 'Title is required', corsHeaders);
+    }
+
+    // Calculate next lesson_order
+    const orderResult = await pool.query(
+      `SELECT COALESCE(MAX(lesson_order), 0) + 1 as next_order 
+       FROM gxp_lessons 
+       WHERE module_id = $1`,
+      [moduleId]
+    );
+    const lessonOrder = orderResult.rows[0].next_order;
+
+    const result = await pool.query(
+      `INSERT INTO gxp_lessons 
+        (module_id, lesson_order, title, description, content_type, estimated_minutes, cfr_regulation_id, document_id, workflow_template_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING *`,
+      [
+        moduleId, 
+        lessonOrder, 
+        title, 
+        description || null, 
+        content_type || 'text',
+        estimated_minutes || null,
+        cfr_regulation_id || null,
+        document_id || null,
+        workflow_template_id || null
+      ]
+    );
+
+    return createSuccessResponse({ lesson: result.rows[0] }, 201);
+  } catch (error) {
+    console.error('Error creating lesson:', error);
+    throw error;
+  }
+}
+
+// Delete a lesson
+async function deleteLesson(pool, lessonId, corsHeaders) {
+  try {
+    // Check if lesson exists
+    const existing = await pool.query('SELECT id FROM gxp_lessons WHERE id = $1', [lessonId]);
+    if (existing.rows.length === 0) {
+      return createErrorResponse(404, 'Lesson not found', corsHeaders);
+    }
+
+    await pool.query('DELETE FROM gxp_lessons WHERE id = $1', [lessonId]);
+
+    return createSuccessResponse({ message: 'Lesson deleted successfully' }, 200);
+  } catch (error) {
+    console.error('Error deleting lesson:', error);
     throw error;
   }
 }

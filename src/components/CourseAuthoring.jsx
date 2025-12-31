@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { Plus, Trash2, Edit2, Eye, Save, X, GripVertical, FileText, Video, Link as LinkIcon, CheckSquare } from 'lucide-react';
-import { listCourses, getCourse, createCourse, updateCourse, updateLesson, listLearningPaths } from '../api';
+import { listCourses, getCourse, createCourse, updateCourse, updateLesson, listLearningPaths, createModule, updateModule, deleteModule, createLesson, deleteLesson } from '../api';
 import { getIndexedCfrRegulations } from '../api';
 import { getIndexedDocuments } from '../api';
 
@@ -17,6 +17,10 @@ export default function CourseAuthoring() {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkType, setLinkType] = useState(null); // 'cfr', 'document', 'workflow'
   const [availableResources, setAvailableResources] = useState([]);
+  const [isCreatingModule, setIsCreatingModule] = useState(false);
+  const [isCreatingLesson, setIsCreatingLesson] = useState(false);
+  const [editingModule, setEditingModule] = useState(null);
+  const [editingLesson, setEditingLesson] = useState(null);
   
   // Course form state
   const [courseForm, setCourseForm] = useState({
@@ -94,10 +98,173 @@ export default function CourseAuthoring() {
       }
       
       await loadCourses();
+      if (selectedCourse?.id) {
+        await loadCourseDetails(selectedCourse.id);
+      }
       alert('Course saved successfully!');
     } catch (err) {
       console.error('Error saving course:', err);
       setError(err.message || 'Failed to save course');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSaveModule() {
+    try {
+      if (!selectedCourse?.id) {
+        setError('Please select or create a course first');
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      const accessToken = await getAccessTokenSilently();
+      
+      if (editingModule) {
+        await updateModule(editingModule.id, moduleForm, accessToken);
+      } else {
+        await createModule(selectedCourse.id, moduleForm, accessToken);
+      }
+      
+      await loadCourseDetails(selectedCourse.id);
+      
+      // Auto-select the newly created or updated module
+      if (!editingModule) {
+        // Find the newly created module (it will be the last one or match the form title)
+        const updatedCourse = await getCourse(selectedCourse.id, accessToken);
+        const newModule = updatedCourse.course.modules?.find(m => m.title === moduleForm.title);
+        if (newModule) {
+          setSelectedModule(newModule);
+        }
+      } else {
+        // Re-select the updated module
+        const updatedCourse = await getCourse(selectedCourse.id, accessToken);
+        const updatedModule = updatedCourse.course.modules?.find(m => m.id === editingModule.id);
+        if (updatedModule) {
+          setSelectedModule(updatedModule);
+        }
+      }
+      
+      setIsCreatingModule(false);
+      setEditingModule(null);
+      setModuleForm({ title: '', description: '', module_order: 1 });
+      alert('Module saved successfully!');
+    } catch (err) {
+      console.error('Error saving module:', err);
+      setError(err.message || 'Failed to save module');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDeleteModule(moduleId) {
+    if (!confirm('Are you sure you want to delete this module? All lessons in this module will also be deleted.')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const accessToken = await getAccessTokenSilently();
+      
+      await deleteModule(moduleId, accessToken);
+      
+      if (selectedModule?.id === moduleId) {
+        setSelectedModule(null);
+        setSelectedLesson(null);
+      }
+      
+      await loadCourseDetails(selectedCourse.id);
+      alert('Module deleted successfully!');
+    } catch (err) {
+      console.error('Error deleting module:', err);
+      setError(err.message || 'Failed to delete module');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSaveLesson() {
+    try {
+      if (!selectedModule?.id) {
+        setError('Please select or create a module first');
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      const accessToken = await getAccessTokenSilently();
+      
+      if (editingLesson) {
+        await updateLesson(editingLesson.id, lessonForm, accessToken);
+      } else {
+        await createLesson(selectedModule.id, lessonForm, accessToken);
+      }
+      
+      await loadCourseDetails(selectedCourse.id);
+      
+      // Auto-select the newly created or updated lesson
+      const updatedCourse = await getCourse(selectedCourse.id, accessToken);
+      const updatedModule = updatedCourse.course.modules?.find(m => m.id === selectedModule.id);
+      if (updatedModule) {
+        setSelectedModule(updatedModule);
+        if (!editingLesson) {
+          // Find the newly created lesson
+          const newLesson = updatedModule.lessons?.find(l => l.title === lessonForm.title);
+          if (newLesson) {
+            setSelectedLesson(newLesson);
+          }
+        } else {
+          // Re-select the updated lesson
+          const updatedLesson = updatedModule.lessons?.find(l => l.id === editingLesson.id);
+          if (updatedLesson) {
+            setSelectedLesson(updatedLesson);
+          }
+        }
+      }
+      
+      setIsCreatingLesson(false);
+      setEditingLesson(null);
+      setLessonForm({
+        title: '',
+        description: '',
+        content_type: 'text',
+        estimated_minutes: null,
+        cfr_regulation_id: null,
+        document_id: null,
+        workflow_template_id: null
+      });
+      alert('Lesson saved successfully!');
+    } catch (err) {
+      console.error('Error saving lesson:', err);
+      setError(err.message || 'Failed to save lesson');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDeleteLesson(lessonId) {
+    if (!confirm('Are you sure you want to delete this lesson?')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const accessToken = await getAccessTokenSilently();
+      
+      await deleteLesson(lessonId, accessToken);
+      
+      if (selectedLesson?.id === lessonId) {
+        setSelectedLesson(null);
+      }
+      
+      await loadCourseDetails(selectedCourse.id);
+      alert('Lesson deleted successfully!');
+    } catch (err) {
+      console.error('Error deleting lesson:', err);
+      setError(err.message || 'Failed to delete lesson');
     } finally {
       setLoading(false);
     }
@@ -343,25 +510,135 @@ export default function CourseAuthoring() {
             </div>
 
             {/* Modules */}
-            {selectedCourse && selectedCourse.modules && selectedCourse.modules.length > 0 && (
-                <div>
-                  <h3 className="text-md font-semibold text-gray-900 mb-2">Modules</h3>
+            {selectedCourse && (
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-md font-semibold text-gray-900">Modules</h3>
+                  {!previewMode && (
+                    <button
+                      onClick={() => {
+                        setIsCreatingModule(true);
+                        setEditingModule(null);
+                        setModuleForm({ title: '', description: '', module_order: 1 });
+                        setSelectedModule(null);
+                        setSelectedLesson(null);
+                      }}
+                      className="p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {isCreatingModule || editingModule ? (
+                  <div className="p-4 bg-gray-50 rounded-lg space-y-3 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Module Title *</label>
+                      <input
+                        type="text"
+                        value={moduleForm.title}
+                        onChange={(e) => setModuleForm({ ...moduleForm, title: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        placeholder="Enter module title"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                      <textarea
+                        value={moduleForm.description}
+                        onChange={(e) => setModuleForm({ ...moduleForm, description: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        rows={2}
+                        placeholder="Enter module description"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSaveModule}
+                        disabled={!moduleForm.title.trim()}
+                        className="flex-1 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                      >
+                        <Save className="w-4 h-4" />
+                        {editingModule ? 'Update' : 'Create'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsCreatingModule(false);
+                          setEditingModule(null);
+                          setModuleForm({ title: '', description: '', module_order: 1 });
+                        }}
+                        className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 flex items-center gap-2 text-sm"
+                      >
+                        <X className="w-4 h-4" />
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {selectedCourse.modules && selectedCourse.modules.length > 0 ? (
                   <div className="space-y-2">
                     {selectedCourse.modules.map(module => (
                       <div
                         key={module.id}
-                        className="p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-indigo-300"
-                        onClick={() => setSelectedModule(module)}
+                        className={`p-3 border rounded-lg ${
+                          selectedModule?.id === module.id
+                            ? 'border-indigo-500 bg-indigo-50'
+                            : 'border-gray-200 hover:border-indigo-300'
+                        }`}
                       >
-                        <div className="font-medium text-gray-900">{module.title}</div>
-                        <div className="text-sm text-gray-500">
-                          {module.lessons?.length || 0} lessons
+                        <div 
+                          className="flex items-start justify-between cursor-pointer"
+                          onClick={() => {
+                            setSelectedModule(module);
+                            setSelectedLesson(null);
+                            setEditingModule(null);
+                            setIsCreatingModule(false);
+                          }}
+                        >
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{module.title}</div>
+                            <div className="text-sm text-gray-500">
+                              {module.lessons?.length || 0} lessons
+                            </div>
+                          </div>
+                          {!previewMode && (
+                            <div className="flex gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                onClick={() => {
+                                  setEditingModule(module);
+                                  setIsCreatingModule(false);
+                                  setModuleForm({
+                                    title: module.title,
+                                    description: module.description || '',
+                                    module_order: module.module_order
+                                  });
+                                }}
+                                className="p-1 text-gray-600 hover:text-indigo-600"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteModule(module.id)}
+                                className="p-1 text-gray-600 hover:text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  !isCreatingModule && (
+                    <div className="text-center text-gray-500 py-4 text-sm">
+                      No modules yet. Click the + button to add one.
+                    </div>
+                  )
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -369,39 +646,193 @@ export default function CourseAuthoring() {
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           {selectedModule ? (
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900">Lessons</h2>
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold text-gray-900">Lessons</h2>
+                {!previewMode && (
+                  <button
+                    onClick={() => {
+                      setIsCreatingLesson(true);
+                      setEditingLesson(null);
+                      setLessonForm({
+                        title: '',
+                        description: '',
+                        content_type: 'text',
+                        estimated_minutes: null,
+                        cfr_regulation_id: null,
+                        document_id: null,
+                        workflow_template_id: null
+                      });
+                      setSelectedLesson(null);
+                    }}
+                    className="p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
               
-              {selectedModule.lessons && selectedModule.lessons.length > 0 && (
+              {isCreatingLesson || editingLesson ? (
+                <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Lesson Title *</label>
+                    <input
+                      type="text"
+                      value={lessonForm.title}
+                      onChange={(e) => setLessonForm({ ...lessonForm, title: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="Enter lesson title"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
+                      value={lessonForm.description}
+                      onChange={(e) => setLessonForm({ ...lessonForm, description: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      rows={2}
+                      placeholder="Enter lesson description"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Content Type</label>
+                    <select
+                      value={lessonForm.content_type}
+                      onChange={(e) => setLessonForm({ ...lessonForm, content_type: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="text">Text</option>
+                      <option value="video">Video</option>
+                      <option value="interactive">Interactive</option>
+                      <option value="document">Document</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Minutes</label>
+                    <input
+                      type="number"
+                      value={lessonForm.estimated_minutes || ''}
+                      onChange={(e) => setLessonForm({ ...lessonForm, estimated_minutes: e.target.value ? parseInt(e.target.value) : null })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="e.g., 30"
+                      min="0"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSaveLesson}
+                      disabled={!lessonForm.title.trim()}
+                      className="flex-1 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                    >
+                      <Save className="w-4 h-4" />
+                      {editingLesson ? 'Update' : 'Create'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsCreatingLesson(false);
+                        setEditingLesson(null);
+                        setLessonForm({
+                          title: '',
+                          description: '',
+                          content_type: 'text',
+                          estimated_minutes: null,
+                          cfr_regulation_id: null,
+                          document_id: null,
+                          workflow_template_id: null
+                        });
+                      }}
+                      className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 flex items-center gap-2 text-sm"
+                    >
+                      <X className="w-4 h-4" />
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {selectedModule.lessons && selectedModule.lessons.length > 0 ? (
                 <div className="space-y-2">
                   {selectedModule.lessons.map(lesson => (
                     <div
                       key={lesson.id}
-                      className="p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-indigo-300"
-                      onClick={() => {
-                        setSelectedLesson(lesson);
-                        setLessonForm({
-                          title: lesson.title,
-                          description: lesson.description || '',
-                          content_type: lesson.content_type || 'text',
-                          estimated_minutes: lesson.estimated_minutes,
-                          cfr_regulation_id: lesson.cfr_regulation_id,
-                          document_id: lesson.document_id,
-                          workflow_template_id: lesson.workflow_template_id
-                        });
-                      }}
+                      className={`p-3 border rounded-lg ${
+                        selectedLesson?.id === lesson.id
+                          ? 'border-indigo-500 bg-indigo-50'
+                          : 'border-gray-200 hover:border-indigo-300'
+                      }`}
                     >
-                      <div className="font-medium text-gray-900">{lesson.title}</div>
-                      <div className="text-sm text-gray-500 flex items-center gap-2 mt-1">
-                        {lesson.cfr_regulation_id && <FileText className="w-3 h-3" />}
-                        {lesson.document_id && <LinkIcon className="w-3 h-3" />}
-                        {lesson.workflow_template_id && <CheckSquare className="w-3 h-3" />}
+                      <div 
+                        className="flex items-start justify-between cursor-pointer"
+                        onClick={() => {
+                          setSelectedLesson(lesson);
+                          setLessonForm({
+                            title: lesson.title,
+                            description: lesson.description || '',
+                            content_type: lesson.content_type || 'text',
+                            estimated_minutes: lesson.estimated_minutes,
+                            cfr_regulation_id: lesson.cfr_regulation_id,
+                            document_id: lesson.document_id,
+                            workflow_template_id: lesson.workflow_template_id
+                          });
+                          setEditingLesson(null);
+                          setIsCreatingLesson(false);
+                        }}
+                      >
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">{lesson.title}</div>
+                          <div className="text-sm text-gray-500 flex items-center gap-2 mt-1">
+                            {lesson.cfr_regulation_id && <FileText className="w-3 h-3" />}
+                            {lesson.document_id && <LinkIcon className="w-3 h-3" />}
+                            {lesson.workflow_template_id && <CheckSquare className="w-3 h-3" />}
+                            {lesson.estimated_minutes && (
+                              <span>{lesson.estimated_minutes} min</span>
+                            )}
+                          </div>
+                        </div>
+                        {!previewMode && (
+                          <div className="flex gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => {
+                                setEditingLesson(lesson);
+                                setIsCreatingLesson(false);
+                                setLessonForm({
+                                  title: lesson.title,
+                                  description: lesson.description || '',
+                                  content_type: lesson.content_type || 'text',
+                                  estimated_minutes: lesson.estimated_minutes,
+                                  cfr_regulation_id: lesson.cfr_regulation_id,
+                                  document_id: lesson.document_id,
+                                  workflow_template_id: lesson.workflow_template_id
+                                });
+                              }}
+                              className="p-1 text-gray-600 hover:text-indigo-600"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteLesson(lesson.id)}
+                              className="p-1 text-gray-600 hover:text-red-600"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
+              ) : (
+                !isCreatingLesson && (
+                  <div className="text-center text-gray-500 py-4 text-sm">
+                    No lessons yet. Click the + button to add one.
+                  </div>
+                )
               )}
               
-              {selectedLesson && (
+              {selectedLesson && !isCreatingLesson && !editingLesson && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Lesson Title</label>
@@ -410,6 +841,17 @@ export default function CourseAuthoring() {
                       value={lessonForm.title}
                       onChange={(e) => setLessonForm({ ...lessonForm, title: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      disabled={previewMode}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
+                      value={lessonForm.description}
+                      onChange={(e) => setLessonForm({ ...lessonForm, description: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      rows={2}
                       disabled={previewMode}
                     />
                   </div>
@@ -428,6 +870,42 @@ export default function CourseAuthoring() {
                       <option value="document">Document</option>
                     </select>
                   </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Minutes</label>
+                    <input
+                      type="number"
+                      value={lessonForm.estimated_minutes || ''}
+                      onChange={(e) => setLessonForm({ ...lessonForm, estimated_minutes: e.target.value ? parseInt(e.target.value) : null })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      disabled={previewMode}
+                      min="0"
+                    />
+                  </div>
+                  
+                  {!previewMode && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          setLoading(true);
+                          setError(null);
+                          const accessToken = await getAccessTokenSilently();
+                          await updateLesson(selectedLesson.id, lessonForm, accessToken);
+                          await loadCourseDetails(selectedCourse.id);
+                          alert('Lesson updated successfully!');
+                        } catch (err) {
+                          console.error('Error updating lesson:', err);
+                          setError(err.message || 'Failed to update lesson');
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 text-sm"
+                    >
+                      <Save className="w-4 h-4" />
+                      Update Lesson
+                    </button>
+                  )}
                   
                   <div className="space-y-2">
                     <button
