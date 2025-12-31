@@ -152,8 +152,25 @@ export const handler = async (event) => {
     const documentsResult = await pool.query(documentsQuery, queryParams);
     
     const documents = documentsResult.rows.map(doc => {
-      // Ensure id is properly converted to number if it's a string
-      const docId = doc.id != null ? (typeof doc.id === 'string' ? parseInt(doc.id, 10) : doc.id) : null;
+      // Ensure id is properly handled - preserve UUIDs as strings, convert numeric strings to numbers
+      let docId = doc.id;
+      if (docId != null) {
+        // If it's a string, check if it's a UUID (contains hyphens) or a numeric string
+        if (typeof docId === 'string') {
+          // If it contains hyphens, it's likely a UUID - keep as string
+          if (docId.includes('-')) {
+            docId = docId; // Keep UUID as string
+          } else {
+            // Try to parse as number if it's a numeric string
+            const parsed = parseInt(docId, 10);
+            if (!isNaN(parsed) && parsed.toString() === docId.trim()) {
+              docId = parsed; // Convert numeric string to number
+            }
+            // Otherwise keep as string (might be other format)
+          }
+        }
+        // If it's already a number, keep it as is
+      }
       
       return {
         id: docId,

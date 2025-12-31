@@ -697,12 +697,32 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
             {uploadedDocuments.map((doc, index) => {
               // Use document_id if id is not available (for backwards compatibility)
               // Handle both null/undefined and ensure we get a valid ID
-              // Also handle cases where id might be a string "null" or empty string
+              // Support both numeric IDs and UUIDs (which are strings)
               let documentId = doc.id ?? doc.document_id ?? null;
               
-              // Convert to number if it's a string representation of a number
-              if (documentId && typeof documentId === 'string' && !isNaN(documentId) && documentId.trim() !== '') {
-                documentId = parseInt(documentId, 10);
+              // Handle different ID formats:
+              // - UUIDs (contain hyphens) should stay as strings
+              // - Numeric strings should be converted to numbers
+              // - Numbers should stay as numbers
+              if (documentId != null && documentId !== '') {
+                if (typeof documentId === 'string') {
+                  const trimmed = documentId.trim();
+                  // If it contains hyphens, it's likely a UUID - keep as string
+                  if (trimmed.includes('-')) {
+                    documentId = trimmed; // Keep UUID as string
+                  } else {
+                    // Try to parse as number if it's a numeric string
+                    const parsed = parseInt(trimmed, 10);
+                    if (!isNaN(parsed) && parsed.toString() === trimmed) {
+                      documentId = parsed; // Convert numeric string to number
+                    } else {
+                      documentId = trimmed; // Keep as string if not numeric
+                    }
+                  }
+                }
+                // If it's already a number, keep it as is
+              } else {
+                documentId = null;
               }
               
               // Final check - ensure it's a valid ID (not null, undefined, empty string, or NaN)
