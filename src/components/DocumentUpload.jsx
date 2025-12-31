@@ -673,11 +673,12 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
             backgroundColor: '#ffffff',
             border: '1px solid #e5e7eb',
             borderRadius: '8px',
-            overflow: 'hidden'
+            overflowX: 'auto',
+            overflowY: 'visible'
           }}>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '1.6fr 1.2fr 1fr 1fr 1fr 220px',
+              gridTemplateColumns: '1.6fr 1.2fr 1fr 1fr 1fr minmax(280px, auto)',
               gap: '16px',
               padding: '12px 16px',
               backgroundColor: '#f8fafc',
@@ -755,13 +756,14 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                   style={{
                     borderBottom: index < uploadedDocuments.length - 1 ? '1px solid #e5e7eb' : 'none',
                     backgroundColor: isEditing ? '#eef2ff' : 'transparent',
-                    transition: 'background-color 0.2s ease'
+                    transition: 'background-color 0.2s ease',
+                    overflow: 'visible'
                   }}
                 >
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '1.6fr 1.2fr 1fr 1fr 1fr 220px',
+                      gridTemplateColumns: '1.6fr 1.2fr 1fr 1fr 1fr minmax(280px, auto)',
                       gap: '16px',
                       padding: '12px 16px',
                       alignItems: 'center',
@@ -865,7 +867,10 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                       display: 'flex',
                       gap: '8px',
                       flexWrap: 'wrap',
-                      justifyContent: 'flex-end'
+                      justifyContent: 'flex-end',
+                      alignItems: 'center',
+                      minWidth: '280px',
+                      overflow: 'visible'
                     }}>
                       {isEditing ? (
                         <>
@@ -916,7 +921,10 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                                     textDecoration: 'none',
                                     borderRadius: '4px',
                                     fontSize: '12px',
-                                    fontWeight: '500'
+                                    fontWeight: '500',
+                                    whiteSpace: 'nowrap',
+                                    minWidth: 'fit-content',
+                                    display: 'inline-block'
                                   }}
                                 >
                                   Download
@@ -931,7 +939,9 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                                     borderRadius: '4px',
                                     fontSize: '12px',
                                     fontWeight: '500',
-                                    cursor: 'pointer'
+                                    cursor: 'pointer',
+                                    whiteSpace: 'nowrap',
+                                    minWidth: 'fit-content'
                                   }}
                                 >
                                   Edit
@@ -948,7 +958,9 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
                                     fontSize: '12px',
                                     fontWeight: '500',
                                     cursor: deletingDocumentId === documentId ? 'not-allowed' : 'pointer',
-                                    opacity: deletingDocumentId === documentId ? 0.7 : 1
+                                    opacity: deletingDocumentId === documentId ? 0.7 : 1,
+                                    whiteSpace: 'nowrap',
+                                    minWidth: 'fit-content'
                                   }}
                                 >
                                   {deletingDocumentId === documentId ? 'Deleting...' : 'Delete'}
