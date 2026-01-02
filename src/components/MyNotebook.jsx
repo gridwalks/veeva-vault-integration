@@ -3,6 +3,15 @@ import ChatHistory from './ChatHistory';
 
 export default function MyNotebook({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('chat-history');
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Force refresh when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      console.log('MyNotebook: Modal opened, refreshing content');
+      setRefreshKey(prev => prev + 1);
+    }
+  }, [isOpen]);
 
   const handleLoadSession = (sessionId) => {
     console.log('MyNotebook: Loading chat session:', sessionId);
@@ -46,7 +55,7 @@ export default function MyNotebook({ isOpen, onClose }) {
       id: 'chat-history',
       label: 'Chat History',
       icon: '💬',
-      component: <ChatHistory onLoadSession={handleLoadSession} />
+      component: <ChatHistory key={refreshKey} onLoadSession={handleLoadSession} />
     }
   ];
 

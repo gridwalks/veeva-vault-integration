@@ -14,12 +14,21 @@ export default function ChatHistory({ onLoadSession }) {
   const itemsPerPage = 20;
 
   useEffect(() => {
-    loadSessions();
+    if (user?.sub) {
+      console.log('ChatHistory: User loaded, loading sessions for user:', user.sub);
+      loadSessions();
+    } else {
+      console.log('ChatHistory: No user found');
+    }
   }, [user?.sub]);
 
   const loadSessions = async () => {
-    if (!user?.sub) return;
+    if (!user?.sub) {
+      console.warn('ChatHistory: Cannot load sessions - no user.sub');
+      return;
+    }
     
+    console.log('ChatHistory: Loading sessions for user_id:', user.sub);
     setLoading(true);
     setError(null);
     try {
@@ -29,18 +38,22 @@ export default function ChatHistory({ onLoadSession }) {
         offset: 0,
         searchText: searchText || undefined
       });
-      console.log('Chat sessions data received:', data);
+      console.log('ChatHistory: Chat sessions data received:', data);
+      console.log('ChatHistory: Data type:', typeof data, 'Is array:', Array.isArray(data), 'Has items:', !!data?.items);
+      
       // Handle both direct items array and nested data structure
       if (Array.isArray(data)) {
+        console.log('ChatHistory: Setting sessions from array, count:', data.length);
         setSessions(data);
       } else if (data?.items) {
+        console.log('ChatHistory: Setting sessions from data.items, count:', data.items.length);
         setSessions(data.items);
       } else {
-        console.warn('Unexpected data structure:', data);
+        console.warn('ChatHistory: Unexpected data structure:', data);
         setSessions([]);
       }
     } catch (error) {
-      console.error('Error loading chat sessions:', error);
+      console.error('ChatHistory: Error loading chat sessions:', error);
       setError(error.message || 'Failed to load chat sessions');
       setSessions([]);
     } finally {
