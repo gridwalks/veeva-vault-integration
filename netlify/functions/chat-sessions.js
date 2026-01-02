@@ -162,6 +162,28 @@ async function getChatSessions(pool, queryParams, headers) {
   }
 
   try {
+    // First, let's check if there are any sessions at all (for debugging)
+    try {
+      const allSessionsCheck = await pool.query('SELECT COUNT(*) as total, COUNT(DISTINCT user_id) as unique_users FROM qms_chat_sessions');
+      console.log('Database check - Total sessions:', allSessionsCheck.rows[0]?.total, 'Unique users:', allSessionsCheck.rows[0]?.unique_users);
+      
+      // Get sample user_ids to see what format they're stored in
+      const sampleUsers = await pool.query('SELECT DISTINCT user_id FROM qms_chat_sessions LIMIT 5');
+      console.log('Sample user_ids in database:', sampleUsers.rows.map(r => r.user_id));
+      
+      // Check if there are any sessions for this specific user
+      if (user_id) {
+        const userSessionsCheck = await pool.query('SELECT COUNT(*) as count FROM qms_chat_sessions WHERE user_id = $1', [user_id]);
+        console.log(`Sessions for user ${user_id}:`, userSessionsCheck.rows[0]?.count);
+        
+        // Also try a case-insensitive search to see if that's the issue
+        const caseInsensitiveCheck = await pool.query('SELECT COUNT(*) as count FROM qms_chat_sessions WHERE LOWER(user_id) = LOWER($1)', [user_id]);
+        console.log(`Sessions for user (case-insensitive):`, caseInsensitiveCheck.rows[0]?.count);
+      }
+    } catch (debugError) {
+      console.error('Error in debug queries:', debugError);
+    }
+    
     let whereClause = '';
     let queryParams_array = [];
     let paramCount = 0;
@@ -171,6 +193,7 @@ async function getChatSessions(pool, queryParams, headers) {
       paramCount++;
       whereClause = ` WHERE user_id = $${paramCount}`;
       queryParams_array.push(user_id);
+      console.log('Filtering by user_id:', user_id);
     }
 
     // Add search filter
@@ -215,8 +238,18 @@ async function getChatSessions(pool, queryParams, headers) {
     
     console.log('Executing data query:', dataQuery);
     console.log('Query parameters:', queryParams_array);
+    console.log('Query parameter count:', queryParams_array.length);
     const dataResult = await pool.query(dataQuery, queryParams_array);
-    console.log('Query result:', { rowCount: dataResult.rows.length, total: countResult.rows[0].count });
+    console.log('Query result:', { 
+      rowCount: dataResult.rows.length, 
+      total: countResult.rows[0].count,
+      sampleRow: dataResult.rows[0] ? {
+        id: dataResult.rows[0].id,
+        user_id: dataResult.rows[0].user_id,
+        session_name: dataResult.rows[0].session_name,
+        created_at: dataResult.rows[0].created_at
+      } : null
+    });
     
     const total = parseInt(countResult.rows[0].count);
 
