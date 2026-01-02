@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import WorkflowHistory from './WorkflowHistory';
 import ChatHistory from './ChatHistory';
 
 export default function MyNotebook({ isOpen, onClose }) {
-  const [activeTab, setActiveTab] = useState('workflow-history');
+  const [activeTab, setActiveTab] = useState('chat-history');
 
   const handleLoadSession = (sessionId) => {
     console.log('MyNotebook: Loading chat session:', sessionId);
@@ -43,12 +42,6 @@ export default function MyNotebook({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const tabs = [
-    {
-      id: 'workflow-history',
-      label: 'Workflow History',
-      icon: '📋',
-      component: <WorkflowHistory />
-    },
     {
       id: 'chat-history',
       label: 'Chat History',
