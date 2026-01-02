@@ -97,7 +97,8 @@ async function createChatSession(pool, body, headers) {
 
   // Trim user_id to avoid whitespace issues
   const trimmedUserId = String(user_id).trim();
-  console.log('Creating chat session for user_id:', trimmedUserId, 'Length:', trimmedUserId.length);
+  console.log('Creating chat session for user_id:', trimmedUserId, 'Type:', typeof trimmedUserId, 'Length:', trimmedUserId.length);
+  console.log('Raw user_id from body:', user_id, 'Type:', typeof user_id);
 
   // Calculate message count
   const message_count = conversation_history.length;
@@ -174,26 +175,43 @@ async function getChatSessions(pool, queryParams, headers) {
       console.log('Database check - Total sessions:', allSessionsCheck.rows[0]?.total, 'Unique users:', allSessionsCheck.rows[0]?.unique_users);
       
       // Get sample user_ids to see what format they're stored in
-      const sampleUsers = await pool.query('SELECT DISTINCT user_id FROM qms_chat_sessions LIMIT 5');
-      console.log('Sample user_ids in database:', sampleUsers.rows.map(r => r.user_id));
+      const sampleUsers = await pool.query('SELECT DISTINCT user_id FROM qms_chat_sessions LIMIT 10');
+      console.log('Sample user_ids in database:', sampleUsers.rows.map(r => ({
+        user_id: r.user_id,
+        type: typeof r.user_id,
+        length: r.user_id?.length,
+        charCodes: r.user_id?.split('').map(c => c.charCodeAt(0)).slice(0, 20)
+      })));
+      
+      // Also get a few actual session records to see the full data
+      const sampleSessions = await pool.query('SELECT id, user_id, session_name, created_at FROM qms_chat_sessions ORDER BY created_at DESC LIMIT 5');
+      console.log('Sample sessions:', sampleSessions.rows);
       
       // Check if there are any sessions for this specific user
       if (user_id) {
+        console.log(`Querying for user_id: "${user_id}" (type: ${typeof user_id}, length: ${user_id.length})`);
         const userSessionsCheck = await pool.query('SELECT COUNT(*) as count FROM qms_chat_sessions WHERE user_id = $1', [user_id]);
-        console.log(`Sessions for user ${user_id}:`, userSessionsCheck.rows[0]?.count);
+        console.log(`Exact match sessions for user ${user_id}:`, userSessionsCheck.rows[0]?.count);
         
         // Also try a case-insensitive search to see if that's the issue
         const caseInsensitiveCheck = await pool.query('SELECT COUNT(*) as count FROM qms_chat_sessions WHERE LOWER(user_id) = LOWER($1)', [user_id]);
-        console.log(`Sessions for user (case-insensitive):`, caseInsensitiveCheck.rows[0]?.count);
+        console.log(`Case-insensitive match sessions:`, caseInsensitiveCheck.rows[0]?.count);
+        
+        // Try with trimmed version
+        const trimmedUserId = String(user_id).trim();
+        if (trimmedUserId !== user_id) {
+          const trimmedCheck = await pool.query('SELECT COUNT(*) as count FROM qms_chat_sessions WHERE user_id = $1', [trimmedUserId]);
+          console.log(`Trimmed user_id match sessions:`, trimmedCheck.rows[0]?.count);
+        }
+        
+        // Try a LIKE search to see if there are similar user_ids
+        const likeCheck = await pool.query('SELECT user_id, COUNT(*) as count FROM qms_chat_sessions WHERE user_id LIKE $1 GROUP BY user_id', [`%${user_id.substring(0, 10)}%`]);
+        console.log(`Similar user_ids (LIKE search):`, likeCheck.rows);
       }
     } catch (debugError) {
       console.error('Error in debug queries:', debugError);
     }
     
-    let whereClause = '';
-    let queryParams_array = [];
-    let paramCount = 0;
-
     // Always filter by user_id - this is required
     if (!user_id) {
       console.warn('No user_id provided in query params');
@@ -207,50 +225,49 @@ async function getChatSessions(pool, queryParams, headers) {
       };
     }
     
-    paramCount++;
-    whereClause = ` WHERE user_id = $${paramCount}`;
-    queryParams_array.push(user_id);
-    console.log('Filtering by user_id:', user_id, 'Type:', typeof user_id);
+    // Use a simpler, more direct query approach
+    const trimmedUserId = String(user_id).trim();
+    console.log('Filtering by user_id:', trimmedUserId, 'Type:', typeof trimmedUserId, 'Length:', trimmedUserId.length);
+    
+    // Build WHERE clause parts
+    const whereConditions = [`user_id = $1`];
+    const queryParams = [trimmedUserId];
+    let paramIndex = 2;
 
     // Add search filter
     if (searchText) {
-      paramCount++;
-      whereClause += whereClause 
-        ? ` AND session_name ILIKE $${paramCount}` 
-        : ` WHERE session_name ILIKE $${paramCount}`;
-      queryParams_array.push(`%${searchText}%`);
+      whereConditions.push(`session_name ILIKE $${paramIndex}`);
+      queryParams.push(`%${searchText}%`);
+      paramIndex++;
     }
 
     // Add date filters
     if (startDate) {
-      paramCount++;
-      whereClause += whereClause 
-        ? ` AND created_at >= $${paramCount}` 
-        : ` WHERE created_at >= $${paramCount}`;
-      queryParams_array.push(startDate);
+      whereConditions.push(`created_at >= $${paramIndex}`);
+      queryParams.push(startDate);
+      paramIndex++;
     }
 
     if (endDate) {
-      paramCount++;
-      whereClause += whereClause 
-        ? ` AND created_at <= $${paramCount}` 
-        : ` WHERE created_at <= $${paramCount}`;
-      queryParams_array.push(endDate);
+      whereConditions.push(`created_at <= $${paramIndex}`);
+      queryParams.push(endDate);
+      paramIndex++;
     }
+    
+    const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
 
     // Get total count and paginated results
-    const countQuery = `SELECT COUNT(*) FROM qms_chat_sessions${whereClause}`;
+    const countQuery = `SELECT COUNT(*) FROM qms_chat_sessions ${whereClause}`;
     console.log('Count query:', countQuery);
-    console.log('Count query params:', queryParams_array);
-    const countResult = await pool.query(countQuery, queryParams_array);
-    console.log('Count result:', countResult.rows[0]?.count);
+    console.log('Count query params:', queryParams);
+    const countResult = await pool.query(countQuery, queryParams);
+    const total = parseInt(countResult.rows[0]?.count || 0);
+    console.log('Count result:', total);
     
     // Build data query with limit and offset
-    // Create a new array for the data query that includes limit and offset
-    const dataQueryParams = [...queryParams_array];
-    paramCount++;
-    const limitParamIndex = paramCount;
-    const offsetParamIndex = paramCount + 1;
+    const dataQueryParams = [...queryParams];
+    const limitParamIndex = paramIndex;
+    const offsetParamIndex = paramIndex + 1;
     dataQueryParams.push(parseInt(limit), parseInt(offset));
     
     const dataQuery = `
@@ -264,7 +281,7 @@ async function getChatSessions(pool, queryParams, headers) {
     try {
       const testQuery = await pool.query(
         `SELECT id, user_id, session_name, created_at FROM qms_chat_sessions WHERE user_id = $1 LIMIT 5`,
-        [user_id]
+        [trimmedUserId]
       );
       console.log('Direct test query result:', {
         rowCount: testQuery.rows.length,
@@ -284,7 +301,7 @@ async function getChatSessions(pool, queryParams, headers) {
     const dataResult = await pool.query(dataQuery, dataQueryParams);
     console.log('Query result:', { 
       rowCount: dataResult.rows.length, 
-      total: countResult.rows[0].count,
+      total: total,
       sampleRow: dataResult.rows[0] ? {
         id: dataResult.rows[0].id,
         user_id: dataResult.rows[0].user_id,
@@ -292,8 +309,6 @@ async function getChatSessions(pool, queryParams, headers) {
         created_at: dataResult.rows[0].created_at
       } : null
     });
-    
-    const total = parseInt(countResult.rows[0].count);
 
     const responseData = {
       success: true,

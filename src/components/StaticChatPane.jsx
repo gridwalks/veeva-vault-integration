@@ -794,16 +794,28 @@ The documents will be automatically included in the comparison analysis.
           }))
         };
 
-        await saveChatSession({
+        console.log('Saving chat session with userId:', user.sub, 'Type:', typeof user.sub, 'Length:', user.sub?.length);
+        console.log('Conversation history length:', conversationHistory.length);
+        console.log('Session name:', sessionName || 'Chat Session');
+        
+        const saveResult = await saveChatSession({
           userId: user.sub,
           sessionName: sessionName || 'Chat Session',
           conversationHistory: conversationHistory,
           documentMetadata: documentMetadata
         });
         
-        console.log('Chat session saved successfully');
+        console.log('Chat session saved successfully:', saveResult);
+        console.log('Saved session ID:', saveResult?.id);
       } catch (error) {
         console.error('Error saving chat session:', error);
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          response: error.response
+        });
+        // Show user-friendly error
+        alert(`Failed to save chat session: ${error.message}`);
         // Don't block clearing if save fails
       }
     }
