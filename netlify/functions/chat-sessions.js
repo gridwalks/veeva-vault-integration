@@ -131,7 +131,10 @@ async function createChatSession(pool, body, headers) {
 async function getChatSessions(pool, queryParams, headers) {
   const page = parseInt(queryParams?.page) || 1;
   const limit = parseInt(queryParams?.limit) || 20;
-  const offset = (page - 1) * limit;
+  // Use offset from query params if provided, otherwise calculate from page
+  const offset = queryParams?.offset !== undefined 
+    ? parseInt(queryParams.offset) 
+    : (page - 1) * limit;
   const searchText = queryParams?.search || '';
   const startDate = queryParams?.startDate;
   const endDate = queryParams?.endDate;
@@ -210,23 +213,30 @@ async function getChatSessions(pool, queryParams, headers) {
     `;
     queryParams_array.push(parseInt(limit), parseInt(offset));
     
+    console.log('Executing data query:', dataQuery);
+    console.log('Query parameters:', queryParams_array);
     const dataResult = await pool.query(dataQuery, queryParams_array);
+    console.log('Query result:', { rowCount: dataResult.rows.length, total: countResult.rows[0].count });
     
     const total = parseInt(countResult.rows[0].count);
 
+    const responseData = {
+      success: true,
+      data: {
+        items: dataResult.rows,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
+    
+    console.log('Returning response with', responseData.data.items.length, 'items');
+    
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({
-        success: true,
-        data: {
-          items: dataResult.rows,
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit)
-        }
-      })
+      body: JSON.stringify(responseData)
     };
   } catch (error) {
     console.error('Error getting chat sessions:', error);

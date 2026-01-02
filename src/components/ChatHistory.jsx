@@ -6,6 +6,7 @@ export default function ChatHistory({ onLoadSession }) {
   const { user } = useAuth0();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [editingNameId, setEditingNameId] = useState(null);
@@ -20,6 +21,7 @@ export default function ChatHistory({ onLoadSession }) {
     if (!user?.sub) return;
     
     setLoading(true);
+    setError(null);
     try {
       const data = await getChatSessions({ 
         userId: user.sub, 
@@ -27,9 +29,20 @@ export default function ChatHistory({ onLoadSession }) {
         offset: 0,
         searchText: searchText || undefined
       });
-      setSessions(data.items || []);
+      console.log('Chat sessions data received:', data);
+      // Handle both direct items array and nested data structure
+      if (Array.isArray(data)) {
+        setSessions(data);
+      } else if (data?.items) {
+        setSessions(data.items);
+      } else {
+        console.warn('Unexpected data structure:', data);
+        setSessions([]);
+      }
     } catch (error) {
       console.error('Error loading chat sessions:', error);
+      setError(error.message || 'Failed to load chat sessions');
+      setSessions([]);
     } finally {
       setLoading(false);
     }
@@ -219,6 +232,20 @@ export default function ChatHistory({ onLoadSession }) {
           }}
         />
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div style={{
+          padding: '12px 16px',
+          backgroundColor: '#fee2e2',
+          border: '1px solid #fca5a5',
+          borderRadius: '6px',
+          marginBottom: '24px',
+          color: '#991b1b'
+        }}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
 
       {/* Sessions List */}
       {loading ? (
