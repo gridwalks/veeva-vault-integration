@@ -95,6 +95,10 @@ async function createChatSession(pool, body, headers) {
     };
   }
 
+  // Trim user_id to avoid whitespace issues
+  const trimmedUserId = String(user_id).trim();
+  console.log('Creating chat session for user_id:', trimmedUserId, 'Length:', trimmedUserId.length);
+
   // Calculate message count
   const message_count = conversation_history.length;
 
@@ -104,7 +108,7 @@ async function createChatSession(pool, body, headers) {
       (user_id, session_name, conversation_history, document_metadata, message_count)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
-    `, [user_id, session_name, JSON.stringify(conversation_history), JSON.stringify(document_metadata), message_count]);
+    `, [trimmedUserId, session_name, JSON.stringify(conversation_history), JSON.stringify(document_metadata), message_count]);
 
     return {
       statusCode: 201,
@@ -138,7 +142,9 @@ async function getChatSessions(pool, queryParams, headers) {
   const searchText = queryParams?.search || '';
   const startDate = queryParams?.startDate;
   const endDate = queryParams?.endDate;
-  const user_id = queryParams?.user_id;
+  // Trim user_id to avoid whitespace issues
+  const user_id = queryParams?.user_id ? String(queryParams.user_id).trim() : null;
+  console.log('getChatSessions called with user_id:', user_id, 'Type:', typeof user_id, 'Length:', user_id?.length);
 
   try {
     // Try to ensure table exists first
@@ -188,13 +194,23 @@ async function getChatSessions(pool, queryParams, headers) {
     let queryParams_array = [];
     let paramCount = 0;
 
-    // Always filter by user_id
-    if (user_id) {
-      paramCount++;
-      whereClause = ` WHERE user_id = $${paramCount}`;
-      queryParams_array.push(user_id);
-      console.log('Filtering by user_id:', user_id);
+    // Always filter by user_id - this is required
+    if (!user_id) {
+      console.warn('No user_id provided in query params');
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          error: 'user_id is required',
+          data: { items: [], total: 0, page: 1, limit, totalPages: 0 }
+        })
+      };
     }
+    
+    paramCount++;
+    whereClause = ` WHERE user_id = $${paramCount}`;
+    queryParams_array.push(user_id);
+    console.log('Filtering by user_id:', user_id, 'Type:', typeof user_id);
 
     // Add search filter
     if (searchText) {
@@ -224,22 +240,48 @@ async function getChatSessions(pool, queryParams, headers) {
 
     // Get total count and paginated results
     const countQuery = `SELECT COUNT(*) FROM qms_chat_sessions${whereClause}`;
+    console.log('Count query:', countQuery);
+    console.log('Count query params:', queryParams_array);
     const countResult = await pool.query(countQuery, queryParams_array);
+    console.log('Count result:', countResult.rows[0]?.count);
     
-    // Add limit and offset parameters
+    // Build data query with limit and offset
+    // Create a new array for the data query that includes limit and offset
+    const dataQueryParams = [...queryParams_array];
     paramCount++;
+    const limitParamIndex = paramCount;
+    const offsetParamIndex = paramCount + 1;
+    dataQueryParams.push(parseInt(limit), parseInt(offset));
+    
     const dataQuery = `
       SELECT * FROM qms_chat_sessions
       ${whereClause}
       ORDER BY created_at DESC
-      LIMIT $${paramCount} OFFSET $${paramCount + 1}
+      LIMIT $${limitParamIndex} OFFSET $${offsetParamIndex}
     `;
-    queryParams_array.push(parseInt(limit), parseInt(offset));
+    
+    // Try a simple direct query first to test if we can get any results
+    try {
+      const testQuery = await pool.query(
+        `SELECT id, user_id, session_name, created_at FROM qms_chat_sessions WHERE user_id = $1 LIMIT 5`,
+        [user_id]
+      );
+      console.log('Direct test query result:', {
+        rowCount: testQuery.rows.length,
+        rows: testQuery.rows.map(r => ({
+          id: r.id,
+          user_id: r.user_id,
+          session_name: r.session_name
+        }))
+      });
+    } catch (testError) {
+      console.error('Test query error:', testError);
+    }
     
     console.log('Executing data query:', dataQuery);
-    console.log('Query parameters:', queryParams_array);
-    console.log('Query parameter count:', queryParams_array.length);
-    const dataResult = await pool.query(dataQuery, queryParams_array);
+    console.log('Data query parameters:', dataQueryParams);
+    console.log('Parameter indices - LIMIT:', limitParamIndex, 'OFFSET:', offsetParamIndex);
+    const dataResult = await pool.query(dataQuery, dataQueryParams);
     console.log('Query result:', { 
       rowCount: dataResult.rows.length, 
       total: countResult.rows[0].count,
