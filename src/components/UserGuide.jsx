@@ -50,7 +50,7 @@ export default function UserGuide() {
               User Guide
             </h1>
             <p className="m-0 text-sm text-gray-500">
-              Learn how to use the Veeva Vault Integration system
+              Learn how to use the application
             </p>
           </div>
         </div>
@@ -79,15 +79,14 @@ export default function UserGuide() {
           {expandedSections.overview && (
             <div className="mt-6 pt-6 border-t border-gray-200">
               <p className="text-gray-700 leading-relaxed mb-4">
-                This is a <strong>Veeva Vault Integration</strong> system that connects to your Veeva Vault 
-                instance and provides powerful AI-powered features for document management, search, and workflow automation.
+                This application provides powerful AI-powered features for document management, search, and workflow automation.
               </p>
               <p className="text-gray-700 leading-relaxed mb-4">
                 The application helps you:
               </p>
               <ul className="list-disc list-inside text-gray-700 space-y-2 mb-4 ml-4">
                 <li>Chat with your documents using AI to get instant answers</li>
-                <li>Index and search through approved Veeva documents</li>
+                <li>Index and search through approved documents</li>
                 <li>Create structured documents (CAPAs, deviations, etc.) through guided workflows</li>
                 <li>View and compare documents side-by-side</li>
                 <li>Access your chat history and workflow history</li>
@@ -207,7 +206,7 @@ export default function UserGuide() {
                   <h3 className="text-lg font-semibold text-gray-700">Document Indexing</h3>
                 </div>
                 <p className="text-gray-700 leading-relaxed mb-2">
-                  Documents from Veeva Vault are indexed with AI-generated summaries and stored for fast retrieval. 
+                  Documents are indexed with AI-generated summaries and stored for fast retrieval. 
                   The system creates semantic embeddings for intelligent search.
                 </p>
                 <ul className="list-disc list-inside text-gray-700 space-y-1 ml-4">
@@ -266,7 +265,7 @@ export default function UserGuide() {
                 </div>
                 <p className="text-gray-700 leading-relaxed mb-2">
                   View, compare, and interact with documents in the right panel. Supports multiple document 
-                  types including PDFs, Word documents, and Veeva-hosted files.
+                  types including PDFs, Word documents, and other file formats.
                 </p>
                 <ul className="list-disc list-inside text-gray-700 space-y-1 ml-4">
                   <li>View selected documents side-by-side</li>
