@@ -6,6 +6,7 @@ import AdminScreen from "./components/AdminScreen.jsx";
 import SelectedDocumentViewer from "./components/SelectedDocumentViewer.jsx";
 import AuthScreen from "./components/AuthScreen.jsx";
 import UserProfile from "./components/UserProfile.jsx";
+import UserGuide from "./components/UserGuide.jsx";
 import MyNotebook from "./components/MyNotebook.jsx";
 import StudentDashboard from "./components/StudentDashboard.jsx";
 import CourseCatalog from "./components/CourseCatalog.jsx";
@@ -380,6 +381,9 @@ useEffect(() => {
       ) : currentScreen === "profile" ? (
         /* Profile Screen */
         <UserProfile user={localUser || user} onUpdateUser={handleUserUpdate} />
+      ) : currentScreen === "guide" ? (
+        /* User Guide Screen */
+        <UserGuide />
       ) : null}
 
       {/* My Notebook Modal */}

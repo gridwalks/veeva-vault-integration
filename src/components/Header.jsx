@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, User, Shield, LogOut, Home, BookOpen, GraduationCap } from 'lucide-react';
+import { Menu, User, Shield, LogOut, Home, BookOpen, GraduationCap, HelpCircle } from 'lucide-react';
 import acceleraqaLogo from '../../assets/AceleraQA_logo.png';
 import MyNotebook from './MyNotebook.jsx';
 
@@ -132,6 +132,20 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout, 
                 >
                   <BookOpen style={{ width: '16px', height: '16px' }} />
                   <span>My Notebook</span>
+                </button>
+
+                {/* User Guide */}
+                <button
+                  onClick={() => {
+                    onScreenChange('guide');
+                    setMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 py-3 px-4 border-none text-left text-sm font-medium cursor-pointer transition-colors hover:bg-gray-50 ${
+                    currentScreen === 'guide' ? 'bg-gray-100 text-indigo-700' : 'bg-transparent text-gray-700'
+                  }`}
+                >
+                  <HelpCircle style={{ width: '16px', height: '16px' }} />
+                  <span>User Guide</span>
                 </button>
 
                 {/* Divider */}
