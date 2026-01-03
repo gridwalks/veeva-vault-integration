@@ -2212,7 +2212,7 @@ The documents will be automatically included in the comparison analysis.
             onFilesChange={(files) => {
               // Optional: Handle file changes if needed
             }}
-            placeholder={workflowState.isActive ? "Answer the workflow question above..." : "Ask me a questions"}
+            placeholder={workflowState.isActive ? "Answer the workflow question above..." : "Ask me a question"}
             disabled={isLoading || isProcessingAttachments}
           />
           

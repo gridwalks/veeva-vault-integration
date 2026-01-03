@@ -1364,7 +1364,7 @@ The files will upload automatically and I'll be able to perform a detailed compa
               onFilesChange={(files) => {
                 // Optional: Handle file changes if needed
               }}
-              placeholder="Ask me a questions"
+              placeholder="Ask me a question"
               disabled={isLoading || isProcessingAttachments}
             />
             
