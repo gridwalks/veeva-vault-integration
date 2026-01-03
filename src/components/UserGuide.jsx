@@ -96,7 +96,7 @@ export default function UserGuide() {
                 <li>Get personalized assistance for quality assurance questions</li>
               </ul>
               <p className="text-gray-700 leading-relaxed">
-                All features are secured with Auth0 authentication, ensuring your data and learning progress remain protected.
+                All features are secured with authentication, ensuring your data and learning progress remain protected.
               </p>
             </div>
           )}
@@ -129,7 +129,7 @@ export default function UserGuide() {
                 <div>
                   <h3 className="text-lg font-semibold text-gray-700 mb-2">1. Authentication</h3>
                   <p className="text-gray-700 leading-relaxed">
-                    When you first access the application, you'll be prompted to log in using Auth0. 
+                    When you first access the application, you'll be prompted to log in using the secure authentication system. 
                     Once authenticated, you'll have access to all features based on your user role.
                   </p>
                 </div>
@@ -514,7 +514,7 @@ export default function UserGuide() {
                 <div>
                   <h3 className="text-base font-semibold text-gray-700 mb-2">🔒 Security & Privacy</h3>
                   <ul className="list-disc list-inside text-gray-700 space-y-1 ml-4">
-                    <li>All data is secured with Auth0 authentication</li>
+                    <li>All data is secured with authentication</li>
                     <li>Your chat sessions and workflows are private to your account</li>
                     <li>Admin features are restricted to users with admin role</li>
                     <li>Documents are accessed through secure serverless proxies</li>
