@@ -79,21 +79,24 @@ export default function UserGuide() {
           {expandedSections.overview && (
             <div className="mt-6 pt-6 border-t border-gray-200">
               <p className="text-gray-700 leading-relaxed mb-4">
-                This application provides powerful AI-powered features for document management, search, and workflow automation.
+                This is an <strong>AI-enabled learning assistant</strong> designed specifically for <strong>Quality Assurance GxP professionals</strong>. 
+                The application helps you master regulatory compliance, quality assurance practices, and pharmaceutical industry standards 
+                through intelligent document interaction, guided learning, and workflow automation.
               </p>
               <p className="text-gray-700 leading-relaxed mb-4">
-                The application helps you:
+                As your learning assistant, the application helps you:
               </p>
               <ul className="list-disc list-inside text-gray-700 space-y-2 mb-4 ml-4">
-                <li>Chat with your documents using AI to get instant answers</li>
-                <li>Index and search through approved documents</li>
-                <li>Create structured documents (CAPAs, deviations, etc.) through guided workflows</li>
-                <li>View and compare documents side-by-side</li>
-                <li>Access your chat history and workflow history</li>
-                <li>Learn through the educational platform</li>
+                <li>Learn from regulatory documents and quality standards using AI-powered chat</li>
+                <li>Understand GxP compliance requirements through interactive document exploration</li>
+                <li>Create quality documents (CAPAs, deviations, etc.) with guided workflows</li>
+                <li>Compare and analyze documents to identify compliance requirements</li>
+                <li>Access comprehensive educational courses and learning paths</li>
+                <li>Track your learning progress and review your study history</li>
+                <li>Get personalized assistance for quality assurance questions</li>
               </ul>
               <p className="text-gray-700 leading-relaxed">
-                All features are secured with Auth0 authentication, ensuring your data remains protected.
+                All features are secured with Auth0 authentication, ensuring your data and learning progress remain protected.
               </p>
             </div>
           )}
@@ -146,10 +149,10 @@ export default function UserGuide() {
                 <div>
                   <h3 className="text-lg font-semibold text-gray-700 mb-2">3. First Steps</h3>
                   <ol className="list-decimal list-inside text-gray-700 space-y-2 ml-4">
-                    <li>Start by asking a question in the chat interface</li>
-                    <li>Select documents from the document viewer if you want to focus on specific documents</li>
-                    <li>Explore the header menu to access different features</li>
-                    <li>Check out "My Notebook" to see your chat and workflow history</li>
+                    <li>Start by asking a question about GxP compliance or quality assurance in the chat interface</li>
+                    <li>Select documents from the document viewer to focus your learning on specific topics</li>
+                    <li>Explore the Learning Platform to access courses and structured learning paths</li>
+                    <li>Check out "My Notebook" to review your learning history and past conversations</li>
                   </ol>
                 </div>
               </div>
@@ -187,15 +190,17 @@ export default function UserGuide() {
                   <h3 className="text-lg font-semibold text-gray-700">Document Chat</h3>
                 </div>
                 <p className="text-gray-700 leading-relaxed mb-2">
-                  Chat with your indexed documents using AI-powered assistance. The system uses semantic search 
-                  to find relevant document sections and provides context-aware answers.
+                  Learn from your indexed documents using AI-powered assistance. The system uses semantic search 
+                  to find relevant document sections and provides educational, context-aware answers to help you 
+                  understand GxP compliance and quality assurance principles.
                 </p>
                 <ul className="list-disc list-inside text-gray-700 space-y-1 ml-4">
-                  <li>Ask questions about your documents in natural language</li>
-                  <li>Select specific documents to focus your queries</li>
-                  <li>Get answers based on both AI-generated and manual summaries</li>
-                  <li>View referenced document sections in the chat</li>
-                  <li>Provide feedback with thumbs up/down buttons</li>
+                  <li>Ask questions about regulatory documents and quality standards in natural language</li>
+                  <li>Select specific documents to focus your learning on particular topics</li>
+                  <li>Get educational answers based on both AI-generated and manual summaries</li>
+                  <li>View referenced document sections to understand the source material</li>
+                  <li>Learn through Socratic questioning or direct answers based on your preference</li>
+                  <li>Provide feedback with thumbs up/down buttons to improve your learning experience</li>
                 </ul>
               </div>
 
@@ -206,15 +211,16 @@ export default function UserGuide() {
                   <h3 className="text-lg font-semibold text-gray-700">Document Indexing</h3>
                 </div>
                 <p className="text-gray-700 leading-relaxed mb-2">
-                  Documents are indexed with AI-generated summaries and stored for fast retrieval. 
-                  The system creates semantic embeddings for intelligent search.
+                  Regulatory and quality documents are indexed with AI-generated summaries and stored for fast retrieval. 
+                  The system creates semantic embeddings for intelligent search, making it easy to find and learn from 
+                  relevant GxP compliance materials.
                 </p>
                 <ul className="list-disc list-inside text-gray-700 space-y-1 ml-4">
-                  <li>Documents are automatically summarized using AI</li>
-                  <li>Manual summaries can be added or edited by users</li>
-                  <li>Documents are chunked for semantic search (RAG)</li>
+                  <li>Documents are automatically summarized using AI to highlight key learning points</li>
+                  <li>Manual summaries can be added or edited to enhance your understanding</li>
+                  <li>Documents are chunked for semantic search (RAG) to find relevant sections</li>
                   <li>Search by document name with pagination support</li>
-                  <li>View document metadata, versions, and summaries</li>
+                  <li>View document metadata, versions, and summaries to understand context</li>
                 </ul>
               </div>
 
