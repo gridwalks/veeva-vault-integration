@@ -9,6 +9,8 @@ export const handler = async (event, context) => {
     const method = event.httpMethod;
     const path = event.path;
 
+    console.log('Chat sessions handler called:', { method, path, hasBody: !!event.body });
+
     // Handle CORS
     const headers = {
       'Access-Control-Allow-Origin': '*',
@@ -33,7 +35,13 @@ export const handler = async (event, context) => {
     if (method === 'POST' || method === 'PUT') {
       try {
         body = JSON.parse(event.body || '{}');
+        console.log('Parsed request body:', { 
+          hasUserId: !!body.user_id, 
+          hasConversationHistory: !!body.conversation_history,
+          conversationHistoryLength: body.conversation_history?.length || 0
+        });
       } catch (parseError) {
+        console.error('Error parsing request body:', parseError);
         return {
           statusCode: 400,
           headers,
@@ -43,15 +51,23 @@ export const handler = async (event, context) => {
     }
 
     // Route requests based on method and path
-    if (method === 'POST' && path.endsWith('/chat-sessions')) {
+    // Check for both /chat-sessions and /api/chat-sessions paths
+    const isChatSessionsPath = path.endsWith('/chat-sessions') || path.includes('/chat-sessions');
+    console.log('Path matching:', { path, isChatSessionsPath, endsWith: path.endsWith('/chat-sessions') });
+    
+    if (method === 'POST' && isChatSessionsPath && !path.includes('/chat-sessions/')) {
+      console.log('Routing to createChatSession');
       return await createChatSession(pool, body, headers);
-    } else if (method === 'GET' && path.endsWith('/chat-sessions')) {
+    } else if (method === 'GET' && isChatSessionsPath && !path.includes('/chat-sessions/')) {
+      console.log('Routing to getChatSessions');
       return await getChatSessions(pool, event.queryStringParameters, headers);
     } else if (method === 'GET' && path.includes('/chat-sessions/')) {
       const id = path.split('/').pop();
+      console.log('Routing to getChatSession, id:', id);
       return await getChatSession(pool, id, headers);
     } else if (method === 'PUT' && path.includes('/chat-sessions/')) {
       const id = path.split('/').pop();
+      console.log('Routing to updateChatSession, id:', id);
       // Check if this is a study notes update or name update
       if (body.study_notes !== undefined) {
         return await updateChatSessionStudyNotes(pool, id, body, headers);
@@ -60,12 +76,14 @@ export const handler = async (event, context) => {
       }
     } else if (method === 'DELETE' && path.includes('/chat-sessions/')) {
       const id = path.split('/').pop();
+      console.log('Routing to deleteChatSession, id:', id);
       return await deleteChatSession(pool, id, headers);
     } else {
+      console.log('No route matched:', { method, path });
       return {
         statusCode: 404,
         headers,
-        body: JSON.stringify({ error: 'Endpoint not found' })
+        body: JSON.stringify({ error: 'Endpoint not found', method, path })
       };
     }
 
@@ -92,7 +110,19 @@ export const handler = async (event, context) => {
 async function createChatSession(pool, body, headers) {
   const { user_id, session_name, conversation_history, document_metadata, study_notes } = body;
 
+  console.log('createChatSession called with:', {
+    hasUserId: !!user_id,
+    hasConversationHistory: !!conversation_history,
+    isArray: Array.isArray(conversation_history),
+    conversationHistoryLength: conversation_history?.length || 0
+  });
+
   if (!user_id || !conversation_history || !Array.isArray(conversation_history)) {
+    console.error('Validation failed:', {
+      hasUserId: !!user_id,
+      hasConversationHistory: !!conversation_history,
+      isArray: Array.isArray(conversation_history)
+    });
     return {
       statusCode: 400,
       headers,
@@ -108,13 +138,60 @@ async function createChatSession(pool, body, headers) {
   // Calculate message count
   const message_count = conversation_history.length;
 
+  // Ensure table exists before inserting
   try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS qms_chat_sessions (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        session_name VARCHAR(500),
+        conversation_history JSONB NOT NULL,
+        document_metadata JSONB,
+        message_count INTEGER DEFAULT 0,
+        study_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Ensure indexes exist
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_sessions_user_id 
+      ON qms_chat_sessions(user_id)
+    `);
+    
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_sessions_created_at 
+      ON qms_chat_sessions(created_at)
+    `);
+    
+    // Try to add study_notes column if it doesn't exist (for existing databases)
+    try {
+      await pool.query(`
+        ALTER TABLE qms_chat_sessions 
+        ADD COLUMN IF NOT EXISTS study_notes TEXT
+      `);
+    } catch (alterError) {
+      // Column might already exist, ignore error
+      console.log('Note: study_notes column may already exist');
+    }
+    
+    console.log('Table qms_chat_sessions ensured to exist');
+  } catch (tableError) {
+    console.error('Error ensuring table exists:', tableError);
+    // Continue anyway - table might already exist
+  }
+
+  try {
+    console.log('Attempting to INSERT chat session into database...');
     const result = await pool.query(`
       INSERT INTO qms_chat_sessions 
       (user_id, session_name, conversation_history, document_metadata, message_count, study_notes)
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `, [trimmedUserId, session_name, JSON.stringify(conversation_history), JSON.stringify(document_metadata), message_count, study_notes || null]);
+    
+    console.log('Chat session inserted successfully. ID:', result.rows[0]?.id);
 
     return {
       statusCode: 201,
@@ -125,13 +202,20 @@ async function createChatSession(pool, body, headers) {
       })
     };
   } catch (error) {
-    console.error('Error creating chat session:', error);
+    console.error('Error creating chat session:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      hint: error.hint,
+      stack: error.stack
+    });
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
         error: 'Failed to create chat session',
-        details: error.message 
+        details: error.message,
+        code: error.code
       })
     };
   }
