@@ -130,6 +130,34 @@ export async function initDatabase() {
 
     console.log('Q&A interactions table created or already exists');
 
+    // Create chat sessions table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS qms_chat_sessions (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        session_name VARCHAR(500),
+        conversation_history JSONB NOT NULL,
+        document_metadata JSONB,
+        message_count INTEGER DEFAULT 0,
+        study_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create indexes for chat sessions
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_sessions_user_id 
+      ON qms_chat_sessions(user_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_sessions_created_at 
+      ON qms_chat_sessions(created_at)
+    `);
+
+    console.log('Chat sessions table created or already exists');
+
     // Create document comparison history table
     await client.query(`
       CREATE TABLE IF NOT EXISTS qms_chat_document_comparisons (
