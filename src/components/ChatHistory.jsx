@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
-import { getChatSessions, deleteChatSession, updateChatSessionName } from '../api';
+import { getChatSessions, deleteChatSession, updateChatSessionName, summarizeChatSession } from '../api';
 
 export default function ChatHistory({ onLoadSession }) {
   const { user } = useAuth0();
@@ -11,6 +11,8 @@ export default function ChatHistory({ onLoadSession }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [editingNameId, setEditingNameId] = useState(null);
   const [editingName, setEditingName] = useState('');
+  const [summarizingSessionId, setSummarizingSessionId] = useState(null);
+  const [viewingNotesSessionId, setViewingNotesSessionId] = useState(null);
   const itemsPerPage = 20;
 
   useEffect(() => {
@@ -111,6 +113,38 @@ export default function ChatHistory({ onLoadSession }) {
       handleUpdateName(sessionId, editingName);
     } else {
       cancelEditingName();
+    }
+  };
+
+  const handleSummarizeSession = async (session) => {
+    if (session.study_notes) {
+      // If notes exist, show them
+      setViewingNotesSessionId(session.id === viewingNotesSessionId ? null : session.id);
+      return;
+    }
+
+    // Generate study notes
+    setSummarizingSessionId(session.id);
+    try {
+      const result = await summarizeChatSession({
+        sessionId: session.id,
+        conversationHistory: null,
+        sessionName: session.session_name
+      });
+
+      if (result && result.study_notes) {
+        // Reload sessions to get updated study notes
+        await loadSessions();
+        setViewingNotesSessionId(session.id);
+        alert('Study notes generated successfully!');
+      } else {
+        alert('Failed to generate study notes.');
+      }
+    } catch (error) {
+      console.error('Error generating study notes:', error);
+      alert(`Failed to generate study notes: ${error.message}`);
+    } finally {
+      setSummarizingSessionId(null);
     }
   };
 
@@ -464,6 +498,40 @@ export default function ChatHistory({ onLoadSession }) {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        handleSummarizeSession(session);
+                      }}
+                      disabled={summarizingSessionId === session.id}
+                      style={{
+                        padding: '6px 16px',
+                        backgroundColor: summarizingSessionId === session.id ? '#9ca3af' : (session.study_notes ? '#10b981' : '#059669'),
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        cursor: summarizingSessionId === session.id ? 'not-allowed' : 'pointer',
+                        fontFamily: 'inherit'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (summarizingSessionId !== session.id) {
+                          e.target.style.backgroundColor = session.study_notes ? '#059669' : '#047857';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (summarizingSessionId !== session.id) {
+                          e.target.style.backgroundColor = session.study_notes ? '#10b981' : '#059669';
+                        }
+                      }}
+                    >
+                      {summarizingSessionId === session.id 
+                        ? 'Generating...' 
+                        : session.study_notes 
+                          ? 'View Notes' 
+                          : 'Summarize'}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
                         handleDeleteSession(session.id);
                       }}
                       style={{
@@ -513,6 +581,61 @@ export default function ChatHistory({ onLoadSession }) {
                 }}>
                   {getPreviewText(session.conversation_history)}
                 </div>
+
+                {/* Study Notes Display */}
+                {viewingNotesSessionId === session.id && session.study_notes && (
+                  <div style={{
+                    marginTop: '12px',
+                    padding: '16px',
+                    backgroundColor: '#f0fdf4',
+                    border: '1px solid #86efac',
+                    borderRadius: '6px'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '12px'
+                    }}>
+                      <h5 style={{
+                        margin: 0,
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: '#166534'
+                      }}>
+                        📚 Study Notes
+                      </h5>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setViewingNotesSessionId(null);
+                        }}
+                        style={{
+                          padding: '4px 8px',
+                          backgroundColor: 'transparent',
+                          color: '#166534',
+                          border: '1px solid #86efac',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          cursor: 'pointer',
+                          fontFamily: 'inherit'
+                        }}
+                      >
+                        Hide
+                      </button>
+                    </div>
+                    <div style={{
+                      fontSize: '13px',
+                      color: '#15803d',
+                      whiteSpace: 'pre-wrap',
+                      lineHeight: '1.6',
+                      maxHeight: '400px',
+                      overflow: 'auto'
+                    }}>
+                      {session.study_notes}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

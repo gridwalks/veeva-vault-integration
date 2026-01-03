@@ -947,6 +947,34 @@ export async function updateChatSessionName({ sessionId, sessionName }) {
   return extractData(data, 'data');
 }
 
+export async function summarizeChatSession({ sessionId, conversationHistory, sessionName }) {
+  const data = await apiRequest({
+    url: '/api/summarize-chat-session',
+    method: 'POST',
+    body: { 
+      session_id: sessionId || null,
+      conversation_history: conversationHistory || null,
+      session_name: sessionName || null
+    },
+    successMessage: 'Generating study notes...',
+    errorMessage: 'Failed to generate study notes'
+  });
+  
+  return extractData(data, 'data');
+}
+
+export async function updateChatSessionStudyNotes({ sessionId, studyNotes }) {
+  const data = await apiRequest({
+    url: `/api/chat-sessions/${sessionId}`,
+    method: 'PUT',
+    body: { study_notes: studyNotes },
+    successMessage: 'Updating study notes...',
+    errorMessage: 'Failed to update study notes'
+  });
+  
+  return extractData(data, 'data');
+}
+
 export async function deleteChatSession({ sessionId }) {
   return apiRequest({
     url: `/api/chat-sessions/${sessionId}`,

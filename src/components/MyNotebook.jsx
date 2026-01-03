@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import ChatHistory from './ChatHistory';
+import StudyNotes from './StudyNotes';
 
 export default function MyNotebook({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('chat-history');
@@ -56,6 +57,12 @@ export default function MyNotebook({ isOpen, onClose }) {
       label: 'Chat History',
       icon: '💬',
       component: <ChatHistory key={refreshKey} onLoadSession={handleLoadSession} />
+    },
+    {
+      id: 'study-notes',
+      label: 'Study Notes',
+      icon: '📚',
+      component: <StudyNotes key={refreshKey} />
     }
   ];
 

@@ -52,7 +52,12 @@ export const handler = async (event, context) => {
       return await getChatSession(pool, id, headers);
     } else if (method === 'PUT' && path.includes('/chat-sessions/')) {
       const id = path.split('/').pop();
-      return await updateChatSessionName(pool, id, body, headers);
+      // Check if this is a study notes update or name update
+      if (body.study_notes !== undefined) {
+        return await updateChatSessionStudyNotes(pool, id, body, headers);
+      } else {
+        return await updateChatSessionName(pool, id, body, headers);
+      }
     } else if (method === 'DELETE' && path.includes('/chat-sessions/')) {
       const id = path.split('/').pop();
       return await deleteChatSession(pool, id, headers);
@@ -85,7 +90,7 @@ export const handler = async (event, context) => {
 
 // Create a new chat session
 async function createChatSession(pool, body, headers) {
-  const { user_id, session_name, conversation_history, document_metadata } = body;
+  const { user_id, session_name, conversation_history, document_metadata, study_notes } = body;
 
   if (!user_id || !conversation_history || !Array.isArray(conversation_history)) {
     return {
@@ -106,10 +111,10 @@ async function createChatSession(pool, body, headers) {
   try {
     const result = await pool.query(`
       INSERT INTO qms_chat_sessions 
-      (user_id, session_name, conversation_history, document_metadata, message_count)
-      VALUES ($1, $2, $3, $4, $5)
+      (user_id, session_name, conversation_history, document_metadata, message_count, study_notes)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
-    `, [trimmedUserId, session_name, JSON.stringify(conversation_history), JSON.stringify(document_metadata), message_count]);
+    `, [trimmedUserId, session_name, JSON.stringify(conversation_history), JSON.stringify(document_metadata), message_count, study_notes || null]);
 
     return {
       statusCode: 201,
@@ -157,12 +162,24 @@ async function getChatSessions(pool, queryParams, headers) {
         conversation_history JSONB NOT NULL,
         document_metadata JSONB,
         message_count INTEGER DEFAULT 0,
+        study_notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_qms_chat_sessions_user_id ON qms_chat_sessions(user_id);
       CREATE INDEX IF NOT EXISTS idx_qms_chat_sessions_created_at ON qms_chat_sessions(created_at);
     `);
+    
+    // Try to add study_notes column if it doesn't exist (for existing databases)
+    try {
+      await pool.query(`
+        ALTER TABLE qms_chat_sessions 
+        ADD COLUMN IF NOT EXISTS study_notes TEXT;
+      `);
+    } catch (alterError) {
+      // Column might already exist, ignore error
+      console.log('Note: study_notes column may already exist');
+    }
   } catch (tableError) {
     console.error('Error ensuring table exists:', tableError);
     // Continue anyway, table might already exist
@@ -437,6 +454,55 @@ async function updateChatSessionName(pool, id, body, headers) {
       headers,
       body: JSON.stringify({ 
         error: 'Failed to update chat session',
+        details: error.message 
+      })
+    };
+  }
+}
+
+// Update chat session study notes
+async function updateChatSessionStudyNotes(pool, id, body, headers) {
+  const { study_notes } = body;
+
+  if (!id || isNaN(parseInt(id))) {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: 'Valid ID is required' })
+    };
+  }
+
+  try {
+    const result = await pool.query(`
+      UPDATE qms_chat_sessions 
+      SET study_notes = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING *
+    `, [study_notes || null, id]);
+
+    if (result.rows.length === 0) {
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({ error: 'Chat session not found' })
+      };
+    }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        success: true,
+        data: result.rows[0]
+      })
+    };
+  } catch (error) {
+    console.error('Error updating chat session study notes:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Failed to update chat session study notes',
         details: error.message 
       })
     };

@@ -195,6 +195,7 @@ CREATE TABLE IF NOT EXISTS qms_chat_sessions (
   conversation_history JSONB NOT NULL,
   document_metadata JSONB,
   message_count INTEGER DEFAULT 0,
+  study_notes TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

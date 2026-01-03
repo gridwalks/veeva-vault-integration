@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { useAuth0 } from '@auth0/auth0-react';
 import DocumentViewer from './DocumentViewer.jsx';
 import ChatPromptBox from './ChatPromptBox.jsx';
-import { createQAInteraction, getUploadedDocuments, downloadUploadedDocumentUrl, updateQAFeedback, pauseWorkflow, resumeWorkflow, saveChatSession, getChatSession, chatWithAITutor } from '../api';
+import { createQAInteraction, getUploadedDocuments, downloadUploadedDocumentUrl, updateQAFeedback, pauseWorkflow, resumeWorkflow, saveChatSession, getChatSession, chatWithAITutor, summarizeChatSession } from '../api';
 
 // Helper function to estimate token count (rough approximation)
 const estimateTokens = (text) => {
@@ -59,6 +59,7 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -838,6 +839,39 @@ The documents will be automatically included in the comparison analysis.
     // Clear workspace (referenced documents and external resources)
     if (onClearWorkspace) {
       onClearWorkspace();
+    }
+  };
+
+  const handleSummarize = async () => {
+    if (conversationHistory.length === 0) {
+      alert('No conversation to summarize');
+      return;
+    }
+
+    setIsSummarizing(true);
+    setError(null);
+
+    try {
+      const sessionName = generateSessionName() || 'Chat Session';
+      
+      const result = await summarizeChatSession({
+        sessionId: null, // We're summarizing current conversation, not a saved session
+        conversationHistory: conversationHistory,
+        sessionName: sessionName
+      });
+
+      if (result && result.study_notes) {
+        alert('Study notes generated successfully! You can view them in My Notebook > Study Notes tab.');
+        console.log('Study notes generated:', result.study_notes);
+      } else {
+        alert('Study notes generated, but no content was returned.');
+      }
+    } catch (error) {
+      console.error('Error generating study notes:', error);
+      setError(`Failed to generate study notes: ${error.message}`);
+      alert(`Failed to generate study notes: ${error.message}`);
+    } finally {
+      setIsSummarizing(false);
     }
   };
 
@@ -1962,26 +1996,57 @@ The documents will be automatically included in the comparison analysis.
                 </div>
               )}
               {conversationHistory.length > 0 && (
-                <button
-                  onClick={clearConversation}
-                  style={{
-                    padding: '4px 10px',
-                    backgroundColor: '#4338ca',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '11px',
-                    fontWeight: '500',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    transition: 'background-color 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#312e81'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#4338ca'}
-                  title="Clear conversation"
-                >
-                  Clear
-                </button>
+                <>
+                  <button
+                    onClick={handleSummarize}
+                    disabled={isSummarizing}
+                    style={{
+                      padding: '4px 10px',
+                      backgroundColor: isSummarizing ? '#9ca3af' : '#10b981',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: isSummarizing ? 'not-allowed' : 'pointer',
+                      fontSize: '11px',
+                      fontWeight: '500',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      transition: 'background-color 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSummarizing) {
+                        e.target.style.backgroundColor = '#059669';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSummarizing) {
+                        e.target.style.backgroundColor = '#10b981';
+                      }
+                    }}
+                    title="Generate study notes from this conversation"
+                  >
+                    {isSummarizing ? 'Summarizing...' : 'Summarize'}
+                  </button>
+                  <button
+                    onClick={clearConversation}
+                    style={{
+                      padding: '4px 10px',
+                      backgroundColor: '#4338ca',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '11px',
+                      fontWeight: '500',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      transition: 'background-color 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#312e81'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#4338ca'}
+                    title="Clear conversation"
+                  >
+                    Clear
+                  </button>
+                </>
               )}
             </div>
           </div>
