@@ -10,7 +10,13 @@ async function apiRequest({ url, params = {}, method = 'GET', body = null, succe
     const queryString = params ? new URLSearchParams(params).toString() : '';
     const fullUrl = queryString ? `${url}?${queryString}` : url;
     
-    console.log(successMessage || 'API request...', params);
+    console.log(successMessage || 'API request...', { 
+      method, 
+      url: fullUrl, 
+      params,
+      hasBody: !!body,
+      bodySize: body ? JSON.stringify(body).length : 0
+    });
     
     // Build request config
     const config = { method };
@@ -23,10 +29,22 @@ async function apiRequest({ url, params = {}, method = 'GET', body = null, succe
       if (!config.headers) config.headers = {};
       config.headers['Content-Type'] = 'application/json';
       config.body = JSON.stringify(body);
+      console.log('Request body preview:', {
+        bodyKeys: Object.keys(body),
+        conversationHistoryLength: body.conversation_history?.length || 0,
+        hasUserId: !!body.user_id
+      });
     }
     
     // Make request
+    console.log('Making fetch request to:', fullUrl);
     const res = await fetch(fullUrl, config);
+    console.log('Fetch response received:', { 
+      status: res.status, 
+      statusText: res.statusText,
+      ok: res.ok,
+      url: res.url 
+    });
     
     // Handle error response
     if (!res.ok) {

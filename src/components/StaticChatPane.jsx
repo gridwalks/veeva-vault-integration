@@ -772,9 +772,16 @@ The documents will be automatically included in the comparison analysis.
   };
 
   const clearConversation = async () => {
+    console.log('clearConversation called', { 
+      conversationHistoryLength: conversationHistory.length, 
+      hasUser: !!user?.sub,
+      userId: user?.sub 
+    });
+    
     // Auto-save session before clearing if there are messages
     if (conversationHistory.length > 0 && user?.sub) {
       try {
+        console.log('Preparing to save chat session before clearing...');
         const sessionName = generateSessionName();
         const documentMetadata = {
           selectedDocuments: selectedDocuments.map(doc => ({
@@ -798,6 +805,7 @@ The documents will be automatically included in the comparison analysis.
         console.log('Saving chat session with userId:', user.sub, 'Type:', typeof user.sub, 'Length:', user.sub?.length);
         console.log('Conversation history length:', conversationHistory.length);
         console.log('Session name:', sessionName || 'Chat Session');
+        console.log('Calling saveChatSession API...');
         
         const saveResult = await saveChatSession({
           userId: user.sub,
@@ -808,17 +816,25 @@ The documents will be automatically included in the comparison analysis.
         
         console.log('Chat session saved successfully:', saveResult);
         console.log('Saved session ID:', saveResult?.id);
+        
+        if (!saveResult?.id) {
+          console.warn('Warning: Chat session save returned no ID');
+        }
       } catch (error) {
         console.error('Error saving chat session:', error);
         console.error('Error details:', {
           message: error.message,
           stack: error.stack,
-          response: error.response
+          response: error.response,
+          helpfulMessage: error.helpfulMessage,
+          details: error.details
         });
         // Show user-friendly error
         alert(`Failed to save chat session: ${error.message}`);
         // Don't block clearing if save fails
       }
+    } else {
+      console.log('Skipping save - no conversation history or user not logged in');
     }
 
     // Now clear the conversation
@@ -848,21 +864,61 @@ The documents will be automatically included in the comparison analysis.
       return;
     }
 
+    if (!user?.sub) {
+      alert('You must be logged in to generate study notes');
+      return;
+    }
+
     setIsSummarizing(true);
     setError(null);
 
     try {
       const sessionName = generateSessionName() || 'Chat Session';
       
-      const result = await summarizeChatSession({
-        sessionId: null, // We're summarizing current conversation, not a saved session
+      // First, save the chat session so we have a session_id to attach notes to
+      console.log('Saving chat session before generating study notes...');
+      const documentMetadata = {
+        selectedDocuments: selectedDocuments.map(doc => ({
+          id: doc.veeva_document_id,
+          name: getDocumentDisplayName(doc),
+          number: getDocumentDisplayNumber(doc)
+        })),
+        attachedDocuments: attachedDocuments.map(doc => ({
+          id: doc.id,
+          name: getDocumentDisplayName(doc),
+          number: getDocumentDisplayNumber(doc)
+        })),
+        uploadedBlobs: uploadedBlobs.map(blob => ({
+          key: blob.key,
+          name: blob.name,
+          size: blob.size,
+          type: blob.type
+        }))
+      };
+
+      const saveResult = await saveChatSession({
+        userId: user.sub,
+        sessionName: sessionName,
         conversationHistory: conversationHistory,
+        documentMetadata: documentMetadata
+      });
+
+      console.log('Chat session saved, ID:', saveResult?.id);
+
+      if (!saveResult?.id) {
+        throw new Error('Failed to save chat session - no session ID returned');
+      }
+
+      // Now generate study notes with the session_id so they get saved to the session
+      const result = await summarizeChatSession({
+        sessionId: saveResult.id,
+        conversationHistory: null, // Don't need to pass this since we have session_id
         sessionName: sessionName
       });
 
       if (result && result.study_notes) {
-        alert('Study notes generated successfully! You can view them in My Notebook > Study Notes tab.');
-        console.log('Study notes generated:', result.study_notes);
+        alert('Study notes generated and saved successfully! You can view them in My Notebook > Study Notes tab.');
+        console.log('Study notes generated and saved:', result.study_notes);
       } else {
         alert('Study notes generated, but no content was returned.');
       }
