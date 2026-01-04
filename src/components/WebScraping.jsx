@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getIndexedCfrRegulations } from '../api';
 
 export default function WebScraping() {
   const [resources, setResources] = useState([]);
@@ -8,6 +9,8 @@ export default function WebScraping() {
   const [entryMode, setEntryMode] = useState('scrape'); // 'scrape' or 'manual'
   const [editingResource, setEditingResource] = useState(null);
   const [scrapeResult, setScrapeResult] = useState(null);
+  const [regulations, setRegulations] = useState([]);
+  const [loadingRegulations, setLoadingRegulations] = useState(false);
   const [filters, setFilters] = useState({
     sourceType: '',
     status: 'active'
@@ -16,14 +19,29 @@ export default function WebScraping() {
     url: '',
     urls: '',
     sourceType: '',
-    regulationIds: '',
+    regulationIds: [],
     title: '',
     content: ''
   });
 
   useEffect(() => {
     loadResources();
+    loadRegulations();
   }, [filters]);
+
+  const loadRegulations = async () => {
+    setLoadingRegulations(true);
+    try {
+      const data = await getIndexedCfrRegulations();
+      if (data.success && data.regulations) {
+        setRegulations(data.regulations || []);
+      }
+    } catch (error) {
+      console.error('Error loading regulations:', error);
+    } finally {
+      setLoadingRegulations(false);
+    }
+  };
 
   const loadResources = async () => {
     setLoading(true);
@@ -77,11 +95,9 @@ export default function WebScraping() {
         payload.url = formData.url.trim();
       }
 
-      // Parse regulation IDs if provided
-      if (formData.regulationIds.trim()) {
-        payload.regulationIds = formData.regulationIds.split(',')
-          .map(id => parseInt(id.trim()))
-          .filter(id => !isNaN(id));
+      // Include regulation IDs if provided
+      if (formData.regulationIds && formData.regulationIds.length > 0) {
+        payload.regulationIds = formData.regulationIds.map(id => parseInt(id)).filter(id => !isNaN(id));
       }
 
       const response = await fetch('/api/scrape-web-resources', {
@@ -148,11 +164,9 @@ export default function WebScraping() {
         sourceType: formData.sourceType || null
       };
 
-      // Parse regulation IDs if provided
-      if (formData.regulationIds.trim()) {
-        payload.regulationIds = formData.regulationIds.split(',')
-          .map(id => parseInt(id.trim()))
-          .filter(id => !isNaN(id));
+      // Include regulation IDs if provided
+      if (formData.regulationIds && formData.regulationIds.length > 0) {
+        payload.regulationIds = formData.regulationIds.map(id => parseInt(id)).filter(id => !isNaN(id));
       }
 
       const response = await fetch('/api/scrape-web-resources', {
@@ -241,7 +255,7 @@ export default function WebScraping() {
       url: '',
       urls: '',
       sourceType: '',
-      regulationIds: '',
+      regulationIds: [],
       title: '',
       content: ''
     });
@@ -637,22 +651,67 @@ export default function WebScraping() {
                   color: '#374151',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
-                  Link to Regulations (IDs, comma-separated)
+                  Link to Regulations <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'normal' }}>(optional)</span>
                 </label>
-                <input
-                  type="text"
-                  value={formData.regulationIds}
-                  onChange={(e) => setFormData(prev => ({ ...prev, regulationIds: e.target.value }))}
+                <select
+                  multiple
+                  value={formData.regulationIds.map(id => String(id))}
+                  onChange={(e) => {
+                    const selectedIds = Array.from(e.target.selectedOptions, option => parseInt(option.value));
+                    setFormData(prev => ({ ...prev, regulationIds: selectedIds }));
+                  }}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
                     border: '1px solid #d1d5db',
                     borderRadius: '6px',
                     fontSize: '14px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    minHeight: '100px',
+                    backgroundColor: '#ffffff'
                   }}
-                  placeholder="1, 2, 3"
-                />
+                  disabled={loadingRegulations}
+                >
+                  {loadingRegulations ? (
+                    <option>Loading regulations...</option>
+                  ) : regulations.length === 0 ? (
+                    <option>No regulations available. Index some CFR regulations first.</option>
+                  ) : (
+                    regulations
+                      .sort((a, b) => {
+                        // Sort by regulation_id (e.g., "part-11" comes before "part-820")
+                        if (a.regulationId && b.regulationId) {
+                          return a.regulationId.localeCompare(b.regulationId);
+                        }
+                        return 0;
+                      })
+                      .map(reg => (
+                        <option key={reg.id} value={reg.id}>
+                          {reg.regulationId} - {reg.title} {reg.regulationType ? `(${reg.regulationType})` : ''}
+                        </option>
+                      ))
+                  )}
+                </select>
+                <p style={{
+                  margin: '4px 0 0 0',
+                  fontSize: '12px',
+                  color: '#6b7280',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  Hold Ctrl/Cmd to select multiple regulations
+                </p>
+                {formData.regulationIds.length > 0 && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '8px',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    color: '#374151'
+                  }}>
+                    <strong>Selected:</strong> {formData.regulationIds.length} regulation{formData.regulationIds.length !== 1 ? 's' : ''}
+                  </div>
+                )}
               </div>
             </div>
 
