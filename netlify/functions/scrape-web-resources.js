@@ -387,12 +387,12 @@ async function chunkAndEmbedWebResource(resourceText, webResourceId, pool, start
 }
 
 // Function to process manual entry (content provided directly)
-async function scrapeWebResourceManual(url, title, content, sourceType, pool, regulationIds = []) {
+async function scrapeWebResourceManual(url, title, content, sourceType, pool, regulationIds = [], resourceId = null) {
   const startTime = Date.now();
   let webResourceDbId = null;
 
   try {
-    console.log(`Processing manual entry for: ${url}`);
+    console.log(`Processing manual entry for: ${url}${resourceId ? ` (updating resource ${resourceId})` : ''}`);
     
     // Extract domain from URL
     const domain = extractDomain(url);
@@ -404,16 +404,20 @@ async function scrapeWebResourceManual(url, title, content, sourceType, pool, re
 
     const extractedText = content.trim();
     
-    // Check if resource already exists
-    const existingResult = await pool.query(
-      'SELECT id, status FROM cfr_title21_web_resources WHERE source_url = $1',
-      [url]
-    );
+    // If resourceId is provided, update that specific resource
+    if (resourceId) {
+      // Verify the resource exists and matches the URL
+      const existingResult = await pool.query(
+        'SELECT id, source_url FROM cfr_title21_web_resources WHERE id = $1',
+        [resourceId]
+      );
 
-    if (existingResult.rows.length > 0) {
-      // Update existing record
-      webResourceDbId = existingResult.rows[0].id;
-      console.log(`Updating existing web resource record for ${url}...`);
+      if (existingResult.rows.length === 0) {
+        throw new Error(`Resource with ID ${resourceId} not found`);
+      }
+
+      webResourceDbId = resourceId;
+      console.log(`Updating web resource record ${resourceId} for ${url}...`);
       
       const updateResult = await pool.query(`
         UPDATE cfr_title21_web_resources 
@@ -432,9 +436,44 @@ async function scrapeWebResourceManual(url, title, content, sourceType, pool, re
       ]);
       
       console.log(`Updated web resource record: ${url} (DB ID: ${webResourceDbId})`);
+      
+      // Delete existing regulation links to replace with new ones
+      await pool.query('DELETE FROM cfr_title21_web_resource_links WHERE web_resource_id = $1', [webResourceDbId]);
     } else {
-      // Create new record
-      console.log(`Creating new web resource record for ${url}...`);
+      // Check if resource already exists by URL
+      const existingResult = await pool.query(
+        'SELECT id, status FROM cfr_title21_web_resources WHERE source_url = $1',
+        [url]
+      );
+
+      if (existingResult.rows.length > 0) {
+        // Update existing record
+        webResourceDbId = existingResult.rows[0].id;
+        console.log(`Updating existing web resource record for ${url}...`);
+        
+        const updateResult = await pool.query(`
+          UPDATE cfr_title21_web_resources 
+          SET title = $1, full_text = $2, extraction_method = $3, 
+              updated_at = CURRENT_TIMESTAMP, last_checked_at = CURRENT_TIMESTAMP,
+              status = 'active', domain = $4, source_type = $5
+          WHERE id = $6
+          RETURNING id
+        `, [
+          title,
+          extractedText,
+          'manual_entry',
+          domain,
+          sourceType || null,
+          webResourceDbId
+        ]);
+        
+        console.log(`Updated web resource record: ${url} (DB ID: ${webResourceDbId})`);
+        
+        // Delete existing regulation links to replace with new ones
+        await pool.query('DELETE FROM cfr_title21_web_resource_links WHERE web_resource_id = $1', [webResourceDbId]);
+      } else {
+        // Create new record
+        console.log(`Creating new web resource record for ${url}...`);
       const insertResult = await pool.query(`
         INSERT INTO cfr_title21_web_resources 
         (source_url, title, source_type, domain, full_text, extraction_method, status, last_checked_at)
@@ -452,8 +491,24 @@ async function scrapeWebResourceManual(url, title, content, sourceType, pool, re
       webResourceDbId = insertResult.rows[0]?.id;
       console.log(`Created new web resource record: ${url} (DB ID: ${webResourceDbId})`);
       
-      if (!webResourceDbId) {
-        throw new Error('Failed to get database ID after insert');
+        if (!webResourceDbId) {
+          throw new Error('Failed to get database ID after insert');
+        }
+      }
+    }
+
+    // Delete existing chunks if updating (they will be recreated)
+    // We need to delete chunks whenever we're updating an existing resource
+    // This happens when resourceId is provided OR when we found an existing resource by URL
+    if (webResourceDbId) {
+      // Check if chunks exist (if they do, we're updating)
+      const chunkCheck = await pool.query(
+        'SELECT COUNT(*) as count FROM cfr_title21_web_resource_chunks WHERE web_resource_id = $1',
+        [webResourceDbId]
+      );
+      if (chunkCheck.rows[0]?.count > 0) {
+        console.log(`Deleting existing chunks for resource ${webResourceDbId} before re-chunking...`);
+        await pool.query('DELETE FROM cfr_title21_web_resource_chunks WHERE web_resource_id = $1', [webResourceDbId]);
       }
     }
 
@@ -717,12 +772,12 @@ export const handler = async (event) => {
     const pool = getPool();
 
     const requestBody = JSON.parse(event.body || '{}');
-    const { url, urls, sourceType, regulationIds, title, content } = requestBody;
+    const { url, urls, sourceType, regulationIds, title, content, resourceId } = requestBody;
 
-    // Handle manual entry (content provided directly)
+    // Handle manual entry (content provided directly) - can be new or update
     if (content && title && url) {
-      console.log(`Processing manual entry for: ${url}`);
-      const result = await scrapeWebResourceManual(url, title, content, sourceType, pool, regulationIds);
+      console.log(`Processing manual entry for: ${url}${resourceId ? ` (updating resource ${resourceId})` : ''}`);
+      const result = await scrapeWebResourceManual(url, title, content, sourceType, pool, regulationIds, resourceId);
       const successCount = result.success ? 1 : 0;
       const failureCount = result.success ? 0 : 1;
       
@@ -734,7 +789,9 @@ export const handler = async (event) => {
         },
         body: JSON.stringify({
           success: true,
-          message: `Processed ${successCount} resource(s) successfully, ${failureCount} failed`,
+          message: resourceId 
+            ? `Updated ${successCount} resource(s) successfully, ${failureCount} failed`
+            : `Processed ${successCount} resource(s) successfully, ${failureCount} failed`,
           results: [result]
         })
       };

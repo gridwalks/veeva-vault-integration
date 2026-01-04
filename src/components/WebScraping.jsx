@@ -8,6 +8,7 @@ export default function WebScraping() {
   const [showScrapeForm, setShowScrapeForm] = useState(false);
   const [entryMode, setEntryMode] = useState('scrape'); // 'scrape' or 'manual'
   const [editingResource, setEditingResource] = useState(null);
+  const [loadingResource, setLoadingResource] = useState(false);
   const [scrapeResult, setScrapeResult] = useState(null);
   const [regulations, setRegulations] = useState([]);
   const [loadingRegulations, setLoadingRegulations] = useState(false);
@@ -69,6 +70,12 @@ export default function WebScraping() {
     
     if (entryMode === 'manual') {
       handleManualEntry(e);
+      return;
+    }
+    
+    // If editing, handle update
+    if (editingResource) {
+      await handleUpdateScrape(e);
       return;
     }
     
@@ -135,6 +142,102 @@ export default function WebScraping() {
     }
   };
 
+  const handleUpdateScrape = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.url.trim()) {
+      alert('Please provide a URL.');
+      return;
+    }
+
+    setScraping(true);
+    setScrapeResult(null);
+    
+    try {
+      // For updates, we'll re-scrape or update content
+      const payload = {
+        url: formData.url.trim(),
+        sourceType: formData.sourceType || null,
+        resourceId: editingResource.id // Signal this is an update
+      };
+
+      // Include regulation IDs if provided
+      if (formData.regulationIds && formData.regulationIds.length > 0) {
+        payload.regulationIds = formData.regulationIds.map(id => parseInt(id)).filter(id => !isNaN(id));
+      }
+
+      // Try to scrape first, but if it fails, update metadata only
+      try {
+        const scrapeResponse = await fetch('/api/scrape-web-resources', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const scrapeResult = await scrapeResponse.json();
+        
+        if (scrapeResponse.ok) {
+          setScrapeResult({
+            success: true,
+            message: 'Resource updated and re-scraped successfully',
+            results: scrapeResult.results
+          });
+          resetScrapeForm();
+          loadResources();
+          return;
+        }
+      } catch (scrapeError) {
+        console.log('Re-scraping failed, updating metadata only:', scrapeError);
+      }
+
+      // Fallback: Update metadata only
+      const updatePayload = {
+        title: editingResource.title, // Keep existing title unless we want to allow editing it
+        source_type: formData.sourceType || null
+      };
+
+      const updateResponse = await fetch(`/api/web-resources/${editingResource.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updatePayload)
+      });
+
+      if (updateResponse.ok) {
+        // Update regulation links
+        if (formData.regulationIds && formData.regulationIds.length > 0) {
+          // Delete existing links and create new ones
+          // This would require a separate endpoint or we handle it in the update
+          // For now, just update the metadata
+        }
+
+        setScrapeResult({
+          success: true,
+          message: 'Resource metadata updated successfully'
+        });
+        resetScrapeForm();
+        loadResources();
+      } else {
+        const error = await updateResponse.json();
+        setScrapeResult({
+          success: false,
+          message: error.error || 'Failed to update resource'
+        });
+      }
+    } catch (error) {
+      console.error('Error updating resource:', error);
+      setScrapeResult({
+        success: false,
+        message: error.message || 'Error updating resource. Please try again.'
+      });
+    } finally {
+      setScraping(false);
+    }
+  };
+
   const handleManualEntry = async (e) => {
     e.preventDefault();
     
@@ -164,6 +267,11 @@ export default function WebScraping() {
         sourceType: formData.sourceType || null
       };
 
+      // If editing, include resource ID
+      if (editingResource) {
+        payload.resourceId = editingResource.id;
+      }
+
       // Include regulation IDs if provided
       if (formData.regulationIds && formData.regulationIds.length > 0) {
         payload.regulationIds = formData.regulationIds.map(id => parseInt(id)).filter(id => !isNaN(id));
@@ -182,7 +290,7 @@ export default function WebScraping() {
       if (response.ok) {
         setScrapeResult({
           success: true,
-          message: result.message,
+          message: editingResource ? 'Resource updated successfully' : result.message,
           results: result.results
         });
         resetScrapeForm();
@@ -190,14 +298,14 @@ export default function WebScraping() {
       } else {
         setScrapeResult({
           success: false,
-          message: result.error || 'Failed to save manual entry'
+          message: result.error || (editingResource ? 'Failed to update resource' : 'Failed to save manual entry')
         });
       }
     } catch (error) {
       console.error('Error saving manual entry:', error);
       setScrapeResult({
         success: false,
-        message: error.message || 'Error saving manual entry. Please try again.'
+        message: error.message || (editingResource ? 'Error updating resource. Please try again.' : 'Error saving manual entry. Please try again.')
       });
     } finally {
       setScraping(false);
@@ -226,27 +334,42 @@ export default function WebScraping() {
     }
   };
 
-  const handleUpdate = async (id, updates) => {
+  const handleEdit = async (id) => {
+    setLoadingResource(true);
     try {
-      const response = await fetch(`/api/web-resources/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(updates)
-      });
-
+      const response = await fetch(`/api/web-resources/${id}`);
       if (response.ok) {
         const result = await response.json();
-        setResources(prev => prev.map(r => r.id === id ? result.resource : r));
-        setEditingResource(null);
+        const resource = result.resource;
+        
+        // Extract linked regulation IDs
+        const linkedRegulationIds = (resource.linkedRegulations || []).map(reg => reg.id);
+        
+        // Determine entry mode based on extraction method
+        const isManual = resource.extractionMethod === 'manual_entry';
+        
+        // Populate form with existing data
+        setFormData({
+          url: resource.sourceUrl,
+          urls: '',
+          sourceType: resource.sourceType || '',
+          regulationIds: linkedRegulationIds,
+          title: resource.title,
+          content: resource.fullText || ''
+        });
+        
+        setEditingResource(resource);
+        setEntryMode(isManual ? 'manual' : 'scrape');
+        setShowScrapeForm(true);
       } else {
         const error = await response.json();
-        alert(`Error: ${error.error || 'Failed to update resource'}`);
+        alert(`Error: ${error.error || 'Failed to load resource for editing'}`);
       }
     } catch (error) {
-      console.error('Error updating resource:', error);
-      alert('Error updating resource. Please try again.');
+      console.error('Error loading resource for editing:', error);
+      alert('Error loading resource. Please try again.');
+    } finally {
+      setLoadingResource(false);
     }
   };
 
@@ -259,6 +382,7 @@ export default function WebScraping() {
       title: '',
       content: ''
     });
+    setEditingResource(null);
     setShowScrapeForm(false);
     setEntryMode('scrape');
   };
@@ -425,22 +549,39 @@ export default function WebScraping() {
             color: '#374151',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}>
-            {entryMode === 'manual' ? 'Manual Entry' : 'Scrape Website'}
+            {editingResource ? 'Edit Resource' : (entryMode === 'manual' ? 'Manual Entry' : 'Scrape Website')}
           </h4>
           
           {entryMode === 'scrape' ? (
-            <p style={{
-              margin: '0 0 16px 0',
-              padding: '12px',
-              backgroundColor: '#fef3c7',
-              border: '1px solid #fbbf24',
-              borderRadius: '6px',
-              fontSize: '13px',
-              color: '#92400e',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-            }}>
-              <strong>Tip:</strong> Make sure the URL is correct and accessible. If you get a 404 error, the page may not exist or may have been moved. Try opening the URL in your browser first to verify it works.
-            </p>
+            <>
+              {editingResource && (
+                <div style={{
+                  margin: '0 0 16px 0',
+                  padding: '12px',
+                  backgroundColor: '#f3f4f6',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  color: '#374151',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  <strong>Current Title:</strong> {editingResource.title}
+                </div>
+              )}
+              <p style={{
+                margin: '0 0 16px 0',
+                padding: '12px',
+                backgroundColor: '#fef3c7',
+                border: '1px solid #fbbf24',
+                borderRadius: '6px',
+                fontSize: '13px',
+                color: '#92400e',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}>
+                <strong>Tip:</strong> Make sure the URL is correct and accessible. If you get a 404 error, the page may not exist or may have been moved. Try opening the URL in your browser first to verify it works.
+                {editingResource && ' The title will be extracted from the page when re-scraping.'}
+              </p>
+            </>
           ) : (
             <p style={{
               margin: '0 0 16px 0',
@@ -731,7 +872,11 @@ export default function WebScraping() {
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}
               >
-                {scraping ? (entryMode === 'manual' ? 'Processing...' : 'Scraping...') : (entryMode === 'manual' ? 'Save & Process' : 'Start Scraping')}
+                {scraping 
+                  ? (entryMode === 'manual' ? 'Processing...' : 'Scraping...') 
+                  : editingResource 
+                    ? (entryMode === 'manual' ? 'Update & Re-process' : 'Re-scrape & Update')
+                    : (entryMode === 'manual' ? 'Save & Process' : 'Start Scraping')}
               </button>
               <button
                 type="button"
@@ -890,6 +1035,23 @@ export default function WebScraping() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => handleEdit(resource.id)}
+                    disabled={loadingResource}
+                    style={{
+                      padding: '4px 8px',
+                      backgroundColor: '#f3f4f6',
+                      color: '#374151',
+                      border: 'none',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      cursor: loadingResource ? 'not-allowed' : 'pointer',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      opacity: loadingResource ? 0.6 : 1
+                    }}
+                  >
+                    {loadingResource ? 'Loading...' : 'Edit'}
+                  </button>
                   <button
                     onClick={() => handleDelete(resource.id)}
                     style={{
