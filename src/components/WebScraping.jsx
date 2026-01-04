@@ -169,6 +169,7 @@ export default function WebScraping() {
 
   const sourceTypes = [
     'fda_guidance',
+    'fda_regulation_preamble',
     'industry_resource',
     'regulatory_news',
     'guidance_document',
