@@ -281,6 +281,94 @@ export async function initDatabase() {
 
     console.log('CFR Title 21 regulation chunks table created or already exists');
 
+    // Create CFR Title 21 web resources table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cfr_title21_web_resources (
+        id SERIAL PRIMARY KEY,
+        source_url TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        source_type VARCHAR(50),
+        domain VARCHAR(255),
+        full_text TEXT,
+        ai_summary TEXT,
+        extraction_method VARCHAR(100),
+        scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_checked_at TIMESTAMP,
+        status VARCHAR(50) DEFAULT 'active'
+      )
+    `);
+
+    // Create indexes for web resources
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_web_resources_source_url 
+      ON cfr_title21_web_resources(source_url)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_web_resources_source_type 
+      ON cfr_title21_web_resources(source_type)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_web_resources_domain 
+      ON cfr_title21_web_resources(domain)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_web_resources_status 
+      ON cfr_title21_web_resources(status)
+    `);
+
+    console.log('CFR Title 21 web resources table created or already exists');
+
+    // Create CFR Title 21 web resource chunks table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cfr_title21_web_resource_chunks (
+        id SERIAL PRIMARY KEY,
+        web_resource_id INTEGER NOT NULL REFERENCES cfr_title21_web_resources(id) ON DELETE CASCADE,
+        chunk_index INTEGER NOT NULL,
+        chunk_text TEXT NOT NULL,
+        embedding vector(1536),
+        token_count INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(web_resource_id, chunk_index)
+      )
+    `);
+
+    // Create index for web resource chunks
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_web_resource_chunks_web_resource_id 
+      ON cfr_title21_web_resource_chunks(web_resource_id)
+    `);
+
+    console.log('CFR Title 21 web resource chunks table created or already exists');
+
+    // Create CFR Title 21 web resource links table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cfr_title21_web_resource_links (
+        id SERIAL PRIMARY KEY,
+        web_resource_id INTEGER NOT NULL REFERENCES cfr_title21_web_resources(id) ON DELETE CASCADE,
+        regulation_id INTEGER NOT NULL REFERENCES cfr_title21_regulations(id) ON DELETE CASCADE,
+        link_type VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(web_resource_id, regulation_id)
+      )
+    `);
+
+    // Create indexes for web resource links
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_web_resource_links_web_resource_id 
+      ON cfr_title21_web_resource_links(web_resource_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_web_resource_links_regulation_id 
+      ON cfr_title21_web_resource_links(regulation_id)
+    `);
+
+    console.log('CFR Title 21 web resource links table created or already exists');
+
     // ============================================================================
     // GxP Educational Platform Tables
     // ============================================================================

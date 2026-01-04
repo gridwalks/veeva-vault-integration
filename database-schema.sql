@@ -439,6 +439,70 @@ ON cfr_title21_regulation_chunks(regulation_id);
 -- CREATE INDEX IF NOT EXISTS idx_cfr_title21_regulation_chunks_embedding 
 -- ON cfr_title21_regulation_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
+-- Web Resources Tables for Title 21 Regulation Information
+
+-- Table for storing scraped web content related to Title 21 regulations
+CREATE TABLE IF NOT EXISTS cfr_title21_web_resources (
+  id SERIAL PRIMARY KEY,
+  source_url TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  source_type VARCHAR(50), -- 'fda_guidance', 'industry_resource', 'regulatory_news', etc.
+  domain VARCHAR(255), -- e.g., 'fda.gov', 'pharma.org'
+  full_text TEXT, -- scraped content
+  ai_summary TEXT,
+  extraction_method VARCHAR(100),
+  scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_checked_at TIMESTAMP, -- for re-scraping
+  status VARCHAR(50) DEFAULT 'active' -- 'active', 'archived', 'error'
+);
+
+-- Create indexes for web resources
+CREATE INDEX IF NOT EXISTS idx_web_resources_source_url 
+ON cfr_title21_web_resources(source_url);
+
+CREATE INDEX IF NOT EXISTS idx_web_resources_source_type 
+ON cfr_title21_web_resources(source_type);
+
+CREATE INDEX IF NOT EXISTS idx_web_resources_domain 
+ON cfr_title21_web_resources(domain);
+
+CREATE INDEX IF NOT EXISTS idx_web_resources_status 
+ON cfr_title21_web_resources(status);
+
+-- Table for storing web resource chunks with embeddings for RAG
+CREATE TABLE IF NOT EXISTS cfr_title21_web_resource_chunks (
+  id SERIAL PRIMARY KEY,
+  web_resource_id INTEGER NOT NULL REFERENCES cfr_title21_web_resources(id) ON DELETE CASCADE,
+  chunk_index INTEGER NOT NULL,
+  chunk_text TEXT NOT NULL,
+  embedding vector(1536),  -- OpenAI ada-002 produces 1536-dimensional embeddings
+  token_count INTEGER,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(web_resource_id, chunk_index)
+);
+
+-- Create indexes for web resource chunks
+CREATE INDEX IF NOT EXISTS idx_web_resource_chunks_web_resource_id 
+ON cfr_title21_web_resource_chunks(web_resource_id);
+
+-- Junction table for linking web resources to regulations (many-to-many)
+CREATE TABLE IF NOT EXISTS cfr_title21_web_resource_links (
+  id SERIAL PRIMARY KEY,
+  web_resource_id INTEGER NOT NULL REFERENCES cfr_title21_web_resources(id) ON DELETE CASCADE,
+  regulation_id INTEGER NOT NULL REFERENCES cfr_title21_regulations(id) ON DELETE CASCADE,
+  link_type VARCHAR(50), -- 'direct_reference', 'related_topic', 'guidance_for', etc.
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(web_resource_id, regulation_id)
+);
+
+-- Create indexes for web resource links
+CREATE INDEX IF NOT EXISTS idx_web_resource_links_web_resource_id 
+ON cfr_title21_web_resource_links(web_resource_id);
+
+CREATE INDEX IF NOT EXISTS idx_web_resource_links_regulation_id 
+ON cfr_title21_web_resource_links(regulation_id);
+
 -- Sample data insertion (optional)
 -- INSERT INTO Veeva_Doc_Chat_document_index (veeva_document_id, document_number, document_name, major_version, minor_version, document_type, status, summary) 
 -- VALUES ('sample-id', 'DOC-001', 'Sample Document', 1, 0, 'Standard Operating Procedure', 'STEADYSTATE', 'This is a sample document summary.');

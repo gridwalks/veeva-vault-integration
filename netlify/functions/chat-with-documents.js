@@ -370,6 +370,8 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = [], re
       docId = chunk.upload_document_id;
     } else if (chunk.source_type === 'cfr_regulation' && chunk.regulation_id) {
       docId = chunk.regulation_id;
+    } else if (chunk.source_type === 'web_resource' && chunk.web_resource_id) {
+      docId = chunk.web_resource_id;
     }
     
     if (docId && chunk.similarity !== undefined) {
@@ -389,6 +391,8 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = [], re
       docId = doc.document_id || doc.id;
     } else if (doc.source_type === 'cfr_regulation' && doc.regulation_id) {
       docId = doc.regulation_id;
+    } else if (doc.source_type === 'web_resource' && doc.document_id) {
+      docId = doc.document_id;
     } else {
       docId = doc.veeva_document_id || doc.document_id || doc.id || doc.number || doc.name;
     }
@@ -1014,6 +1018,36 @@ export const handler = async (event) => {
             // Continue without CFR chunks if query fails
           }
         }
+
+        // Query web resource chunks
+        let webResourceChunks = [];
+        if (queryEmbedding && !vectorSearchFailed) {
+          const webResourceQuery = `
+            SELECT 
+              c.chunk_text,
+              c.web_resource_id,
+              c.chunk_index,
+              wr.title,
+              wr.source_url,
+              wr.source_type,
+              wr.domain,
+              1 - (c.embedding <=> $1::vector) as similarity,
+              'web_resource' as source_type
+            FROM cfr_title21_web_resource_chunks c
+            JOIN cfr_title21_web_resources wr ON c.web_resource_id = wr.id
+            WHERE wr.status = 'active'
+            ORDER BY c.embedding <=> $1::vector
+            LIMIT 5
+          `;
+          try {
+            const webResourceResult = await pool.query(webResourceQuery, [embeddingStr]);
+            webResourceChunks = webResourceResult.rows;
+            console.log(`Found ${webResourceChunks.length} web resource chunks`);
+          } catch (webResourceError) {
+            console.error('Error querying web resources:', webResourceError);
+            // Continue without web resource chunks if query fails
+          }
+        }
         
         // Query uploaded document chunks if we have uploaded document IDs
         if (uploadedDocumentIds.length > 0) {
@@ -1080,7 +1114,7 @@ export const handler = async (event) => {
         // Combine and sort by similarity
         // For comparison mode, limit chunks to prevent context overflow
         const maxChunks = isComparisonQuery ? 6 : 5;
-        relevantChunks = [...veevaChunks, ...uploadedChunks, ...cfrChunks]
+        relevantChunks = [...veevaChunks, ...uploadedChunks, ...cfrChunks, ...webResourceChunks]
           .sort((a, b) => b.similarity - a.similarity)
           .slice(0, maxChunks);
         
@@ -1113,13 +1147,18 @@ export const handler = async (event) => {
         .filter(c => c.source_type === 'cfr_regulation' && c.regulation_id)
         .map(c => c.regulation_id))];
       
+      const uniqueWebResourceIds = [...new Set(relevantChunks
+        .filter(c => c.source_type === 'web_resource' && c.web_resource_id)
+        .map(c => c.web_resource_id))];
+      
       console.log('Semantic search results:', {
         totalChunks: relevantChunks.length,
         uniqueVeevaDocIds: uniqueVeevaDocIds,
         uniqueUploadedDocIds: uniqueUploadedDocIds,
         uniqueCfrRegulationIds: uniqueCfrRegulationIds,
+        uniqueWebResourceIds: uniqueWebResourceIds,
         chunkDetails: relevantChunks.map(c => ({
-          docId: c.veeva_document_id || c.upload_document_id || c.regulation_id,
+          docId: c.veeva_document_id || c.upload_document_id || c.regulation_id || c.web_resource_id,
           docName: c.document_name || c.title,
           docNumber: c.document_number,
           similarity: c.similarity,
@@ -1167,6 +1206,20 @@ export const handler = async (event) => {
         `;
         const cfrDocResult = await pool.query(cfrDocQuery, uniqueCfrRegulationIds);
         relevantDocuments.push(...cfrDocResult.rows);
+      }
+
+      // Fetch web resource metadata
+      if (uniqueWebResourceIds.length > 0) {
+        const webResourcePlaceholders = uniqueWebResourceIds.map((_, index) => `$${index + 1}`).join(',');
+        const webResourceQuery = `
+          SELECT id as document_id, title as document_name, source_type as document_type,
+                 source_url, domain, ai_summary,
+                 'web_resource' as source_type
+          FROM cfr_title21_web_resources
+          WHERE id IN (${webResourcePlaceholders}) AND status = 'active'
+        `;
+        const webResourceResult = await pool.query(webResourceQuery, uniqueWebResourceIds);
+        relevantDocuments.push(...webResourceResult.rows);
       }
       
       // If in educational context, fetch linked course/lesson materials
@@ -1551,7 +1604,7 @@ export const handler = async (event) => {
       console.log('Building context from relevant chunks (RAG)');
       const documentMetadataMap = new Map(
         relevantDocuments.map(doc => [
-          doc.veeva_document_id || doc.document_id || (doc.source_type === 'cfr_regulation' ? doc.document_id : null), 
+          doc.veeva_document_id || doc.document_id || (doc.source_type === 'cfr_regulation' ? doc.document_id : null) || (doc.source_type === 'web_resource' ? doc.document_id : null), 
           doc
         ])
       );
@@ -1561,15 +1614,21 @@ export const handler = async (event) => {
       const MAX_CHUNK_TEXT_LENGTH = isComparisonQuery ? 600 : 1500;
       
       const chunkContext = relevantChunks.map((chunk, index) => {
-        const docId = chunk.veeva_document_id || chunk.upload_document_id || chunk.regulation_id;
+        const docId = chunk.veeva_document_id || chunk.upload_document_id || chunk.regulation_id || chunk.web_resource_id;
         const docMetadata = documentMetadataMap.get(docId);
         const manualSummary = docMetadata?.manual_summary;
         const isCfrChunk = chunk.source_type === 'cfr_regulation';
+        const isWebResourceChunk = chunk.source_type === 'web_resource';
 
         let context;
         if (isCfrChunk) {
           context = `**Relevant Section ${index + 1}** from "${chunk.title || chunk.document_name}" (CFR Title 21 ${chunk.regulation_type || 'regulation'})
 Regulation ID: ${chunk.regulation_identifier || 'N/A'}
+Similarity: ${(chunk.similarity * 100).toFixed(1)}%`;
+        } else if (isWebResourceChunk) {
+          context = `**Relevant Section ${index + 1}** from "${chunk.title || 'Web Resource'}" (${chunk.source_type || 'web_resource'})
+Source: ${chunk.source_url || 'N/A'}
+Domain: ${chunk.domain || 'N/A'}
 Similarity: ${(chunk.similarity * 100).toFixed(1)}%`;
         } else {
           context = `**Relevant Section ${index + 1}** from "${chunk.document_name}" (${chunk.document_number} v${chunk.major_version}.${chunk.minor_version})
@@ -1642,10 +1701,11 @@ Status: ${doc.status || 'Unknown'}`;
       // Fallback to document summaries
       console.log('Building context from document summaries (keyword search fallback)');
       documentContext = relevantDocuments.map(doc => {
-        // Handle Veeva, uploaded documents, and CFR regulations
+        // Handle Veeva, uploaded documents, CFR regulations, and web resources
         const isVeevaDoc = doc.source_type === 'veeva';
         const isUploadedDoc = doc.source_type === 'upload';
         const isCfrRegulation = doc.source_type === 'cfr_regulation';
+        const isWebResource = doc.source_type === 'web_resource';
         
         let context = '';
         
@@ -1668,6 +1728,25 @@ Regulation ID: ${doc.regulation_id || 'N/A'}`;
             context += `\nSummary: ${summaryText}`;
           } else {
             context += `\nSummary: No summary available for this CFR regulation.`;
+          }
+          
+          context += '\n\n---';
+          return context;
+        } else if (isWebResource) {
+          context = `**${doc.document_name}** (Web Resource)
+Source Type: ${doc.document_type || 'Unknown'}
+URL: ${doc.source_url || 'N/A'}
+Domain: ${doc.domain || 'N/A'}`;
+          
+          // Add AI summary if available
+          if (doc.ai_summary) {
+            const maxSummaryLength = isComparisonQuery ? 300 : 800;
+            const summaryText = doc.ai_summary.length > maxSummaryLength 
+              ? doc.ai_summary.substring(0, maxSummaryLength) + '...' 
+              : doc.ai_summary;
+            context += `\nSummary: ${summaryText}`;
+          } else {
+            context += `\nSummary: No summary available for this web resource.`;
           }
           
           context += '\n\n---';
