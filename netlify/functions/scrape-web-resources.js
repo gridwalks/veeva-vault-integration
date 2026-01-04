@@ -34,7 +34,20 @@ async function downloadHTMLContent(url) {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
-      throw new Error(`HTTP ${response.status}: ${response.statusText}. Response: ${errorText.substring(0, 200)}`);
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      
+      // Provide more helpful error messages for common HTTP errors
+      if (response.status === 404) {
+        errorMessage = `Page not found (404). The URL may be incorrect, the page may have been moved, or it may require authentication. Please verify the URL is correct and accessible.`;
+      } else if (response.status === 403) {
+        errorMessage = `Access forbidden (403). The website may require authentication or may be blocking automated access.`;
+      } else if (response.status === 401) {
+        errorMessage = `Unauthorized (401). The website requires authentication to access this content.`;
+      } else if (response.status >= 500) {
+        errorMessage = `Server error (${response.status}). The website's server encountered an error. Please try again later.`;
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const htmlContent = await response.text();

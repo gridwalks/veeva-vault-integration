@@ -306,6 +306,18 @@ export default function WebScraping() {
           }}>
             Scrape Website
           </h4>
+          <p style={{
+            margin: '0 0 16px 0',
+            padding: '12px',
+            backgroundColor: '#fef3c7',
+            border: '1px solid #fbbf24',
+            borderRadius: '6px',
+            fontSize: '13px',
+            color: '#92400e',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          }}>
+            <strong>Tip:</strong> Make sure the URL is correct and accessible. If you get a 404 error, the page may not exist or may have been moved. Try opening the URL in your browser first to verify it works.
+          </p>
           
           <form onSubmit={handleScrape}>
             <div style={{ marginBottom: '16px' }}>
