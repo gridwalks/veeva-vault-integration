@@ -35,6 +35,9 @@
 [functions."index-cfr-regulations"]
   timeout = 60
 
+[functions."scrape-web-resources"]
+  timeout = 60
+
 [build.environment]
   NODE_VERSION = "18"
 
