@@ -5,6 +5,7 @@ export default function WebScraping() {
   const [loading, setLoading] = useState(false);
   const [scraping, setScraping] = useState(false);
   const [showScrapeForm, setShowScrapeForm] = useState(false);
+  const [entryMode, setEntryMode] = useState('scrape'); // 'scrape' or 'manual'
   const [editingResource, setEditingResource] = useState(null);
   const [scrapeResult, setScrapeResult] = useState(null);
   const [filters, setFilters] = useState({
@@ -15,7 +16,9 @@ export default function WebScraping() {
     url: '',
     urls: '',
     sourceType: '',
-    regulationIds: ''
+    regulationIds: '',
+    title: '',
+    content: ''
   });
 
   useEffect(() => {
@@ -45,6 +48,11 @@ export default function WebScraping() {
 
   const handleScrape = async (e) => {
     e.preventDefault();
+    
+    if (entryMode === 'manual') {
+      handleManualEntry(e);
+      return;
+    }
     
     if (!formData.url.trim() && !formData.urls.trim()) {
       alert('Please provide at least one URL to scrape.');
@@ -111,6 +119,77 @@ export default function WebScraping() {
     }
   };
 
+  const handleManualEntry = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.url.trim()) {
+      alert('Please provide a URL (even if you can\'t scrape it, we need it for reference).');
+      return;
+    }
+    
+    if (!formData.title.trim()) {
+      alert('Please provide a title for this resource.');
+      return;
+    }
+    
+    if (!formData.content.trim() || formData.content.trim().length < 20) {
+      alert('Please provide the content (at least 20 characters).');
+      return;
+    }
+
+    setScraping(true);
+    setScrapeResult(null);
+    
+    try {
+      const payload = {
+        url: formData.url.trim(),
+        title: formData.title.trim(),
+        content: formData.content.trim(),
+        sourceType: formData.sourceType || null
+      };
+
+      // Parse regulation IDs if provided
+      if (formData.regulationIds.trim()) {
+        payload.regulationIds = formData.regulationIds.split(',')
+          .map(id => parseInt(id.trim()))
+          .filter(id => !isNaN(id));
+      }
+
+      const response = await fetch('/api/scrape-web-resources', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        setScrapeResult({
+          success: true,
+          message: result.message,
+          results: result.results
+        });
+        resetScrapeForm();
+        loadResources();
+      } else {
+        setScrapeResult({
+          success: false,
+          message: result.error || 'Failed to save manual entry'
+        });
+      }
+    } catch (error) {
+      console.error('Error saving manual entry:', error);
+      setScrapeResult({
+        success: false,
+        message: error.message || 'Error saving manual entry. Please try again.'
+      });
+    } finally {
+      setScraping(false);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!confirm('Are you sure you want to delete this scraped resource? This will also delete all associated chunks.')) {
       return;
@@ -162,9 +241,12 @@ export default function WebScraping() {
       url: '',
       urls: '',
       sourceType: '',
-      regulationIds: ''
+      regulationIds: '',
+      title: '',
+      content: ''
     });
     setShowScrapeForm(false);
+    setEntryMode('scrape');
   };
 
   const sourceTypes = [
@@ -198,23 +280,48 @@ export default function WebScraping() {
         }}>
           Web Scraping for Title 21 Regulations
         </h3>
-        <button
-          onClick={() => setShowScrapeForm(true)}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#4338ca',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '14px',
-            fontWeight: '500',
-            cursor: 'pointer',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          + Scrape Website
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => {
+              setEntryMode('scrape');
+              setShowScrapeForm(true);
+            }}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#4338ca',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            + Scrape Website
+          </button>
+          <button
+            onClick={() => {
+              setEntryMode('manual');
+              setShowScrapeForm(true);
+            }}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#059669',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            + Manual Entry
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -304,76 +411,191 @@ export default function WebScraping() {
             color: '#374151',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}>
-            Scrape Website
+            {entryMode === 'manual' ? 'Manual Entry' : 'Scrape Website'}
           </h4>
-          <p style={{
-            margin: '0 0 16px 0',
-            padding: '12px',
-            backgroundColor: '#fef3c7',
-            border: '1px solid #fbbf24',
-            borderRadius: '6px',
-            fontSize: '13px',
-            color: '#92400e',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          }}>
-            <strong>Tip:</strong> Make sure the URL is correct and accessible. If you get a 404 error, the page may not exist or may have been moved. Try opening the URL in your browser first to verify it works.
-          </p>
+          
+          {entryMode === 'scrape' ? (
+            <p style={{
+              margin: '0 0 16px 0',
+              padding: '12px',
+              backgroundColor: '#fef3c7',
+              border: '1px solid #fbbf24',
+              borderRadius: '6px',
+              fontSize: '13px',
+              color: '#92400e',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            }}>
+              <strong>Tip:</strong> Make sure the URL is correct and accessible. If you get a 404 error, the page may not exist or may have been moved. Try opening the URL in your browser first to verify it works.
+            </p>
+          ) : (
+            <p style={{
+              margin: '0 0 16px 0',
+              padding: '12px',
+              backgroundColor: '#d1fae5',
+              border: '1px solid #10b981',
+              borderRadius: '6px',
+              fontSize: '13px',
+              color: '#065f46',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            }}>
+              <strong>Manual Entry:</strong> Use this when automated scraping is blocked (e.g., by bot detection). Copy the content from the webpage and paste it here. The content will be processed and made searchable just like scraped content.
+            </p>
+          )}
           
           <form onSubmit={handleScrape}>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '4px',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#374151',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
-                Single URL
-              </label>
-              <input
-                type="url"
-                value={formData.url}
-                onChange={(e) => setFormData(prev => ({ ...prev, url: e.target.value }))}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}
-                placeholder="https://www.fda.gov/..."
-              />
-            </div>
+            {entryMode === 'manual' ? (
+              <>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '4px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#374151',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    URL * <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'normal' }}>(for reference, even if scraping is blocked)</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.url}
+                    onChange={(e) => setFormData(prev => ({ ...prev, url: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}
+                    placeholder="https://www.fda.gov/..."
+                    required
+                  />
+                </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{
-                display: 'block',
-                marginBottom: '4px',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#374151',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
-                Multiple URLs (one per line)
-              </label>
-              <textarea
-                value={formData.urls}
-                onChange={(e) => setFormData(prev => ({ ...prev, urls: e.target.value }))}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  minHeight: '100px',
-                  resize: 'vertical'
-                }}
-                placeholder="https://www.fda.gov/...&#10;https://www.fda.gov/..."
-              />
-            </div>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '4px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#374151',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}
+                    placeholder="Page title or document name"
+                    required
+                  />
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '4px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#374151',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    Content * <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 'normal' }}>(paste the text content from the webpage)</span>
+                  </label>
+                  <textarea
+                    value={formData.content}
+                    onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      minHeight: '300px',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Paste the content from the webpage here..."
+                    required
+                  />
+                  <p style={{
+                    margin: '4px 0 0 0',
+                    fontSize: '12px',
+                    color: '#6b7280',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    Minimum 20 characters. The content will be chunked and embedded for search.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '4px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#374151',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    Single URL
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.url}
+                    onChange={(e) => setFormData(prev => ({ ...prev, url: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}
+                    placeholder="https://www.fda.gov/..."
+                  />
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '4px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#374151',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  }}>
+                    Multiple URLs (one per line)
+                  </label>
+                  <textarea
+                    value={formData.urls}
+                    onChange={(e) => setFormData(prev => ({ ...prev, urls: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      minHeight: '100px',
+                      resize: 'vertical'
+                    }}
+                    placeholder="https://www.fda.gov/...&#10;https://www.fda.gov/..."
+                  />
+                </div>
+              </>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
               <div>
@@ -440,7 +662,7 @@ export default function WebScraping() {
                 disabled={scraping}
                 style={{
                   padding: '10px 20px',
-                  backgroundColor: scraping ? '#9ca3af' : '#4338ca',
+                  backgroundColor: scraping ? '#9ca3af' : (entryMode === 'manual' ? '#059669' : '#4338ca'),
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '6px',
@@ -450,7 +672,7 @@ export default function WebScraping() {
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}
               >
-                {scraping ? 'Scraping...' : 'Start Scraping'}
+                {scraping ? (entryMode === 'manual' ? 'Processing...' : 'Scraping...') : (entryMode === 'manual' ? 'Save & Process' : 'Start Scraping')}
               </button>
               <button
                 type="button"

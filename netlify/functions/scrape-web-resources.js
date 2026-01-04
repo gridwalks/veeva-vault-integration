@@ -73,6 +73,18 @@ async function downloadHTMLContent(url) {
       headers: Object.fromEntries(response.headers.entries())
     });
 
+    // Check if we were redirected to a bot detection page
+    if (response.url.includes('abuse-detection') || response.url.includes('apology') || 
+        response.url.includes('challenge') || response.url.includes('captcha')) {
+      const errorMessage = `The website (${new URL(response.url).hostname}) is blocking automated requests and redirecting to a bot detection page. This is common with sites using Cloudflare or similar protection. The page exists but cannot be scraped automatically. You may need to manually copy the content or use the website's official API if available.`;
+      console.error('Bot detection triggered:', {
+        originalUrl: url,
+        finalUrl: response.url,
+        status: response.status
+      });
+      throw new Error(errorMessage);
+    }
+
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
       let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
@@ -85,8 +97,10 @@ async function downloadHTMLContent(url) {
         finalUrl: response.url !== url ? `(redirected from ${url})` : ''
       });
       
-      // Provide more helpful error messages for common HTTP errors
-      if (response.status === 404) {
+      // Check if redirected to bot detection even with non-200 status
+      if (response.url.includes('abuse-detection') || response.url.includes('apology')) {
+        errorMessage = `The website is blocking automated requests (bot detection). The page exists but cannot be scraped automatically. You may need to manually copy the content or check if the website offers an API.`;
+      } else if (response.status === 404) {
         errorMessage = `Page not found (404). The URL may be incorrect, the page may have been moved, or it may require authentication. Final URL: ${response.url}. Please verify the URL is correct and accessible in a browser.`;
       } else if (response.status === 403) {
         errorMessage = `Access forbidden (403). The website may require authentication or may be blocking automated access. Try accessing the URL in a browser first.`;
@@ -106,8 +120,14 @@ async function downloadHTMLContent(url) {
       throw new Error(`Downloaded content too short (${htmlContent.length} chars). May be an error page.`);
     }
     
-    // Check if the content looks like an error page
+    // Check if the content looks like an error page or bot detection page
     const lowerContent = htmlContent.toLowerCase();
+    if (lowerContent.includes('abuse-detection') || lowerContent.includes('apology') || 
+        lowerContent.includes('challenge') || lowerContent.includes('cloudflare') ||
+        lowerContent.includes('checking your browser')) {
+      console.warn('Content appears to be a bot detection page despite 200 status');
+      throw new Error('The website is blocking automated requests (bot detection). The page exists but cannot be scraped automatically. You may need to manually copy the content or check if the website offers an API.');
+    }
     if (lowerContent.includes('404') || lowerContent.includes('not found') || lowerContent.includes('page not found')) {
       console.warn('Content appears to be an error page despite 200 status');
       throw new Error('The page appears to be an error page (404) even though the server returned a 200 status. The URL may be incorrect or the page may have been moved.');
@@ -366,6 +386,140 @@ async function chunkAndEmbedWebResource(resourceText, webResourceId, pool, start
   }
 }
 
+// Function to process manual entry (content provided directly)
+async function scrapeWebResourceManual(url, title, content, sourceType, pool, regulationIds = []) {
+  const startTime = Date.now();
+  let webResourceDbId = null;
+
+  try {
+    console.log(`Processing manual entry for: ${url}`);
+    
+    // Extract domain from URL
+    const domain = extractDomain(url);
+    
+    // Validate content
+    if (!content || content.trim().length < 20) {
+      throw new Error('Content must be at least 20 characters long');
+    }
+
+    const extractedText = content.trim();
+    
+    // Check if resource already exists
+    const existingResult = await pool.query(
+      'SELECT id, status FROM cfr_title21_web_resources WHERE source_url = $1',
+      [url]
+    );
+
+    if (existingResult.rows.length > 0) {
+      // Update existing record
+      webResourceDbId = existingResult.rows[0].id;
+      console.log(`Updating existing web resource record for ${url}...`);
+      
+      const updateResult = await pool.query(`
+        UPDATE cfr_title21_web_resources 
+        SET title = $1, full_text = $2, extraction_method = $3, 
+            updated_at = CURRENT_TIMESTAMP, last_checked_at = CURRENT_TIMESTAMP,
+            status = 'active', domain = $4, source_type = $5
+        WHERE id = $6
+        RETURNING id
+      `, [
+        title,
+        extractedText,
+        'manual_entry',
+        domain,
+        sourceType || null,
+        webResourceDbId
+      ]);
+      
+      console.log(`Updated web resource record: ${url} (DB ID: ${webResourceDbId})`);
+    } else {
+      // Create new record
+      console.log(`Creating new web resource record for ${url}...`);
+      const insertResult = await pool.query(`
+        INSERT INTO cfr_title21_web_resources 
+        (source_url, title, source_type, domain, full_text, extraction_method, status, last_checked_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+        RETURNING id
+      `, [
+        url,
+        title,
+        sourceType || null,
+        domain,
+        extractedText,
+        'manual_entry',
+        'active'
+      ]);
+      webResourceDbId = insertResult.rows[0]?.id;
+      console.log(`Created new web resource record: ${url} (DB ID: ${webResourceDbId})`);
+      
+      if (!webResourceDbId) {
+        throw new Error('Failed to get database ID after insert');
+      }
+    }
+
+    // Chunk and embed the resource
+    console.log(`Starting chunking for manual entry ${url} (DB ID: ${webResourceDbId}) with ${extractedText.length} characters of text`);
+    const chunkResult = await chunkAndEmbedWebResource(extractedText, webResourceDbId, pool, startTime);
+    
+    if (!chunkResult.success || chunkResult.chunksCreated === 0) {
+      console.warn(`⚠️ Warning: Failed to create chunks for ${url}. Error: ${chunkResult.error || 'Unknown error'}`);
+      // Update status to error but don't fail the entire operation
+      await pool.query(
+        'UPDATE cfr_title21_web_resources SET status = $1 WHERE id = $2',
+        ['error', webResourceDbId]
+      );
+    }
+
+    // Link to regulations if provided
+    if (regulationIds && regulationIds.length > 0) {
+      for (const regulationId of regulationIds) {
+        try {
+          await pool.query(`
+            INSERT INTO cfr_title21_web_resource_links (web_resource_id, regulation_id, link_type)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (web_resource_id, regulation_id) DO NOTHING
+          `, [webResourceDbId, regulationId, 'related_topic']);
+        } catch (linkError) {
+          console.warn(`Failed to link web resource ${webResourceDbId} to regulation ${regulationId}:`, linkError.message);
+        }
+      }
+    }
+
+    const duration = Date.now() - startTime;
+    console.log(`✓ Successfully processed manual entry ${url} in ${duration}ms (${chunkResult.chunksCreated || 0} chunks created)`);
+
+    return {
+      success: true,
+      webResourceId: webResourceDbId,
+      url,
+      title,
+      chunksCreated: chunkResult.chunksCreated || 0,
+      duration
+    };
+
+  } catch (error) {
+    console.error(`❌ Error processing manual entry ${url}:`, error);
+    
+    // If we have a DB ID, update status to error
+    if (webResourceDbId) {
+      try {
+        await pool.query(
+          'UPDATE cfr_title21_web_resources SET status = $1 WHERE id = $2',
+          ['error', webResourceDbId]
+        );
+      } catch (updateError) {
+        console.error('Failed to update error status:', updateError);
+      }
+    }
+    
+    return {
+      success: false,
+      url,
+      error: error.message
+    };
+  }
+}
+
 // Function to scrape a single web resource
 async function scrapeWebResource(url, sourceType, pool, regulationIds = []) {
   const startTime = Date.now();
@@ -563,7 +717,28 @@ export const handler = async (event) => {
     const pool = getPool();
 
     const requestBody = JSON.parse(event.body || '{}');
-    const { url, urls, sourceType, regulationIds } = requestBody;
+    const { url, urls, sourceType, regulationIds, title, content } = requestBody;
+
+    // Handle manual entry (content provided directly)
+    if (content && title && url) {
+      console.log(`Processing manual entry for: ${url}`);
+      const result = await scrapeWebResourceManual(url, title, content, sourceType, pool, regulationIds);
+      const successCount = result.success ? 1 : 0;
+      const failureCount = result.success ? 0 : 1;
+      
+      return {
+        statusCode: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({
+          success: true,
+          message: `Processed ${successCount} resource(s) successfully, ${failureCount} failed`,
+          results: [result]
+        })
+      };
+    }
 
     // Support both single URL and array of URLs
     const urlsToScrape = urls || (url ? [url] : []);
@@ -577,7 +752,7 @@ export const handler = async (event) => {
         },
         body: JSON.stringify({
           success: false,
-          error: 'No URLs provided. Please provide either "url" or "urls" array in the request body.'
+          error: 'No URLs provided. Please provide either "url" or "urls" array in the request body, or use manual entry with "url", "title", and "content" fields.'
         })
       };
     }
