@@ -19,28 +19,77 @@ async function downloadHTMLContent(url) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
-    const response = await fetch(url, {
+    // Use a more modern, realistic User-Agent that matches current browsers
+    const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    
+    // Extract domain for Referer header
+    let referer = null;
+    try {
+      const urlObj = new URL(url);
+      referer = `${urlObj.protocol}//${urlObj.hostname}/`;
+    } catch (e) {
+      // If URL parsing fails, skip referer
+    }
+    
+    const fetchOptions = {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'User-Agent': userAgent,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
         'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1'
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'max-age=0'
       },
+      redirect: 'follow', // Follow redirects automatically
       signal: controller.signal
+    };
+    
+    // Add Referer if we have the domain
+    if (referer) {
+      fetchOptions.headers['Referer'] = referer;
+    }
+    
+    console.log(`Fetching with headers:`, {
+      'User-Agent': fetchOptions.headers['User-Agent'].substring(0, 50) + '...',
+      'Referer': referer || 'none',
+      'redirect': 'follow'
     });
+    
+    const response = await fetch(url, fetchOptions);
 
     clearTimeout(timeoutId);
+    
+    // Log response details for debugging
+    console.log(`Response received:`, {
+      status: response.status,
+      statusText: response.statusText,
+      url: response.url,
+      redirected: response.redirected,
+      headers: Object.fromEntries(response.headers.entries())
+    });
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
       let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
       
+      // Log more details for debugging
+      console.error(`HTTP Error ${response.status}:`, {
+        url: response.url,
+        statusText: response.statusText,
+        errorTextPreview: errorText.substring(0, 500),
+        finalUrl: response.url !== url ? `(redirected from ${url})` : ''
+      });
+      
       // Provide more helpful error messages for common HTTP errors
       if (response.status === 404) {
-        errorMessage = `Page not found (404). The URL may be incorrect, the page may have been moved, or it may require authentication. Please verify the URL is correct and accessible.`;
+        errorMessage = `Page not found (404). The URL may be incorrect, the page may have been moved, or it may require authentication. Final URL: ${response.url}. Please verify the URL is correct and accessible in a browser.`;
       } else if (response.status === 403) {
-        errorMessage = `Access forbidden (403). The website may require authentication or may be blocking automated access.`;
+        errorMessage = `Access forbidden (403). The website may require authentication or may be blocking automated access. Try accessing the URL in a browser first.`;
       } else if (response.status === 401) {
         errorMessage = `Unauthorized (401). The website requires authentication to access this content.`;
       } else if (response.status >= 500) {
@@ -51,10 +100,17 @@ async function downloadHTMLContent(url) {
     }
 
     const htmlContent = await response.text();
-    console.log(`Downloaded ${htmlContent.length} characters from ${url}`);
+    console.log(`Downloaded ${htmlContent.length} characters from ${response.url}`);
     
     if (htmlContent.length < 100) {
       throw new Error(`Downloaded content too short (${htmlContent.length} chars). May be an error page.`);
+    }
+    
+    // Check if the content looks like an error page
+    const lowerContent = htmlContent.toLowerCase();
+    if (lowerContent.includes('404') || lowerContent.includes('not found') || lowerContent.includes('page not found')) {
+      console.warn('Content appears to be an error page despite 200 status');
+      throw new Error('The page appears to be an error page (404) even though the server returned a 200 status. The URL may be incorrect or the page may have been moved.');
     }
     
     return htmlContent;
@@ -63,6 +119,51 @@ async function downloadHTMLContent(url) {
       throw new Error(`Download timeout after 30 seconds`);
     }
     console.error(`Error downloading from ${url}:`, error.message);
+    throw error;
+  }
+}
+
+// Simplified download function as fallback (minimal headers)
+async function downloadHTMLContentSimple(url) {
+  try {
+    console.log(`Trying simplified download for: ${url}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      },
+      redirect: 'follow',
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+    
+    console.log(`Simplified request response:`, {
+      status: response.status,
+      url: response.url,
+      redirected: response.redirected
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new Error(`HTTP ${response.status}: ${response.statusText}. Final URL: ${response.url}`);
+    }
+
+    const htmlContent = await response.text();
+    console.log(`Simplified download successful: ${htmlContent.length} characters`);
+    
+    if (htmlContent.length < 100) {
+      throw new Error(`Downloaded content too short (${htmlContent.length} chars)`);
+    }
+    
+    return htmlContent;
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error(`Download timeout after 30 seconds`);
+    }
     throw error;
   }
 }
@@ -273,8 +374,24 @@ async function scrapeWebResource(url, sourceType, pool, regulationIds = []) {
   try {
     console.log(`Starting scrape for: ${url}`);
     
-    // Download HTML content
-    const htmlContent = await downloadHTMLContent(url);
+    // Download HTML content - try with improved headers first
+    let htmlContent;
+    try {
+      htmlContent = await downloadHTMLContent(url);
+    } catch (downloadError) {
+      // If we get a 404, try a simpler request without some headers that might trigger blocks
+      if (downloadError.message.includes('404') || downloadError.message.includes('not found')) {
+        console.log(`First attempt failed with 404, trying simpler request...`);
+        try {
+          htmlContent = await downloadHTMLContentSimple(url);
+        } catch (simpleError) {
+          // If simple request also fails, throw the original error with more context
+          throw new Error(`${downloadError.message} (Also tried simplified request: ${simpleError.message})`);
+        }
+      } else {
+        throw downloadError;
+      }
+    }
     
     // Extract text from HTML
     const extractedText = extractTextFromHTMLStructured(htmlContent);
