@@ -384,23 +384,37 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
         selectedDocumentsLength: selectedDocuments.length
       });
       
-      // Check if user is asking for comparison but hasn't uploaded any documents
-      // Use more restrictive patterns that clearly indicate comparison intent
+      // Check if user is asking for document comparison but hasn't uploaded any documents
+      // Only require documents if the comparison query explicitly mentions documents/files
       const lowerMessage = userMessage.toLowerCase();
-      const isComparisonQuery = lowerMessage.includes('compare') || 
-                               lowerMessage.includes('comparison') ||
-                               lowerMessage.includes('compare to') ||
-                               lowerMessage.includes('compare with') ||
-                               lowerMessage.includes('review against') ||
-                               lowerMessage.includes('errors based on') ||
-                               lowerMessage.includes('differences between') ||
-                               (lowerMessage.includes('versus') && (lowerMessage.includes('document') || lowerMessage.includes('doc'))) ||
-                               (lowerMessage.includes('vs') && (lowerMessage.includes('document') || lowerMessage.includes('doc')));
+      const hasComparisonKeywords = lowerMessage.includes('compare') || 
+                                    lowerMessage.includes('comparison') ||
+                                    lowerMessage.includes('compare to') ||
+                                    lowerMessage.includes('compare with') ||
+                                    lowerMessage.includes('review against') ||
+                                    lowerMessage.includes('errors based on') ||
+                                    lowerMessage.includes('differences between') ||
+                                    lowerMessage.includes('versus') ||
+                                    lowerMessage.includes('vs');
+      
+      // Check if the comparison explicitly mentions documents/files
+      const mentionsDocuments = lowerMessage.includes('document') || 
+                                lowerMessage.includes('doc') ||
+                                lowerMessage.includes('file') ||
+                                lowerMessage.includes('files') ||
+                                lowerMessage.includes('attachment') ||
+                                lowerMessage.includes('attachments') ||
+                                lowerMessage.includes('pdf') ||
+                                lowerMessage.includes('report') ||
+                                lowerMessage.includes('specification');
+      
+      // Only treat as document comparison query if it mentions documents
+      const isDocumentComparisonQuery = hasComparisonKeywords && mentionsDocuments;
       
       // Check if user has documents (either attached or in current message)
       const hasDocuments = allDocumentIds.length > 0 || (files && files.length > 0) || uploadedBlobs.length > 0 || newBlobUploads.length > 0;
       
-      if (isComparisonQuery && !hasDocuments) {
+      if (isDocumentComparisonQuery && !hasDocuments) {
         // Add a helpful message about uploading documents
         const helpfulMessage = {
           role: 'assistant',
@@ -413,7 +427,9 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
 
 The files will upload automatically and I'll be able to perform a detailed comparison analysis for you.
 
-**Supported file types:** PDF, DOC, DOCX, TXT, CSV`
+**Supported file types:** PDF, DOC, DOCX, TXT, CSV
+
+**Note:** If you want to compare topics or concepts without documents, you can ask your question directly without mentioning documents.`
         };
         
         setConversationHistory(prev => [...prev, helpfulMessage]);
