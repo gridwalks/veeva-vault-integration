@@ -369,6 +369,68 @@ export async function initDatabase() {
 
     console.log('CFR Title 21 web resource links table created or already exists');
 
+    // Create pharmaceutical practices table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS pharmaceutical_practices (
+        id SERIAL PRIMARY KEY,
+        practice_code VARCHAR(10) UNIQUE NOT NULL,
+        practice_name VARCHAR(255) NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create index for pharmaceutical practices
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_pharmaceutical_practices_practice_code 
+      ON pharmaceutical_practices(practice_code)
+    `);
+
+    console.log('Pharmaceutical practices table created or already exists');
+
+    // Create practice-regulation associations table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS practice_regulation_associations (
+        id SERIAL PRIMARY KEY,
+        practice_id INTEGER NOT NULL REFERENCES pharmaceutical_practices(id) ON DELETE CASCADE,
+        regulation_id INTEGER NOT NULL REFERENCES cfr_title21_regulations(id) ON DELETE CASCADE,
+        association_type VARCHAR(50) DEFAULT 'primary',
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(practice_id, regulation_id)
+      )
+    `);
+
+    // Create indexes for practice-regulation associations
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_practice_regulation_associations_practice_id 
+      ON practice_regulation_associations(practice_id)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_practice_regulation_associations_regulation_id 
+      ON practice_regulation_associations(regulation_id)
+    `);
+
+    console.log('Practice-regulation associations table created or already exists');
+
+    // Seed initial pharmaceutical practices
+    try {
+      await client.query(`
+        INSERT INTO pharmaceutical_practices (practice_code, practice_name, description) VALUES
+          ('GCP', 'Good Clinical Practices', 'Standards for the design, conduct, performance, monitoring, auditing, recording, analyses, and reporting of clinical trials that involve the participation of human subjects.'),
+          ('GMP', 'Good Manufacturing Practices', 'Regulations that require manufacturers, processors, and packagers of drugs, medical devices, and certain types of food and blood to take proactive steps to ensure that their products are safe, pure, and effective.'),
+          ('GLP', 'Good Laboratory Practices', 'Regulations that ensure the quality and integrity of nonclinical laboratory studies that support research or marketing permits for products regulated by the FDA.'),
+          ('GDP', 'Good Distribution Practices', 'Guidelines for the proper distribution of medicinal products for human use to ensure that the quality and integrity of medicines is maintained throughout the supply chain.')
+        ON CONFLICT (practice_code) DO NOTHING
+      `);
+      console.log('Initial pharmaceutical practices seeded');
+    } catch (seedError) {
+      console.warn('Error seeding pharmaceutical practices (may already exist):', seedError.message);
+    }
+
     // ============================================================================
     // GxP Educational Platform Tables
     // ============================================================================

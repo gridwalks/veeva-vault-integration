@@ -495,6 +495,8 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = [], re
           subchapter_id: doc.subchapter_id,
           summary: doc.ai_summary || null,
           source_type: "cfr_regulation",
+          associated_practices: doc.associated_practices || [],
+          is_practice_associated: (doc.associated_practices && doc.associated_practices.length > 0) || false,
           maxSimilarity: similarityScores.maxSimilarity,
           avgSimilarity: similarityScores.avgSimilarity,
         };
@@ -584,6 +586,127 @@ function detectComparisonIntent(message) {
   const hasComparisonStructure = /\b(?:this|that|these|those)\s+(?:document|doc|file|report|assessment|specification|requirement|srd)\b/i.test(message);
   
   return hasComparisonKeywords && (hasDocumentReferences || hasComparisonStructure);
+}
+
+// Function to detect pharmaceutical practice intent in user messages
+async function detectPracticeIntent(message, pool) {
+  if (!message || typeof message !== 'string') {
+    return [];
+  }
+  
+  const lowerMessage = message.toLowerCase();
+  
+  // Practice keywords mapping
+  const practiceKeywords = {
+    'GCP': ['gcp', 'good clinical practice', 'good clinical practices', 'clinical trial', 'clinical study', 'clinical research', 'investigational', 'informed consent', 'irb', 'institutional review board'],
+    'GMP': ['gmp', 'good manufacturing practice', 'good manufacturing practices', 'manufacturing', 'production', 'cGMP', 'current good manufacturing', 'drug manufacturing', 'pharmaceutical manufacturing'],
+    'GLP': ['glp', 'good laboratory practice', 'good laboratory practices', 'laboratory', 'nonclinical', 'non-clinical', 'preclinical', 'pre-clinical', 'lab study', 'animal study'],
+    'GDP': ['gdp', 'good distribution practice', 'good distribution practices', 'distribution', 'supply chain', 'wholesale', 'pharmacy distribution', 'drug distribution']
+  };
+  
+  // Quick keyword check first
+  const detectedPractices = new Set();
+  
+  for (const [practiceCode, keywords] of Object.entries(practiceKeywords)) {
+    for (const keyword of keywords) {
+      if (lowerMessage.includes(keyword)) {
+        detectedPractices.add(practiceCode);
+        break;
+      }
+    }
+  }
+  
+  // If we found practices via keywords, return them
+  if (detectedPractices.size > 0) {
+    console.log('Practice detected via keywords:', Array.from(detectedPractices));
+    return Array.from(detectedPractices);
+  }
+  
+  // If no keyword match, use AI detection
+  try {
+    const practiceList = Object.entries(practiceKeywords).map(([code, keywords]) => 
+      `${code} (${keywords.slice(0, 3).join(', ')})`
+    ).join(', ');
+    
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.1-70b-versatile",
+      messages: [
+        {
+          role: "system",
+          content: `You are a pharmaceutical regulatory assistant. Analyze the user's message to determine if they are asking about pharmaceutical practices (GCP, GMP, GLP, GDP).
+
+Available practices:
+- GCP (Good Clinical Practices): Clinical trials, human subjects, informed consent, IRB
+- GMP (Good Manufacturing Practices): Manufacturing, production, drug production, pharmaceutical manufacturing
+- GLP (Good Laboratory Practices): Laboratory studies, nonclinical studies, animal studies, preclinical research
+- GDP (Good Distribution Practices): Distribution, supply chain, wholesale, pharmacy distribution
+
+Respond with a JSON object containing a "practices" array of practice codes (e.g., {"practices": ["GCP"]} or {"practices": ["GMP", "GLP"]} or {"practices": []} if none detected).
+Examples:
+- "What are GCP requirements?" -> {"practices": ["GCP"]}
+- "Tell me about manufacturing standards" -> {"practices": ["GMP"]}
+- "Clinical trial regulations" -> {"practices": ["GCP"]}
+- "Lab study requirements" -> {"practices": ["GLP"]}
+- "How to distribute drugs?" -> {"practices": ["GDP"]}
+- "What is a CAPA?" -> {"practices": []}`
+        },
+        {
+          role: "user",
+          content: message
+        }
+      ],
+      max_tokens: 50,
+      temperature: 0.1,
+      response_format: { type: "json_object" }
+    });
+    
+    const aiResponse = completion.choices[0]?.message?.content?.trim();
+    console.log('AI practice detection response:', aiResponse);
+    
+    if (aiResponse) {
+      try {
+        const parsed = JSON.parse(aiResponse);
+        // Handle different possible response formats
+        let practices = [];
+        if (Array.isArray(parsed)) {
+          practices = parsed;
+        } else if (parsed.practices && Array.isArray(parsed.practices)) {
+          practices = parsed.practices;
+        } else if (parsed.practice_codes && Array.isArray(parsed.practice_codes)) {
+          practices = parsed.practice_codes;
+        } else if (typeof parsed === 'string') {
+          // Handle case where AI returns a single practice code as string
+          practices = [parsed];
+        }
+        
+        if (practices.length > 0) {
+          // Validate that practices are valid codes
+          const validPractices = practices
+            .map(p => typeof p === 'string' ? p.toUpperCase().trim() : String(p).toUpperCase().trim())
+            .filter(p => ['GCP', 'GMP', 'GLP', 'GDP'].includes(p));
+          
+          if (validPractices.length > 0) {
+            console.log('Practice detected via AI:', validPractices);
+            return validPractices;
+          }
+        }
+      } catch (parseError) {
+        console.warn('Error parsing AI practice detection response:', parseError);
+        // Try to extract practice codes from plain text response as fallback
+        const textResponse = aiResponse.toUpperCase();
+        const fallbackPractices = ['GCP', 'GMP', 'GLP', 'GDP'].filter(p => textResponse.includes(p));
+        if (fallbackPractices.length > 0) {
+          console.log('Practice detected via text fallback:', fallbackPractices);
+          return fallbackPractices;
+        }
+      }
+    }
+  } catch (aiError) {
+    console.error('AI practice detection failed:', aiError);
+    // Continue without AI detection - return empty array
+  }
+  
+  return [];
 }
 
 export const handler = async (event) => {
@@ -813,6 +936,31 @@ export const handler = async (event) => {
     const safeFileNameSelectWithAlias = uploadedColumnSupport.safeFileName
       ? "d.safe_file_name"
       : "NULL::TEXT AS safe_file_name";
+
+    // Detect pharmaceutical practice intent
+    let detectedPractices = [];
+    let practiceAssociatedRegulationIds = [];
+    try {
+      detectedPractices = await detectPracticeIntent(messageValidation.sanitized, pool);
+      console.log('Detected practices:', detectedPractices);
+      
+      // If practices are detected, get associated regulation IDs
+      if (detectedPractices.length > 0) {
+        const practicePlaceholders = detectedPractices.map((_, index) => `$${index + 1}`).join(',');
+        const practiceRegulationQuery = `
+          SELECT DISTINCT pra.regulation_id
+          FROM practice_regulation_associations pra
+          INNER JOIN pharmaceutical_practices pp ON pra.practice_id = pp.id
+          WHERE pp.practice_code IN (${practicePlaceholders})
+        `;
+        const practiceRegulationResult = await pool.query(practiceRegulationQuery, detectedPractices);
+        practiceAssociatedRegulationIds = practiceRegulationResult.rows.map(row => row.regulation_id);
+        console.log(`Found ${practiceAssociatedRegulationIds.length} regulations associated with practices:`, detectedPractices);
+      }
+    } catch (practiceError) {
+      console.error('Error detecting practices or fetching associated regulations:', practiceError);
+      // Continue without practice detection if it fails
+    }
 
     // Detect if user is asking specifically about uploaded documents
     const isUploadedDocQuery = messageValidation.sanitized.toLowerCase().includes('uploaded') || 
@@ -1204,6 +1352,14 @@ export const handler = async (event) => {
         .filter(c => c.source_type === 'cfr_regulation' && c.regulation_id)
         .map(c => c.regulation_id))];
       
+      // Add practice-associated regulation IDs if practices were detected
+      if (practiceAssociatedRegulationIds.length > 0) {
+        const allCfrRegulationIds = new Set([...uniqueCfrRegulationIds, ...practiceAssociatedRegulationIds]);
+        uniqueCfrRegulationIds.length = 0;
+        uniqueCfrRegulationIds.push(...Array.from(allCfrRegulationIds));
+        console.log(`Added ${practiceAssociatedRegulationIds.length} practice-associated regulations. Total CFR regulations: ${uniqueCfrRegulationIds.length}`);
+      }
+      
       const uniqueWebResourceIds = [...new Set(relevantChunks
         .filter(c => c.source_type === 'web_resource' && c.web_resource_id)
         .map(c => c.web_resource_id))];
@@ -1213,6 +1369,8 @@ export const handler = async (event) => {
         uniqueVeevaDocIds: uniqueVeevaDocIds,
         uniqueUploadedDocIds: uniqueUploadedDocIds,
         uniqueCfrRegulationIds: uniqueCfrRegulationIds,
+        practiceAssociatedRegulationIds: practiceAssociatedRegulationIds.length,
+        detectedPractices: detectedPractices,
         uniqueWebResourceIds: uniqueWebResourceIds,
         chunkDetails: relevantChunks.map(c => ({
           docId: c.veeva_document_id || c.upload_document_id || c.regulation_id || c.web_resource_id,
@@ -1255,11 +1413,26 @@ export const handler = async (event) => {
       if (uniqueCfrRegulationIds.length > 0) {
         const cfrDocPlaceholders = uniqueCfrRegulationIds.map((_, index) => `$${index + 1}`).join(',');
         const cfrDocQuery = `
-          SELECT id as document_id, title as document_name, regulation_type as document_type,
-                 regulation_id, chapter_id, subchapter_id, ai_summary,
-                 'cfr_regulation' as source_type
-          FROM cfr_title21_regulations
-          WHERE id IN (${cfrDocPlaceholders})
+          SELECT 
+            r.id as document_id, 
+            r.title as document_name, 
+            r.regulation_type as document_type,
+            r.regulation_id, 
+            r.chapter_id, 
+            r.subchapter_id, 
+            r.ai_summary,
+            'cfr_regulation' as source_type,
+            COALESCE(
+              (
+                SELECT array_agg(pp.practice_code ORDER BY pp.practice_code)
+                FROM practice_regulation_associations pra
+                INNER JOIN pharmaceutical_practices pp ON pra.practice_id = pp.id
+                WHERE pra.regulation_id = r.id
+              ),
+              ARRAY[]::VARCHAR[]
+            ) as associated_practices
+          FROM cfr_title21_regulations r
+          WHERE r.id IN (${cfrDocPlaceholders})
         `;
         const cfrDocResult = await pool.query(cfrDocQuery, uniqueCfrRegulationIds);
         relevantDocuments.push(...cfrDocResult.rows);

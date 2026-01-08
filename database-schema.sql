@@ -464,6 +464,49 @@ ON cfr_title21_web_resources(source_url);
 CREATE INDEX IF NOT EXISTS idx_web_resources_source_type 
 ON cfr_title21_web_resources(source_type);
 
+-- Pharmaceutical Practices Tables
+
+-- Table for storing pharmaceutical practices (GCP, GMP, GLP, GDP, etc.)
+CREATE TABLE IF NOT EXISTS pharmaceutical_practices (
+  id SERIAL PRIMARY KEY,
+  practice_code VARCHAR(10) UNIQUE NOT NULL, -- e.g., 'GCP', 'GMP', 'GLP', 'GDP'
+  practice_name VARCHAR(255) NOT NULL, -- e.g., 'Good Clinical Practices'
+  description TEXT, -- Full description of the practice
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for pharmaceutical practices
+CREATE INDEX IF NOT EXISTS idx_pharmaceutical_practices_practice_code 
+ON pharmaceutical_practices(practice_code);
+
+-- Table for storing practice-regulation associations (many-to-many)
+CREATE TABLE IF NOT EXISTS practice_regulation_associations (
+  id SERIAL PRIMARY KEY,
+  practice_id INTEGER NOT NULL REFERENCES pharmaceutical_practices(id) ON DELETE CASCADE,
+  regulation_id INTEGER NOT NULL REFERENCES cfr_title21_regulations(id) ON DELETE CASCADE,
+  association_type VARCHAR(50) DEFAULT 'primary', -- 'primary', 'secondary', 'related'
+  notes TEXT, -- Optional notes about the association
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(practice_id, regulation_id)
+);
+
+-- Create indexes for practice-regulation associations
+CREATE INDEX IF NOT EXISTS idx_practice_regulation_associations_practice_id 
+ON practice_regulation_associations(practice_id);
+
+CREATE INDEX IF NOT EXISTS idx_practice_regulation_associations_regulation_id 
+ON practice_regulation_associations(regulation_id);
+
+-- Seed initial pharmaceutical practices
+INSERT INTO pharmaceutical_practices (practice_code, practice_name, description) VALUES
+  ('GCP', 'Good Clinical Practices', 'Standards for the design, conduct, performance, monitoring, auditing, recording, analyses, and reporting of clinical trials that involve the participation of human subjects.'),
+  ('GMP', 'Good Manufacturing Practices', 'Regulations that require manufacturers, processors, and packagers of drugs, medical devices, and certain types of food and blood to take proactive steps to ensure that their products are safe, pure, and effective.'),
+  ('GLP', 'Good Laboratory Practices', 'Regulations that ensure the quality and integrity of nonclinical laboratory studies that support research or marketing permits for products regulated by the FDA.'),
+  ('GDP', 'Good Distribution Practices', 'Guidelines for the proper distribution of medicinal products for human use to ensure that the quality and integrity of medicines is maintained throughout the supply chain.')
+ON CONFLICT (practice_code) DO NOTHING;
+
 CREATE INDEX IF NOT EXISTS idx_web_resources_domain 
 ON cfr_title21_web_resources(domain);
 
