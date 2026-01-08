@@ -1101,3 +1101,73 @@ export async function deleteVeevaData({ accessToken }) {
     errorMessage: 'Failed to delete Veeva data'
   });
 }
+
+// Practice Management API functions
+export async function getPractices({ accessToken } = {}) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  
+  return apiRequest({
+    url: '/api/practice-management/practices',
+    headers,
+    successMessage: 'Fetching practices...',
+    errorMessage: 'Failed to load practices'
+  });
+}
+
+export async function getRegulations({ search = '', limit = 100, offset = 0, accessToken } = {}) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  const params = { limit, offset };
+  if (search) params.search = search;
+  
+  return apiRequest({
+    url: '/api/practice-management/regulations',
+    params,
+    headers,
+    successMessage: 'Fetching regulations...',
+    errorMessage: 'Failed to load regulations'
+  });
+}
+
+export async function getAssociations({ practice_id, regulation_id, accessToken } = {}) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  const params = {};
+  if (practice_id) params.practice_id = practice_id;
+  if (regulation_id) params.regulation_id = regulation_id;
+  
+  return apiRequest({
+    url: '/api/practice-management/associations',
+    params,
+    headers,
+    successMessage: 'Fetching associations...',
+    errorMessage: 'Failed to load associations'
+  });
+}
+
+export async function createPracticeAssociation({ practice_id, regulation_id, association_type = 'primary', notes = null, accessToken }) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  
+  return apiRequest({
+    url: '/api/practice-management/associations',
+    method: 'POST',
+    body: { practice_id, regulation_id, association_type, notes },
+    headers,
+    successMessage: 'Creating association...',
+    errorMessage: 'Failed to create association'
+  });
+}
+
+export async function deletePracticeAssociation({ associationId, accessToken }) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  
+  return apiRequest({
+    url: `/api/practice-management/associations/${associationId}`,
+    method: 'DELETE',
+    headers,
+    successMessage: 'Deleting association...',
+    errorMessage: 'Failed to delete association'
+  });
+}
+    successMessage: 'Deleting Veeva data...',
+    errorMessage: 'Failed to delete Veeva data'
+  });
+}

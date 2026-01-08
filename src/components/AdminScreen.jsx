@@ -14,6 +14,7 @@ import VeevaDocumentList from "./VeevaDocumentList.jsx";
 import CourseAuthoring from "./CourseAuthoring.jsx";
 import EducationalAnalytics from "./EducationalAnalytics.jsx";
 import WebScraping from "./WebScraping.jsx";
+import PracticeManagement from "./PracticeManagement.jsx";
 
 export default function AdminScreen({ userId }) {
   const { getAccessTokenSilently } = useAuth0();
@@ -248,6 +249,7 @@ export default function AdminScreen({ userId }) {
         { id: "blob", label: "Blob Documents", requiresVeeva: false },
         { id: "external", label: "External Resources", requiresVeeva: false },
         { id: "cfr", label: "CFR Title 21", requiresVeeva: false },
+        { id: "practice-management", label: "Practice Associations", requiresVeeva: false },
         { id: "web-scraping", label: "Web Scraping", requiresVeeva: false },
         { id: "qa", label: "Q&A Management", requiresVeeva: false }
       ]
@@ -561,6 +563,8 @@ export default function AdminScreen({ userId }) {
         <ExternalResources />
       ) : activeTab === "cfr" ? (
         <CfrTitle21 />
+      ) : activeTab === "practice-management" ? (
+        <PracticeManagement />
       ) : activeTab === "web-scraping" ? (
         <WebScraping />
       ) : activeTab === "qa" ? (
