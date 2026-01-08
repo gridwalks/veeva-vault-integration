@@ -124,85 +124,110 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
     setActiveDocument(document);
     
     try {
-      // Check if this is an uploaded document
-      if (document.isUploaded || document.source_type === 'upload') {
-        console.log('Handling uploaded document:', document);
+      // Check if this is an uploaded document or unknown document (which might be uploaded)
+      // Unknown documents are often uploaded documents that weren't properly tagged
+      const isUploadedDocument = document.isUploaded || 
+                                  document.source_type === 'upload' || 
+                                  document.source_type === 'unknown' ||
+                                  document.blob_url ||
+                                  (!document.veeva_document_id && document.id);
+      
+      if (isUploadedDocument) {
+        console.log('Handling uploaded/unknown document:', document);
         
         // For uploaded documents, we need to download them using the download API
         const { downloadUploadedDocumentUrl } = await import('../api');
-        const downloadUrl = downloadUploadedDocumentUrl({ 
-          documentId: document.veeva_document_id || document.id || document.document_id 
-        });
+        const documentId = document.veeva_document_id || document.id || document.document_id;
+        
+        if (!documentId) {
+          throw new Error('Document ID is missing. Cannot load document.');
+        }
+        
+        const downloadUrl = downloadUploadedDocumentUrl({ documentId });
         
         try {
           const response = await fetch(downloadUrl);
           if (!response.ok) {
-            throw new Error(`Failed to download uploaded document: ${response.status} ${response.statusText}`);
-          }
-          
-          const blob = await response.blob();
-          const fileType = response.headers.get('content-type') || 'application/octet-stream';
-          
-          console.log('Uploaded document downloaded:', {
-            size: blob.size,
-            type: fileType
-          });
-
-          // Determine the file name with proper extension
-          let fileName = document.name || document.document_name || 'document';
-          
-          // If the document name doesn't have an extension, try to infer it from content-type
-          if (!fileName.includes('.')) {
-            const extensionMap = {
-              'application/pdf': '.pdf',
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
-              'application/msword': '.doc',
-              'text/plain': '.txt',
-              'application/rtf': '.rtf'
-            };
-            
-            const extension = extensionMap[fileType] || '';
-            fileName = fileName + extension;
-          }
-
-          console.log('Using filename for uploaded document:', fileName);
-
-          // Check if it's already a PDF
-          const isPdf = fileType.includes('pdf') || fileName.toLowerCase().endsWith('.pdf');
-          
-          if (isPdf) {
-            // For PDFs, create a blob URL and display directly
-            const url = URL.createObjectURL(blob);
-            setDocumentContent(url);
-            setIsLoading(false);
-            return;
-          } else {
-            // For other file types, convert to PDF first
-            console.log('Converting uploaded document to PDF...');
-            
-            const formData = new FormData();
-            formData.append('file', blob, fileName);
-            
-            const convertResponse = await fetch('/api/convert-to-pdf', {
-              method: 'POST',
-              body: formData
-            });
-            
-            if (!convertResponse.ok) {
-              throw new Error(`Failed to convert document: ${convertResponse.status} ${convertResponse.statusText}`);
+            // If it's an unknown document and the upload API fails, it might be a Veeva document
+            // that wasn't properly tagged. Try Veeva API as fallback for 403 or 404 errors
+            if (document.source_type === 'unknown' && (response.status === 404 || response.status === 403)) {
+              console.log(`Upload API returned ${response.status} for unknown document, trying Veeva API as fallback`);
+              // Fall through to Veeva download path below
+            } else {
+              throw new Error(`Failed to download uploaded document: ${response.status} ${response.statusText}`);
             }
+          } else {
+            const blob = await response.blob();
+            const fileType = response.headers.get('content-type') || 'application/octet-stream';
             
-            const convertedBlob = await convertResponse.blob();
-            const convertedUrl = URL.createObjectURL(convertedBlob);
-            setDocumentContent(convertedUrl);
-            setIsLoading(false);
-            return;
+            console.log('Uploaded document downloaded:', {
+              size: blob.size,
+              type: fileType
+            });
+
+            // Determine the file name with proper extension
+            let fileName = document.name || document.document_name || 'document';
+            
+            // If the document name doesn't have an extension, try to infer it from content-type
+            if (!fileName.includes('.')) {
+              const extensionMap = {
+                'application/pdf': '.pdf',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+                'application/msword': '.doc',
+                'text/plain': '.txt',
+                'application/rtf': '.rtf'
+              };
+              
+              const extension = extensionMap[fileType] || '';
+              fileName = fileName + extension;
+            }
+
+            console.log('Using filename for uploaded document:', fileName);
+
+            // Check if it's already a PDF
+            const isPdf = fileType.includes('pdf') || fileName.toLowerCase().endsWith('.pdf');
+            
+            if (isPdf) {
+              // For PDFs, create a blob URL and display directly
+              const url = URL.createObjectURL(blob);
+              setDocumentContent(url);
+              setIsLoading(false);
+              return;
+            } else {
+              // For other file types, convert to PDF first
+              console.log('Converting uploaded document to PDF...');
+              
+              const formData = new FormData();
+              formData.append('file', blob, fileName);
+              
+              const convertResponse = await fetch('/api/convert-to-pdf', {
+                method: 'POST',
+                body: formData
+              });
+              
+              if (!convertResponse.ok) {
+                throw new Error(`Failed to convert document: ${convertResponse.status} ${convertResponse.statusText}`);
+              }
+              
+              const convertedBlob = await convertResponse.blob();
+              const convertedUrl = URL.createObjectURL(convertedBlob);
+              setDocumentContent(convertedUrl);
+              setIsLoading(false);
+              return;
+            }
           }
         } catch (error) {
-          console.error('Error handling uploaded document:', error);
-          setDocumentContent(`Error loading uploaded document: ${error.message}`);
-          setIsLoading(false);
-          return;
+          // If it's an unknown document and upload API fails, try Veeva as fallback
+          // This handles network errors or other issues that might prevent us from determining document type
+          if (document.source_type === 'unknown' && (error.message.includes('404') || error.message.includes('403'))) {
+            console.log('Upload API failed, trying Veeva API as fallback for unknown document');
+            // Fall through to Veeva download path below
+          } else {
+            console.error('Error handling uploaded document:', error);
+            setDocumentContent(`Error loading uploaded document: ${error.message}`);
+            setIsLoading(false);
+            return;
+          }
         }
       }
       
@@ -320,6 +345,18 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
         
         const originalResponse = await fetch(originalUrl);
         if (!originalResponse.ok) {
+          // Handle 403 errors specifically
+          if (originalResponse.status === 403) {
+            const errorText = await originalResponse.text();
+            let errorMessage = 'Access denied (403). ';
+            try {
+              const errorData = JSON.parse(errorText);
+              errorMessage += errorData.message || errorData.error || 'You may not have permission to access this document, or it may not be a Veeva document.';
+            } catch {
+              errorMessage += 'You may not have permission to access this document, or it may not be a Veeva document.';
+            }
+            throw new Error(errorMessage);
+          }
           throw new Error(`Failed to download original document: ${originalResponse.status} ${originalResponse.statusText}`);
         }
         
