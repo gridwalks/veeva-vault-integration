@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, User, Shield, LogOut, Home, BookOpen, GraduationCap, HelpCircle } from 'lucide-react';
+import { Menu, User, Shield, LogOut, Home, BookOpen, HelpCircle } from 'lucide-react';
 import acceleraqaLogo from '../../assets/AceleraQA_logo.png';
 import MyNotebook from './MyNotebook.jsx';
 
@@ -107,20 +107,6 @@ export default function Header({ user, currentScreen, onScreenChange, onLogout, 
                     <span>Admin Panel</span>
                   </button>
                 )}
-
-                {/* Education Platform */}
-                <button
-                  onClick={() => {
-                    onScreenChange('education');
-                    setMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-3 py-3 px-4 border-none text-left text-sm font-medium cursor-pointer transition-colors hover:bg-gray-50 ${
-                    currentScreen === 'education' ? 'bg-gray-100 text-indigo-700' : 'bg-transparent text-gray-700'
-                  }`}
-                >
-                  <GraduationCap style={{ width: '16px', height: '16px' }} />
-                  <span>Learning Platform</span>
-                </button>
 
                 {/* My Notebook */}
                 <button
