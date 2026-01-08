@@ -23,6 +23,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
     attachment: false,  // Collapsed by default
     unknown: false  // Collapsed by default
   });
+  const [isExternalResourcesExpanded, setIsExternalResourcesExpanded] = React.useState(false);  // Collapsed by default
 
   // Helper functions for document display
   const getDocumentDisplayName = (doc) => {
@@ -1306,89 +1307,138 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
               {referencedExternalResources.length > 0 && (
                 <div style={{ marginTop: referencedDocuments.length > 0 ? '8px' : '0' }}>
                   <div style={{
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: '#374151',
-                    marginBottom: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    backgroundColor: '#ffffff'
                   }}>
-                    🔗 Related external resources:
-                  </div>
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px'
-                  }}>
-                    {referencedExternalResources.map((resource, resIndex) => (
-                      <div key={resource.id || resIndex} style={{
-                        padding: '16px',
+                    {/* Header */}
+                    <button
+                      onClick={() => setIsExternalResourcesExpanded(!isExternalResourcesExpanded)}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
                         backgroundColor: '#f8fafc',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        transition: 'all 0.2s ease'
+                        border: 'none',
+                        borderBottom: isExternalResourcesExpanded ? '1px solid #e5e7eb' : 'none',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s ease',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#f1f5f9'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#f8fafc'}
+                    >
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        color: '#374151'
                       }}>
-                        <div style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start',
-                          marginBottom: '8px'
+                        <span>🔗</span>
+                        <span>Related external resources:</span>
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: '400',
+                          color: '#6b7280',
+                          backgroundColor: '#e5e7eb',
+                          padding: '2px 6px',
+                          borderRadius: '10px'
                         }}>
-                          <div style={{ flex: 1 }}>
-                            <h4 style={{
-                              margin: '0 0 3px 0',
-                              fontSize: '13px',
-                              fontWeight: '600',
-                              color: '#374151',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                            }}>
-                              {resource.title}
-                            </h4>
-                            {resource.description && (
-                              <p style={{
-                                margin: '4px 0 0 0',
-                                fontSize: '12px',
-                                color: '#6b7280',
-                                lineHeight: '1.3',
-                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                              }}>
-                                {resource.description}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div style={{
-                          display: 'flex',
-                          gap: '8px'
-                        }}>
-                          <a
-                            href={resource.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              padding: '6px 12px',
-                              backgroundColor: '#4338ca',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              cursor: 'pointer',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                              transition: 'background-color 0.2s ease',
-                              textDecoration: 'none',
-                              display: 'inline-block'
-                            }}
-                            onMouseEnter={(e) => e.target.style.backgroundColor = '#312e81'}
-                            onMouseLeave={(e) => e.target.style.backgroundColor = '#4338ca'}
-                          >
-                            🔗 Open Resource
-                          </a>
-                        </div>
+                          {referencedExternalResources.length}
+                        </span>
                       </div>
-                    ))}
+                      <span style={{
+                        fontSize: '12px',
+                        color: '#6b7280',
+                        transition: 'transform 0.2s ease',
+                        transform: isExternalResourcesExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
+                      }}>
+                        ▼
+                      </span>
+                    </button>
+
+                    {/* Content */}
+                    {isExternalResourcesExpanded && (
+                      <div style={{
+                        padding: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px'
+                      }}>
+                        {referencedExternalResources.map((resource, resIndex) => (
+                          <div key={resource.id || resIndex} style={{
+                            padding: '16px',
+                            backgroundColor: '#f8fafc',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '8px',
+                            transition: 'all 0.2s ease'
+                          }}>
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              marginBottom: '8px'
+                            }}>
+                              <div style={{ flex: 1 }}>
+                                <h4 style={{
+                                  margin: '0 0 3px 0',
+                                  fontSize: '13px',
+                                  fontWeight: '600',
+                                  color: '#374151',
+                                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                                }}>
+                                  {resource.title}
+                                </h4>
+                                {resource.description && (
+                                  <p style={{
+                                    margin: '4px 0 0 0',
+                                    fontSize: '12px',
+                                    color: '#6b7280',
+                                    lineHeight: '1.3',
+                                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                                  }}>
+                                    {resource.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div style={{
+                              display: 'flex',
+                              gap: '8px'
+                            }}>
+                              <a
+                                href={resource.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  padding: '6px 12px',
+                                  backgroundColor: '#4338ca',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                  transition: 'background-color 0.2s ease',
+                                  textDecoration: 'none',
+                                  display: 'inline-block'
+                                }}
+                                onMouseEnter={(e) => e.target.style.backgroundColor = '#312e81'}
+                                onMouseLeave={(e) => e.target.style.backgroundColor = '#4338ca'}
+                              >
+                                🔗 Open Resource
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
