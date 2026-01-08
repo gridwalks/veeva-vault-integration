@@ -359,19 +359,25 @@ async function processAttachments(attachments = []) {
 }
 
 function buildResponseDocuments(relevantDocuments, processedAttachments = [], relevantChunks = []) {
+  // Helper function to normalize IDs to strings for consistent matching
+  const normalizeId = (id) => {
+    if (id == null) return null;
+    return String(id).trim();
+  };
+  
   // Create a map of document IDs to similarity scores from chunks
   const docSimilarityMap = new Map();
   
   relevantChunks.forEach(chunk => {
     let docId = null;
     if (chunk.source_type === 'veeva' && chunk.veeva_document_id) {
-      docId = chunk.veeva_document_id;
+      docId = normalizeId(chunk.veeva_document_id);
     } else if (chunk.source_type === 'upload' && chunk.upload_document_id) {
-      docId = chunk.upload_document_id;
+      docId = normalizeId(chunk.upload_document_id);
     } else if (chunk.source_type === 'cfr_regulation' && chunk.regulation_id) {
-      docId = chunk.regulation_id;
+      docId = normalizeId(chunk.regulation_id);
     } else if (chunk.source_type === 'web_resource' && chunk.web_resource_id) {
-      docId = chunk.web_resource_id;
+      docId = normalizeId(chunk.web_resource_id);
     }
     
     if (docId && chunk.similarity !== undefined) {
@@ -386,17 +392,19 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = [], re
   const getSimilarityScores = (doc) => {
     let docId = null;
     if (doc.source_type === 'veeva' && doc.veeva_document_id) {
-      docId = doc.veeva_document_id;
+      docId = normalizeId(doc.veeva_document_id);
     } else if (doc.source_type === 'upload' && (doc.document_id || doc.id)) {
-      docId = doc.document_id || doc.id;
+      docId = normalizeId(doc.document_id || doc.id);
     } else if (doc.source_type === 'cfr_regulation' && doc.regulation_id) {
-      docId = doc.regulation_id;
+      docId = normalizeId(doc.regulation_id);
     } else if (doc.source_type === 'web_resource' && doc.document_id) {
-      docId = doc.document_id;
+      docId = normalizeId(doc.document_id);
     } else {
-      docId = doc.veeva_document_id || doc.document_id || doc.id || doc.number || doc.name;
+      const fallbackId = doc.veeva_document_id || doc.document_id || doc.id || doc.number || doc.name;
+      docId = normalizeId(fallbackId);
     }
     
+    // Try to find similarities with normalized ID
     const similarities = docSimilarityMap.get(docId) || [];
     if (similarities.length === 0) {
       return { maxSimilarity: null, avgSimilarity: null };
