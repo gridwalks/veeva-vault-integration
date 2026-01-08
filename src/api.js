@@ -1167,7 +1167,3 @@ export async function deletePracticeAssociation({ associationId, accessToken }) 
     errorMessage: 'Failed to delete association'
   });
 }
-    successMessage: 'Deleting Veeva data...',
-    errorMessage: 'Failed to delete Veeva data'
-  });
-}
