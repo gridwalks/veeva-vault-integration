@@ -395,8 +395,10 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = [], re
       docId = normalizeId(doc.veeva_document_id);
     } else if (doc.source_type === 'upload' && (doc.document_id || doc.id)) {
       docId = normalizeId(doc.document_id || doc.id);
-    } else if (doc.source_type === 'cfr_regulation' && doc.regulation_id) {
-      docId = normalizeId(doc.regulation_id);
+    } else if (doc.source_type === 'cfr_regulation') {
+      // For CFR regulations, chunks use regulation_id (database ID), 
+      // and documents have document_id (database ID) from the query
+      docId = normalizeId(doc.document_id || doc.id);
     } else if (doc.source_type === 'web_resource' && doc.document_id) {
       docId = normalizeId(doc.document_id);
     } else {
@@ -420,6 +422,8 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = [], re
     ...relevantDocuments.map((doc) => {
       const isVeevaDoc = doc.source_type === "veeva";
       const isUploadedDoc = doc.source_type === "upload";
+      const isCfrRegulation = doc.source_type === "cfr_regulation";
+      const isWebResource = doc.source_type === "web_resource";
       const similarityScores = getSimilarityScores(doc);
 
       if (isUploadedDoc) {
@@ -468,6 +472,51 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = [], re
           type: doc.document_type,
           status: doc.status,
           source_type: "veeva",
+          maxSimilarity: similarityScores.maxSimilarity,
+          avgSimilarity: similarityScores.avgSimilarity,
+        };
+      }
+
+      if (isCfrRegulation) {
+        return {
+          id: doc.document_id || doc.id,
+          document_id: doc.document_id || doc.id,
+          veeva_document_id: doc.document_id || doc.id, // For compatibility with viewer
+          name: doc.document_name || doc.title || "CFR Regulation",
+          document_name: doc.document_name || doc.title || "CFR Regulation",
+          number: doc.regulation_id || doc.document_id || "",
+          document_number: doc.regulation_id || "",
+          version: "1.0",
+          type: doc.document_type || doc.regulation_type || "cfr_regulation",
+          document_type: doc.document_type || doc.regulation_type || "cfr_regulation",
+          status: "active",
+          regulation_id: doc.regulation_id,
+          chapter_id: doc.chapter_id,
+          subchapter_id: doc.subchapter_id,
+          summary: doc.ai_summary || null,
+          source_type: "cfr_regulation",
+          maxSimilarity: similarityScores.maxSimilarity,
+          avgSimilarity: similarityScores.avgSimilarity,
+        };
+      }
+
+      if (isWebResource) {
+        return {
+          id: doc.document_id || doc.id,
+          document_id: doc.document_id || doc.id,
+          veeva_document_id: doc.document_id || doc.id, // For compatibility with viewer
+          name: doc.document_name || doc.title || "Web Resource",
+          document_name: doc.document_name || doc.title || "Web Resource",
+          number: doc.source_url || "",
+          document_number: doc.source_url || "",
+          version: "1.0",
+          type: doc.document_type || doc.source_type || "web_resource",
+          document_type: doc.document_type || doc.source_type || "web_resource",
+          status: doc.status || "active",
+          source_url: doc.source_url,
+          domain: doc.domain,
+          summary: doc.ai_summary || null,
+          source_type: "web_resource",
           maxSimilarity: similarityScores.maxSimilarity,
           avgSimilarity: similarityScores.avgSimilarity,
         };
