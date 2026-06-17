@@ -2,8 +2,8 @@ import { Pool } from 'pg';
 import { ensureUploadedDocumentColumnSupport } from './uploaded-document-columns.js';
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  connectionString: process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: true }
 });
 
 export const handler = async (event) => {

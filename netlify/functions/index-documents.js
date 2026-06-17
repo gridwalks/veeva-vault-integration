@@ -590,7 +590,7 @@ export const handler = async (event) => {
       hasDomain: !!domain,
       hasApiVersion: !!v,
       hasOpenaiKey: !!process.env.OPENAI_API_KEY,
-      hasDatabaseUrl: !!process.env.DATABASE_URL,
+      hasDatabaseUrl: !!(process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL),
       domain: domain,
       apiVersion: v
     });

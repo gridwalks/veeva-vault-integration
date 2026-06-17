@@ -6,10 +6,23 @@ const { Pool } = pg;
 let pool = null;
 let supabaseClient = null;
 
+// Netlify Supabase integration injects SUPABASE_DATABASE_URL; fall back to DATABASE_URL for local dev
+function getConnectionString() {
+  return process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
+}
+
+// Derive https://<ref>.supabase.co from the pooler connection string
+function deriveSupabaseUrl() {
+  const connStr = getConnectionString() || '';
+  const match = connStr.match(/postgres\.([a-z0-9]+):/);
+  if (match) return `https://${match[1]}.supabase.co`;
+  return process.env.SUPABASE_URL || null;
+}
+
 export function getPool() {
   if (!pool) {
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: getConnectionString(),
       ssl: { rejectUnauthorized: true },
       max: 10,
       idleTimeoutMillis: 30000,
@@ -21,9 +34,9 @@ export function getPool() {
 
 export function getSupabaseClient() {
   if (!supabaseClient) {
-    const url = process.env.SUPABASE_URL;
+    const url = deriveSupabaseUrl();
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set');
+    if (!url || !key) throw new Error('Cannot derive Supabase URL or SUPABASE_SERVICE_ROLE_KEY is not set');
     supabaseClient = createClient(url, key, {
       auth: { persistSession: false }
     });

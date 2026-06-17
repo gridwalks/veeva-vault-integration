@@ -523,7 +523,7 @@ export const handler = async (event) => {
     bodyLength: event.body?.length || 0,
     functionTimeout: '26 seconds (configured)',
     environment: {
-      hasDatabaseUrl: !!process.env.DATABASE_URL,
+      hasDatabaseUrl: !!(process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL),
       hasOpenaiKey: !!process.env.OPENAI_API_KEY,
       hasGroqKey: !!process.env.GROQ_API_KEY,
       blobStorage: 'ENABLED',

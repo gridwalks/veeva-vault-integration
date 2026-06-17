@@ -7,7 +7,7 @@ async function ensureAuditTable() {
     return;
   }
 
-  if (!process.env.DATABASE_URL) {
+  if (!process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL) {
     console.warn('DATABASE_URL is not set. Blob audit logging is disabled.');
     return;
   }
@@ -32,7 +32,7 @@ async function ensureAuditTable() {
 }
 
 export async function writeBlobAudit({ action, blobKey, status, metadata = null, errorMessage = null }) {
-  if (!process.env.DATABASE_URL) {
+  if (!process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL) {
     return;
   }
 

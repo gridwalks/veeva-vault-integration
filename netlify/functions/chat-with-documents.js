@@ -786,8 +786,8 @@ export const handler = async (event) => {
       };
     }
 
-    if (!process.env.DATABASE_URL) {
-      logSafely('error', 'DATABASE_URL environment variable is not set');
+    if (!process.env.SUPABASE_DATABASE_URL && !process.env.DATABASE_URL) {
+      logSafely('error', 'SUPABASE_DATABASE_URL environment variable is not set');
       return {
         statusCode: 500,
         headers: { ...corsHeaders, ...securityHeaders },

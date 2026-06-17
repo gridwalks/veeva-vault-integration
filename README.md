@@ -27,9 +27,12 @@ VAULT_USERNAME=<your_vault_username>
 VAULT_PASSWORD=<your_vault_password>
 
 # Supabase Configuration (AccelerQA Reg Intel database)
-SUPABASE_URL=https://<your-project-ref>.supabase.co
+# Auto-injected by Netlify <-> Supabase integration in production.
+# For local dev, copy from Supabase → Settings → API / Database.
+SUPABASE_DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
 SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
-DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
+SUPABASE_ANON_KEY=<your-anon-key>
+SUPABASE_JWT_SECRET=<your-jwt-secret>
 
 # OpenAI Configuration (for document summarization)
 OPENAI_API_KEY=<your_openai_api_key>
@@ -112,9 +115,9 @@ Netlify CLI will read `.env` for local dev. In production, set these in **Netlif
 ## Database Setup
 
 1. Create a [Supabase](https://supabase.com) project (AccelerQA Reg Intel database).
-2. In **Settings → API**, copy your Project URL → `SUPABASE_URL` and Service Role Key → `SUPABASE_SERVICE_ROLE_KEY`.
-3. In **Settings → Database → Connection string**, copy the **Transaction pooler** URL → `DATABASE_URL`.
-4. Enable the `pgvector` extension in **Database → Extensions** (search "vector").
+2. In Netlify → **Integrations → Supabase**, link the project — this auto-injects `SUPABASE_DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, and `SUPABASE_JWT_SECRET`.
+3. For local dev, copy those values manually from **Supabase → Settings → API / Database** into your `.env`.
+4. Enable the `pgvector` extension in **Supabase → Database → Extensions** (search "vector").
 5. The database schema will be automatically created on first run (see `database-schema.sql` for reference).
 
 ## Deploy to Netlify

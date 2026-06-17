@@ -1,8 +1,8 @@
 import { Pool } from 'pg';
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  connectionString: process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: true }
 });
 
 // Helper function to handle CORS
