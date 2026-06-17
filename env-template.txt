@@ -7,9 +7,12 @@ VAULT_API_VERSION=v25.2
 VAULT_USERNAME=<your_vault_username>
 VAULT_PASSWORD=<your_vault_password>
 
-# Neon Database Configuration (for document indexing)
-# Get this from your Neon database dashboard
-DATABASE_URL=postgresql://username:password@hostname:5432/database
+# Supabase Configuration (AccelerQA Reg Intel database)
+# Get these from your Supabase project → Settings → API
+SUPABASE_URL=https://<your-project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+# Get DATABASE_URL from Supabase → Settings → Database → Connection string (Transaction pooler recommended)
+DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
 
 # OpenAI Configuration (for document summarization)
 OPENAI_API_KEY=<your_openai_api_key>

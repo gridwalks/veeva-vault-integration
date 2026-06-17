@@ -1,17 +1,34 @@
 import pg from 'pg';
+import { createClient } from '@supabase/supabase-js';
 
 const { Pool } = pg;
 
 let pool = null;
+let supabaseClient = null;
 
 export function getPool() {
   if (!pool) {
     pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false }
+      ssl: { rejectUnauthorized: true },
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
     });
   }
   return pool;
+}
+
+export function getSupabaseClient() {
+  if (!supabaseClient) {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set');
+    supabaseClient = createClient(url, key, {
+      auth: { persistSession: false }
+    });
+  }
+  return supabaseClient;
 }
 
 export async function initDatabase() {

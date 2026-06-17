@@ -50,7 +50,7 @@ A React + Netlify Functions application that connects to **Veeva Vault** and pro
 - Node 18+
 - Netlify account
 - Veeva Vault credentials (username/password)
-- Neon database account (for document indexing)
+- Supabase project (AccelerQA Reg Intel database)
 - OpenAI API key (for document summarization)
 - Auth0 account (for authentication)
 
@@ -72,8 +72,10 @@ VAULT_API_VERSION=v25.2
 VAULT_USERNAME=<your_vault_username>
 VAULT_PASSWORD=<your_vault_password>
 
-# Neon Database Configuration (for document indexing)
-DATABASE_URL=postgresql://username:password@hostname:5432/database
+# Supabase Configuration (AccelerQA Reg Intel database)
+SUPABASE_URL=https://<your-project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
 
 # OpenAI Configuration (for document summarization)
 OPENAI_API_KEY=<your_openai_api_key>
@@ -537,9 +539,9 @@ See `WORKFLOW-HISTORY-IMPLEMENTATION-SUMMARY.md` for details.
 - `qms_chat_indexing_logs` - Indexing activity logs
 - `blob_audit_log` - File upload audit trail
 
-**Database Setup:**
-1. Create Neon database account
-2. Enable pgvector extension: `CREATE EXTENSION IF NOT EXISTS vector;`
+**Database Setup (Supabase - AccelerQA Reg Intel):**
+1. Create a Supabase project and enable the `vector` extension in **Database → Extensions**
+2. Set `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `DATABASE_URL` (Transaction pooler string) in environment variables
 3. Schema auto-created on first run via `initDatabase()` in `db.js`
 
 ### File Structure

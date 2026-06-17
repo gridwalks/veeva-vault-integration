@@ -8,7 +8,7 @@ A React + Netlify Functions app that connects to **Veeva Vault** and lists **app
 - Node 18+
 - Netlify account
 - Veeva Vault credentials (username/password)
-- Neon database account (for document indexing)
+- Supabase project (AccelerQA Reg Intel database)
 - OpenAI API key (for document summarization)
 
 ## Quick Start (Local)
@@ -26,8 +26,10 @@ VAULT_API_VERSION=v25.2
 VAULT_USERNAME=<your_vault_username>
 VAULT_PASSWORD=<your_vault_password>
 
-# Neon Database Configuration (for document indexing)
-DATABASE_URL=postgresql://username:password@hostname:5432/database
+# Supabase Configuration (AccelerQA Reg Intel database)
+SUPABASE_URL=https://<your-project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
 
 # OpenAI Configuration (for document summarization)
 OPENAI_API_KEY=<your_openai_api_key>
@@ -78,7 +80,7 @@ Netlify CLI will read `.env` for local dev. In production, set these in **Netlif
 ## Document Indexing Features
 
 - **Automatic Summarization**: Documents are processed through OpenAI to generate concise summaries.
-- **Database Storage**: Document metadata and summaries stored in Neon PostgreSQL database.
+- **Database Storage**: Document metadata and summaries stored in Supabase PostgreSQL database.
 - **Upsert Logic**: Existing documents are updated if their metadata changes, preserving existing summaries.
 - **Version Tracking**: Captures document name, number, major/minor versions, and status.
 - **Search & Filter**: Search indexed documents by name with pagination support.
@@ -97,7 +99,7 @@ Netlify CLI will read `.env` for local dev. In production, set these in **Netlif
 - **Netlify Blobs Storage**: Chat attachments up to ~2 MB are stored privately in the `chat-uploads` Netlify Blob store via `POST /.netlify/functions/blob-upload`. The function returns a blob key and a short-lived signed URL for Groq ingestion.
 - **Secure Deletion**: Use `POST /.netlify/functions/blob-delete` with `{ key }` to remove uploads when a chat is cleared. Users can toggle automatic purge behaviour in the UI.
 - **Automated Cleanup**: The scheduled function `/.netlify/functions/cleanup-blobs` runs daily at 02:00 UTC (configured in `netlify.toml`) and removes uploads older than 48 hours.
-- **Audit Logging**: Upload, delete, and cleanup actions write rows to the `blob_audit_log` table in Neon for traceability.
+- **Audit Logging**: Upload, delete, and cleanup actions write rows to the `blob_audit_log` table in Supabase for traceability.
 
 ## Manual Summary Features
 
@@ -109,10 +111,11 @@ Netlify CLI will read `.env` for local dev. In production, set these in **Netlif
 
 ## Database Setup
 
-1. Create a Neon database account at [neon.tech](https://neon.tech).
-2. Create a new PostgreSQL database.
-3. Copy the connection string and set it as `DATABASE_URL` in your environment variables.
-4. The database schema will be automatically created on first run (see `database-schema.sql` for reference).
+1. Create a [Supabase](https://supabase.com) project (AccelerQA Reg Intel database).
+2. In **Settings → API**, copy your Project URL → `SUPABASE_URL` and Service Role Key → `SUPABASE_SERVICE_ROLE_KEY`.
+3. In **Settings → Database → Connection string**, copy the **Transaction pooler** URL → `DATABASE_URL`.
+4. Enable the `pgvector` extension in **Database → Extensions** (search "vector").
+5. The database schema will be automatically created on first run (see `database-schema.sql` for reference).
 
 ## Deploy to Netlify
 
