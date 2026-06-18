@@ -316,8 +316,6 @@ export default function CourseAuthoring() {
         // CFR regulations use integer IDs
         updateData.cfr_regulation_id = parseInt(resourceId);
       } else if (linkType === 'document') {
-        // Documents can be UUID (veeva_document_id) or integer (id)
-        // Backend will handle the conversion
         updateData.document_id = resourceId;
       } else if (linkType === 'workflow') {
         // Workflows use integer IDs

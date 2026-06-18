@@ -317,7 +317,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
 
     try {
       const allDocumentIds = [
-        ...selectedDocuments.map(doc => doc.veeva_document_id),
+        ...selectedDocuments.map(doc => doc.id),
         ...attachedDocuments.map(doc => doc.id),
         ...newBlobUploads.filter(upload => upload.indexed && upload.documentId).map(upload => `uploaded_${upload.documentId}`)
       ];
@@ -373,7 +373,7 @@ export default function DocumentChat({ isOpen, onClose, selectedDocuments = [], 
       }
       
       console.log('Sending chat request with document IDs:', {
-        selectedDocuments: selectedDocuments.map(doc => doc.veeva_document_id),
+        selectedDocuments: selectedDocuments.map(doc => doc.id),
         attachedDocuments: attachedDocuments.map(doc => doc.id),
         blobAttachments: blobAttachmentsForRequest.map(item => item.key),
         allDocumentIds,
@@ -528,7 +528,7 @@ The files will upload automatically and I'll be able to perform a detailed compa
     if (onOpenDocumentInPane) {
       // Route document to the right pane
       const mappedDocument = {
-        veeva_document_id: document.id,
+        document_id: document.id,
         // Preserve all ID fields for blob documents
         id: document.id,
         document_id: document.document_id || document.id,
@@ -566,12 +566,12 @@ The files will upload automatically and I'll be able to perform a detailed compa
         answer: answer.substring(0, 100) + '...',
         documentsCount: documents.length,
         documents: documents.map(doc => ({
-          id: doc.id || doc.veeva_document_id,
+          id: doc.id,
           name: getDocumentDisplayName(doc)
         }))
       });
 
-      const documentIds = documents.map(doc => doc.id || doc.veeva_document_id).filter(Boolean);
+      const documentIds = documents.map(doc => doc.id).filter(Boolean);
       const documentNames = documents.map(doc => getDocumentDisplayName(doc)).filter(Boolean);
       
       const result = await createQAInteraction({

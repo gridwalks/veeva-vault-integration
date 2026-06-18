@@ -1035,7 +1035,6 @@ export const handler = async (event) => {
         // Convert embedding array to PostgreSQL vector format
         const embeddingStr = '[' + queryEmbedding.join(',') + ']';
         
-        // veevaChunks removed — no longer used
         let uploadedChunks = [];
 
         if (uploadedDocumentIds.length === 0) {
@@ -1525,7 +1524,7 @@ export const handler = async (event) => {
       console.log('Building context from relevant chunks (RAG)');
       const documentMetadataMap = new Map(
         relevantDocuments.map(doc => [
-          doc.veeva_document_id || doc.document_id || (doc.source_type === 'cfr_regulation' ? doc.document_id : null) || (doc.source_type === 'web_resource' ? doc.document_id : null), 
+          doc.document_id || doc.id,
           doc
         ])
       );

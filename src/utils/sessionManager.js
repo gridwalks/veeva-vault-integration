@@ -6,7 +6,7 @@
  * This provides user-specific document isolation without requiring full authentication.
  */
 
-const SESSION_KEY = 'veeva_chat_session_id';
+const SESSION_KEY = 'qms_chat_session_id';
 const SESSION_EXPIRY_DAYS = 30; // Sessions expire after 30 days
 
 /**

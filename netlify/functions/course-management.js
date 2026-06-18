@@ -537,7 +537,6 @@ async function updateLesson(pool, lessonId, body, corsHeaders) {
     if (document_id !== undefined) {
       let resolvedDocumentId = document_id;
       
-      // If document_id is a UUID string (veeva_document_id), look up the integer id
       if (document_id && typeof document_id === 'string' && document_id.includes('-')) {
         const docLookup = await pool.query(
           'SELECT id FROM qms_chat_documents WHERE id::text = $1',

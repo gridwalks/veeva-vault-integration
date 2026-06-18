@@ -86,7 +86,7 @@ export const handler = async (event) => {
       uploadedDocChunkStats = await pool.query(`
         SELECT
           d.id,
-          d.original_filename as veeva_document_id,
+          d.original_filename,
           d.document_name,
           COUNT(c.id) as chunk_count,
           COUNT(CASE WHEN c.embedding IS NOT NULL THEN 1 END) as chunks_with_embeddings,
@@ -205,7 +205,7 @@ export const handler = async (event) => {
         },
         documents: docChunkStats.rows.map(row => ({
           id: row.id,
-          veevaDocumentId: row.veeva_document_id,
+          originalFilename: row.original_filename,
           name: row.document_name,
           chunkCount: parseInt(row.chunk_count),
           chunksWithEmbeddings: parseInt(row.chunks_with_embeddings),

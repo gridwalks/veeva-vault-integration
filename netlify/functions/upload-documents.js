@@ -219,9 +219,9 @@ async function createDocumentsTable(pool) {
       CREATE INDEX IF NOT EXISTS idx_qms_chat_documents_source_type ON qms_chat_documents(source_type);
     `);
     
-    console.log('Veeva_Doc_Chat_documents table created successfully');
+    console.log('qms_chat_documents table created successfully');
   } catch (error) {
-    console.error('Error creating Veeva_Doc_Chat_documents table:', error);
+    console.error('Error creating qms_chat_documents table:', error);
     throw error;
   }
 }
@@ -286,13 +286,12 @@ async function storeDocument(pool, fileName, extractedText, summary, fileSize, e
 // Helper function to create chunks table if it doesn't exist
 async function createChunksTable(pool) {
   try {
-    console.log('Creating Veeva_Doc_Chat_document_chunks table...');
-    
+    console.log('Creating qms_chat_document_chunks table...');
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS qms_chat_document_chunks (
         id SERIAL PRIMARY KEY,
         document_id INTEGER NOT NULL REFERENCES qms_chat_documents(id) ON DELETE CASCADE,
-        veeva_document_id VARCHAR(255),
         chunk_index INTEGER NOT NULL,
         chunk_text TEXT NOT NULL,
         embedding vector(1536),
@@ -320,7 +319,6 @@ async function createChunksTable(pool) {
     // Create indexes
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_qms_chat_chunks_document_id ON qms_chat_document_chunks(document_id);
-      CREATE INDEX IF NOT EXISTS idx_qms_chat_chunks_veeva_document_id ON qms_chat_document_chunks(veeva_document_id);
     `);
     
     // Add user_id column for existing deployments
@@ -329,9 +327,9 @@ async function createChunksTable(pool) {
       ADD COLUMN IF NOT EXISTS user_id VARCHAR(255)
     `);
 
-    console.log('Veeva_Doc_Chat_document_chunks table created successfully');
+    console.log('qms_chat_document_chunks table created successfully');
   } catch (error) {
-    console.error('Error creating Veeva_Doc_Chat_document_chunks table:', error);
+    console.error('Error creating qms_chat_document_chunks table:', error);
     throw error;
   }
 }
@@ -459,11 +457,10 @@ async function chunkAndEmbedDocument(
           // Simple INSERT without ON CONFLICT to avoid constraint issues
           await pool.query(`
             INSERT INTO qms_chat_document_chunks
-            (document_id, veeva_document_id, chunk_index, chunk_text, embedding, token_count, user_id)
-            VALUES ($1, $2, $3, $4, $5::vector, $6, $7)
+            (document_id, chunk_index, chunk_text, embedding, token_count, user_id)
+            VALUES ($1, $2, $3, $4::vector, $5, $6)
           `, [
             documentId,
-            null, // No Veeva document ID for uploaded files
             chunk.index,
             chunk.text,
             embeddingLiteral,
@@ -480,11 +477,10 @@ async function chunkAndEmbedDocument(
 
             await pool.query(`
               INSERT INTO qms_chat_document_chunks
-              (document_id, veeva_document_id, chunk_index, chunk_text, embedding, token_count, user_id)
-              VALUES ($1, $2, $3, $4, NULL, $5, $6)
+              (document_id, chunk_index, chunk_text, embedding, token_count, user_id)
+              VALUES ($1, $2, $3, NULL, $4, $5)
             `, [
               documentId,
-              null,
               chunk.index,
               chunk.text,
               chunk.tokenCount,

@@ -161,7 +161,7 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected, o
       console.log(`Regenerating summary for document: ${doc.document_name}`, {
         documentId: doc.id,
         sourceType: doc.source_type,
-        hasVeevaId: !!doc.veeva_document_id,
+        hasId: !!doc.id,
         hasBlobUrl: !!doc.blob_url
       });
       

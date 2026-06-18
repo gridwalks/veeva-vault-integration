@@ -36,15 +36,14 @@ async function logIndexingActivity(pool, logData) {
 
     await pool.query(`
       INSERT INTO qms_chat_indexing_logs (
-        operation_type, source_type, document_id, veeva_document_id, 
-        document_name, document_number, document_type, version, status,
+        operation_type, source_type, document_id,
+        document_name, document_type, version, status,
         processing_duration_ms, chunks_created, summary_generated, error_message,
         batch_id, batch_offset, user_id, session_id, force_regenerate
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
     `, [
-      operationType, sourceType, documentId, null, // veeva_document_id is null for CFR
-      documentName, null, // document_number is null for CFR
-      documentType, version, status,
+      operationType, sourceType, documentId,
+      documentName, documentType, version, status,
       processingDurationMs, chunksCreated, summaryGenerated, errorMessage,
       batchId, batchOffset, userId, sessionId, forceRegenerate
     ]);

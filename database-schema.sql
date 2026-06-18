@@ -98,6 +98,48 @@ CREATE TABLE IF NOT EXISTS qms_chat_unified_chunks (
 CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_chunks_document_id
 ON qms_chat_unified_chunks(document_id);
 
+-- Uploaded document chunks (used by upload-documents and blob-upload functions)
+CREATE TABLE IF NOT EXISTS qms_chat_document_chunks (
+  id SERIAL PRIMARY KEY,
+  document_id INTEGER NOT NULL REFERENCES qms_chat_documents(id) ON DELETE CASCADE,
+  chunk_index INTEGER NOT NULL,
+  chunk_text TEXT NOT NULL,
+  embedding vector(1536),
+  token_count INTEGER,
+  user_id VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT unique_document_chunk UNIQUE (document_id, chunk_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_qms_chat_chunks_document_id ON qms_chat_document_chunks(document_id);
+
+-- Indexing activity log
+CREATE TABLE IF NOT EXISTS qms_chat_indexing_logs (
+  id SERIAL PRIMARY KEY,
+  operation_type VARCHAR(50) NOT NULL,
+  source_type VARCHAR(50),
+  document_id INTEGER,
+  document_name TEXT,
+  document_type VARCHAR(100),
+  version VARCHAR(50),
+  status VARCHAR(50),
+  processing_duration_ms INTEGER,
+  chunks_created INTEGER DEFAULT 0,
+  summary_generated BOOLEAN DEFAULT false,
+  error_message TEXT,
+  batch_id VARCHAR(255),
+  batch_offset INTEGER,
+  user_id VARCHAR(255),
+  session_id VARCHAR(255),
+  force_regenerate BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_qms_chat_indexing_logs_operation_type ON qms_chat_indexing_logs(operation_type);
+CREATE INDEX IF NOT EXISTS idx_qms_chat_indexing_logs_status ON qms_chat_indexing_logs(status);
+CREATE INDEX IF NOT EXISTS idx_qms_chat_indexing_logs_created_at ON qms_chat_indexing_logs(created_at);
+
 -- Table for storing Q&A interactions
 CREATE TABLE IF NOT EXISTS qms_chat_qa_interactions (
   id SERIAL PRIMARY KEY,

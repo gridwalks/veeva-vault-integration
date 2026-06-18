@@ -125,7 +125,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                                   document.source_type === 'upload' || 
                                   document.source_type === 'unknown' ||
                                   document.blob_url ||
-                                  (!document.veeva_document_id && document.id);
+                                  (!document.id && document.id);
       
       if (isUploadedDocument) {
         console.log('Handling uploaded/unknown document:', document);
@@ -310,8 +310,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
       const major = versionParts[0] || 1;
       const minor = versionParts[1] || 0;
       
-      // Get document ID - handle both veeva_document_id and id fields
-      const docId = document.veeva_document_id || document.id || document.document_id;
+      const docId = document.id || document.document_id;
       
       console.log('Loading document for viewing...', { docId, major, minor });
       
@@ -572,7 +571,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
   };
 
   const handleRemoveDocument = (documentToRemove) => {
-    onDocumentsSelected(selectedDocuments.filter(doc => doc.veeva_document_id !== documentToRemove.veeva_document_id));
+    onDocumentsSelected(selectedDocuments.filter(doc => doc.id !== documentToRemove.id));
   };
 
   // Expose handleOpenDocument function to parent component
@@ -831,7 +830,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                   {!activeDocument.isWorkflowDocument && (
                     <button
                       onClick={() => {
-                        const docId = activeDocument.veeva_document_id || activeDocument.id || activeDocument.document_id;
+                        const docId = activeDocument.id || activeDocument.document_id;
                         const url = `/api/download-file?docId=${docId}&major=${activeDocument.version?.split('.')[0] || 1}&minor=${activeDocument.version?.split('.')[1] || 0}`;
                         const link = document.createElement('a');
                         link.href = url;
@@ -1209,7 +1208,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
                                   const similarityPercent = similarityScore ? Math.round(similarityScore * 100) : null;
 
                                   return (
-                                    <div key={doc.veeva_document_id || doc.id || doc.document_id || index} style={{
+                                    <div key={doc.id || doc.document_id || index} style={{
                                       padding: '14px',
                                       backgroundColor: '#f8fafc',
                                       border: '1px solid #e5e7eb',
@@ -1491,7 +1490,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
               gap: '12px'
             }}>
               {selectedDocuments.map((doc, index) => (
-                <div key={doc.veeva_document_id || index} style={{
+                <div key={doc.id || index} style={{
                   padding: '16px',
                   backgroundColor: '#f8fafc',
                   border: '1px solid #e5e7eb',

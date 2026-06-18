@@ -18,9 +18,7 @@ async function logIndexingActivity(pool, logData) {
       operationType,
       sourceType,
       documentId,
-      veevaDocumentId,
       documentName,
-      documentNumber,
       documentType,
       version,
       status,
@@ -37,14 +35,14 @@ async function logIndexingActivity(pool, logData) {
 
     await pool.query(`
       INSERT INTO qms_chat_indexing_logs (
-        operation_type, source_type, document_id, veeva_document_id, 
-        document_name, document_number, document_type, version, status,
+        operation_type, source_type, document_id,
+        document_name, document_type, version, status,
         processing_duration_ms, chunks_created, summary_generated, error_message,
         batch_id, batch_offset, user_id, session_id, force_regenerate
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
     `, [
-      operationType, sourceType, documentId, veevaDocumentId,
-      documentName, documentNumber, documentType, version, status,
+      operationType, sourceType, documentId,
+      documentName, documentType, version, status,
       processingDurationMs, chunksCreated, summaryGenerated, errorMessage,
       batchId, batchOffset, userId, sessionId, forceRegenerate
     ]);
@@ -128,9 +126,7 @@ async function processAndIndexDocument(fileBuffer, fileName, blobKey, userId = n
           operationType: 'upload',
           sourceType: 'upload',
           documentId: null,
-          veevaDocumentId: null,
           documentName: fileName,
-          documentNumber: null,
           documentType: 'uploaded',
           version: '1.0',
           status: 'error',
@@ -231,12 +227,11 @@ async function processAndIndexDocument(fileBuffer, fileName, blobKey, userId = n
           const embeddingStr = '[' + embedding.join(',') + ']';
           
           await pool.query(`
-            INSERT INTO qms_chat_document_chunks 
-            (document_id, veeva_document_id, chunk_index, chunk_text, embedding, token_count, user_id)
-            VALUES ($1, $2, $3, $4, $5::vector, $6, $7)
+            INSERT INTO qms_chat_document_chunks
+            (document_id, chunk_index, chunk_text, embedding, token_count, user_id)
+            VALUES ($1, $2, $3, $4::vector, $5, $6)
           `, [
             documentId,
-            null, // No Veeva document ID for uploaded files
             chunk.index,
             chunk.text,
             embeddingStr,
@@ -259,9 +254,7 @@ async function processAndIndexDocument(fileBuffer, fileName, blobKey, userId = n
       operationType: 'upload',
       sourceType: 'upload',
       documentId: documentId,
-      veevaDocumentId: null,
       documentName: fileName,
-      documentNumber: `UPLOAD-${Date.now()}`,
       documentType: 'uploaded',
       version: '1.0',
       status: 'success',
@@ -292,9 +285,7 @@ async function processAndIndexDocument(fileBuffer, fileName, blobKey, userId = n
         operationType: 'upload',
         sourceType: 'upload',
         documentId: null,
-        veevaDocumentId: null,
         documentName: fileName,
-        documentNumber: null,
         documentType: 'uploaded',
         version: '1.0',
         status: 'error',

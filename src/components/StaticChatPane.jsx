@@ -442,10 +442,10 @@ export default function StaticChatPane({ selectedDocuments = [], onOpenDocumentI
       }
 
       // Proceed with normal chat (will detect workflow after answering)
-      // Combine Veeva document IDs and attached document IDs (including newly uploaded ones)
-      const veevaDocIds = selectedDocuments.map(doc => doc.veeva_document_id);
-      const attachedDocIds = attachedDocuments.map(doc => doc.id);
-      const allDocumentIds = [...veevaDocIds, ...attachedDocIds];
+      const allDocumentIds = [
+        ...selectedDocuments.map(doc => doc.id),
+        ...attachedDocuments.map(doc => doc.id)
+      ];
       
       // Check if user is asking for document comparison but hasn't selected any documents
       // Only require documents if the comparison query explicitly mentions documents/files
@@ -801,7 +801,7 @@ The documents will be automatically included in the comparison analysis.
         const sessionName = generateSessionName();
         const documentMetadata = {
           selectedDocuments: selectedDocuments.map(doc => ({
-            id: doc.veeva_document_id,
+            id: doc.id,
             name: getDocumentDisplayName(doc),
             number: getDocumentDisplayNumber(doc)
           })),
@@ -895,7 +895,7 @@ The documents will be automatically included in the comparison analysis.
       console.log('Saving chat session before generating study notes...');
       const documentMetadata = {
         selectedDocuments: selectedDocuments.map(doc => ({
-          id: doc.veeva_document_id,
+          id: doc.id,
           name: getDocumentDisplayName(doc),
           number: getDocumentDisplayNumber(doc)
         })),
@@ -953,9 +953,9 @@ The documents will be automatically included in the comparison analysis.
     const displayNumber = getDocumentDisplayNumber(document);
 
     if (onOpenDocumentInPane) {
-      // Route document to the right pane (both Veeva and uploaded documents)
+      // Route document to the right pane
       const mappedDocument = {
-        veeva_document_id: document.id,
+        document_id: document.id,
         // Preserve all ID fields for blob documents
         id: document.id,
         document_id: document.document_id || document.id,
@@ -995,12 +995,12 @@ The documents will be automatically included in the comparison analysis.
         answer: answer.substring(0, 100) + '...',
         documentsCount: documents.length,
         documents: documents.map(doc => ({
-          id: doc.id || doc.veeva_document_id,
+          id: doc.id,
           name: getDocumentDisplayName(doc)
         }))
       });
 
-      const documentIds = documents.map(doc => doc.id || doc.veeva_document_id).filter(Boolean);
+      const documentIds = documents.map(doc => doc.id).filter(Boolean);
       const documentNames = documents.map(doc => getDocumentDisplayName(doc)).filter(Boolean);
       
       const result = await createQAInteraction({
@@ -1297,7 +1297,7 @@ The documents will be automatically included in the comparison analysis.
           
           // Create a pseudo-document object for the viewer
           onOpenDocumentInPane({
-            veeva_document_id: `workflow_${data.instance.id}`,
+            document_id: `workflow_${data.instance.id}`,
             document_name: `${workflowState.template.name} - Completed`,
             document_type: 'Generated Workflow Document',
             version: '1.0',
