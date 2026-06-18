@@ -231,9 +231,6 @@ async function createDocumentsTable(pool) {
 
 async function storeDocument(pool, fileName, extractedText, summary, fileSize, extractionMethod, blobUrl, originalFileName, mimeType, userId) {
   try {
-    // Ensure table structure is up to date
-    await createDocumentsTable(pool);
-
     const { safeFileName: hasSafeFileName, manualSummary: hasManualSummary } =
       await ensureUploadedDocumentColumnSupport(pool);
 

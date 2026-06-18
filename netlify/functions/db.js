@@ -5,6 +5,7 @@ const { Pool } = pg;
 
 let pool = null;
 let supabaseClient = null;
+let dbInitialized = false;
 
 // Netlify Supabase integration injects SUPABASE_DATABASE_URL; fall back to DATABASE_URL for local dev
 function getConnectionString() {
@@ -45,8 +46,10 @@ export function getSupabaseClient() {
 }
 
 export async function initDatabase() {
+  if (dbInitialized) return;
+
   const client = getPool();
-  
+
   try {
     console.log('Initializing database schema...');
     const startTime = Date.now();
@@ -490,6 +493,63 @@ export async function initDatabase() {
 
     console.log('GxP modules table created or already exists');
 
+    // Create uploaded documents table (used by upload-documents.js and referenced by gxp_lessons)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS qms_chat_documents (
+        id SERIAL PRIMARY KEY,
+        document_name TEXT NOT NULL,
+        safe_file_name TEXT,
+        document_type VARCHAR(255) DEFAULT 'uploaded_document',
+        version VARCHAR(50) DEFAULT '1.0',
+        content TEXT,
+        ai_summary TEXT,
+        manual_summary TEXT,
+        file_size BIGINT,
+        extraction_method VARCHAR(100),
+        source_type VARCHAR(50) DEFAULT 'upload',
+        blob_url TEXT,
+        original_filename TEXT,
+        mime_type VARCHAR(255),
+        user_id VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_qms_chat_documents_name ON qms_chat_documents(document_name)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_qms_chat_documents_type ON qms_chat_documents(document_type)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_qms_chat_documents_source_type ON qms_chat_documents(source_type)`);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS qms_chat_document_chunks (
+        id SERIAL PRIMARY KEY,
+        document_id INTEGER NOT NULL REFERENCES qms_chat_documents(id) ON DELETE CASCADE,
+        chunk_index INTEGER NOT NULL,
+        chunk_text TEXT NOT NULL,
+        embedding vector(1536),
+        token_count INTEGER,
+        user_id VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT unique_document_chunk UNIQUE (document_id, chunk_index)
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_qms_chat_document_chunks_document_id ON qms_chat_document_chunks(document_id)`);
+
+    console.log('qms_chat_documents and qms_chat_document_chunks tables created or already exist');
+
+    // Create workflow templates table (referenced by gxp_lessons)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS qms_chat_workflow_templates (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        category VARCHAR(100),
+        steps_json JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('qms_chat_workflow_templates table created or already exists');
+
     // Create lessons table
     await client.query(`
       CREATE TABLE IF NOT EXISTS gxp_lessons (
@@ -807,6 +867,7 @@ export async function initDatabase() {
 
     const duration = Date.now() - startTime;
     console.log(`Database schema initialized successfully in ${duration}ms`);
+    dbInitialized = true;
   } catch (error) {
     console.error('Error initializing database:', {
       message: error.message,
