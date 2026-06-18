@@ -231,8 +231,8 @@ async function createDocumentsTable(pool) {
 
 async function storeDocument(pool, fileName, extractedText, summary, fileSize, extractionMethod, blobUrl, originalFileName, mimeType, userId) {
   try {
-    const { safeFileName: hasSafeFileName, manualSummary: hasManualSummary } =
-      await ensureUploadedDocumentColumnSupport(pool);
+    const hasSafeFileName = true;
+    const hasManualSummary = true;
 
     const safeFileName = generateSafeFileName(originalFileName || fileName);
 
@@ -527,12 +527,21 @@ export const handler = async (event) => {
     }
   });
 
-  // Initialize database connection
-  await initDatabase();
-  const pool = getPool();
-
   // Get CORS headers
   const corsHeaders = getCorsHeaders(['POST', 'OPTIONS']);
+
+  // Initialize database — must be inside try so DB failures return 500, not crash → 502
+  try {
+    await initDatabase();
+  } catch (dbInitError) {
+    console.error('Database initialization failed:', dbInitError.message);
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ success: false, error: 'Database initialization failed', details: dbInitError.message })
+    };
+  }
+  const pool = getPool();
 
   // Handle OPTIONS request for CORS
   if (event.httpMethod === 'OPTIONS') {
