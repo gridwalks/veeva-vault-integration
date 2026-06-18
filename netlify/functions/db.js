@@ -25,9 +25,9 @@ export function getPool() {
     pool = new Pool({
       connectionString: getConnectionString(),
       ssl: { rejectUnauthorized: false },
-      max: 10,
+      max: 3,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
+      connectionTimeoutMillis: 15000,
     });
   }
   return pool;

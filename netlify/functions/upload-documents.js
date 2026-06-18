@@ -530,7 +530,21 @@ export const handler = async (event) => {
   // Get CORS headers
   const corsHeaders = getCorsHeaders(['POST', 'OPTIONS']);
 
-  // Initialize database — must be inside try so DB failures return 500, not crash → 502
+  const pool = getPool();
+
+  // Test DB connectivity before doing anything else
+  try {
+    await pool.query('SELECT 1');
+  } catch (connError) {
+    console.error('Database connection failed:', connError.message);
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ success: false, error: 'Database connection failed', details: connError.message })
+    };
+  }
+
+  // Initialize schema (no-op after first cold start)
   try {
     await initDatabase();
   } catch (dbInitError) {
@@ -541,7 +555,6 @@ export const handler = async (event) => {
       body: JSON.stringify({ success: false, error: 'Database initialization failed', details: dbInitError.message })
     };
   }
-  const pool = getPool();
 
   // Handle OPTIONS request for CORS
   if (event.httpMethod === 'OPTIONS') {
