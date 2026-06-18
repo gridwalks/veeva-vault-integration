@@ -3,7 +3,7 @@ import { getStore } from '@netlify/blobs';
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: true }
+  ssl: { rejectUnauthorized: false }
 });
 
 export const handler = async (event) => {
