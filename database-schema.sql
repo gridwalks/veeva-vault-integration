@@ -1,6 +1,7 @@
--- Document Index Database Schema for Neon Database
+-- Document Index Database Schema for Supabase (AccelerQA Reg Intel)
+-- IMPORTANT: Enable the "vector" extension in Supabase → Database → Extensions BEFORE running this script.
 
--- Enable pgvector extension for vector similarity search
+-- Enable pgvector extension for vector similarity search (safe to run if already enabled)
 CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE IF NOT EXISTS Veeva_Doc_Chat_document_index (
