@@ -519,19 +519,37 @@ export async function initDatabase() {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_qms_chat_documents_type ON qms_chat_documents(document_type)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_qms_chat_documents_source_type ON qms_chat_documents(source_type)`);
 
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS qms_chat_document_chunks (
-        id SERIAL PRIMARY KEY,
-        document_id INTEGER NOT NULL REFERENCES qms_chat_documents(id) ON DELETE CASCADE,
-        chunk_index INTEGER NOT NULL,
-        chunk_text TEXT NOT NULL,
-        embedding vector(1536),
-        token_count INTEGER,
-        user_id VARCHAR(255),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT unique_document_chunk UNIQUE (document_id, chunk_index)
-      )
-    `);
+    // Try with vector type first; fall back without it if pgvector isn't enabled yet
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS qms_chat_document_chunks (
+          id SERIAL PRIMARY KEY,
+          document_id INTEGER NOT NULL REFERENCES qms_chat_documents(id) ON DELETE CASCADE,
+          chunk_index INTEGER NOT NULL,
+          chunk_text TEXT NOT NULL,
+          embedding vector(1536),
+          token_count INTEGER,
+          user_id VARCHAR(255),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT unique_document_chunk UNIQUE (document_id, chunk_index)
+        )
+      `);
+    } catch (chunkTableError) {
+      console.warn('Could not create qms_chat_document_chunks with vector type, trying without:', chunkTableError.message);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS qms_chat_document_chunks (
+          id SERIAL PRIMARY KEY,
+          document_id INTEGER NOT NULL REFERENCES qms_chat_documents(id) ON DELETE CASCADE,
+          chunk_index INTEGER NOT NULL,
+          chunk_text TEXT NOT NULL,
+          embedding TEXT,
+          token_count INTEGER,
+          user_id VARCHAR(255),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT unique_document_chunk UNIQUE (document_id, chunk_index)
+        )
+      `);
+    }
     await client.query(`CREATE INDEX IF NOT EXISTS idx_qms_chat_document_chunks_document_id ON qms_chat_document_chunks(document_id)`);
 
     console.log('qms_chat_documents and qms_chat_document_chunks tables created or already exist');

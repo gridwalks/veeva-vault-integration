@@ -158,11 +158,12 @@ export default function DocumentUpload({ onUploadComplete, userId }) {
         body: formData
       });
 
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
-      }
+      const result = await response.json().catch(() => ({}));
 
-      const result = await response.json();
+      if (!response.ok) {
+        const detail = result.details || result.error || response.statusText;
+        throw new Error(`Upload failed: ${response.status} — ${detail}`);
+      }
       setUploadResult(result);
       
       if (onUploadComplete) {
