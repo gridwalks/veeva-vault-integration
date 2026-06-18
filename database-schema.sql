@@ -4,57 +4,7 @@
 -- Enable pgvector extension for vector similarity search (safe to run if already enabled)
 CREATE EXTENSION IF NOT EXISTS vector;
 
-CREATE TABLE IF NOT EXISTS Veeva_Doc_Chat_document_index (
-  id SERIAL PRIMARY KEY,
-  veeva_document_id VARCHAR(255) UNIQUE NOT NULL,
-  document_number VARCHAR(255) NOT NULL,
-  document_name TEXT NOT NULL,
-  major_version INTEGER NOT NULL,
-  minor_version INTEGER NOT NULL,
-  document_type VARCHAR(255),
-  status VARCHAR(100),
-  summary TEXT,
-  manual_summary TEXT,
-  indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Create indexes for faster lookups
-CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_document_index_veeva_id 
-ON Veeva_Doc_Chat_document_index(veeva_document_id);
-
-CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_document_index_number 
-ON Veeva_Doc_Chat_document_index(document_number);
-
-CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_document_index_name 
-ON Veeva_Doc_Chat_document_index(document_name);
-
--- Table for storing document chunks with embeddings for RAG
-CREATE TABLE IF NOT EXISTS Veeva_Doc_Chat_document_chunks (
-  id SERIAL PRIMARY KEY,
-  document_id INTEGER NOT NULL REFERENCES Veeva_Doc_Chat_document_index(id) ON DELETE CASCADE,
-  veeva_document_id VARCHAR(255) NOT NULL,
-  chunk_index INTEGER NOT NULL,
-  chunk_text TEXT NOT NULL,
-  embedding vector(1536),  -- OpenAI ada-002 produces 1536-dimensional embeddings
-  token_count INTEGER,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(document_id, chunk_index)
-);
-
--- Create indexes for faster chunk retrieval and vector search
-CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_chunks_document_id 
-ON Veeva_Doc_Chat_document_chunks(document_id);
-
-CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_chunks_veeva_document_id 
-ON Veeva_Doc_Chat_document_chunks(veeva_document_id);
-
--- Create IVFFLAT index for faster vector similarity search
--- Note: This index should be created after inserting data for better performance
--- CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_chunks_embedding 
--- ON Veeva_Doc_Chat_document_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
-
--- Table for storing uploaded documents (separate from Veeva documents)
+-- Table for storing uploaded documents
 CREATE TABLE IF NOT EXISTS qms_chat_documents (
   id SERIAL PRIMARY KEY,
   document_name TEXT NOT NULL,
@@ -66,7 +16,7 @@ CREATE TABLE IF NOT EXISTS qms_chat_documents (
   manual_summary TEXT,
   file_size BIGINT,
   extraction_method VARCHAR(100),
-  source_type VARCHAR(50) DEFAULT 'upload', -- 'upload', 'veeva', 'external'
+  source_type VARCHAR(50) DEFAULT 'upload',
   blob_url TEXT, -- URL to the file stored in Netlify Blob
   original_filename TEXT, -- Original filename when uploaded
   mime_type VARCHAR(255), -- MIME type of the original file
@@ -106,11 +56,7 @@ ON qms_chat_external_resources(category);
 CREATE INDEX IF NOT EXISTS idx_qms_chat_external_resources_url 
 ON qms_chat_external_resources(url);
 
--- Update the document_chunks table to support both Veeva and uploaded documents
--- First, we need to make the document_id reference more flexible
--- We'll create a new table structure that can handle both types
-
--- Create a unified documents table that combines both Veeva and uploaded documents
+-- Unified documents table (uploaded documents and external sources)
 CREATE TABLE IF NOT EXISTS qms_chat_unified_documents (
   id SERIAL PRIMARY KEY,
   document_name TEXT NOT NULL,
@@ -121,49 +67,36 @@ CREATE TABLE IF NOT EXISTS qms_chat_unified_documents (
   manual_summary TEXT,
   file_size BIGINT,
   extraction_method VARCHAR(100),
-  source_type VARCHAR(50) NOT NULL, -- 'veeva', 'upload', 'external'
-  veeva_document_id VARCHAR(255), -- Only for Veeva documents
-  document_number VARCHAR(255), -- Only for Veeva documents
-  major_version INTEGER, -- Only for Veeva documents
-  minor_version INTEGER, -- Only for Veeva documents
-  status VARCHAR(100), -- Only for Veeva documents
+  source_type VARCHAR(50) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create indexes for unified documents
-CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_documents_name 
+CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_documents_name
 ON qms_chat_unified_documents(document_name);
 
-CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_documents_type 
+CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_documents_type
 ON qms_chat_unified_documents(document_type);
 
-CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_documents_source_type 
+CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_documents_source_type
 ON qms_chat_unified_documents(source_type);
 
-CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_documents_veeva_id 
-ON qms_chat_unified_documents(veeva_document_id);
-
--- Update the document_chunks table to reference the unified documents table
--- Note: This is a breaking change, so we'll create a new table for chunks
+-- Unified chunks table
 CREATE TABLE IF NOT EXISTS qms_chat_unified_chunks (
   id SERIAL PRIMARY KEY,
   document_id INTEGER NOT NULL REFERENCES qms_chat_unified_documents(id) ON DELETE CASCADE,
-  veeva_document_id VARCHAR(255), -- Keep for backward compatibility
   chunk_index INTEGER NOT NULL,
   chunk_text TEXT NOT NULL,
-  embedding vector(1536),  -- OpenAI ada-002 produces 1536-dimensional embeddings
+  embedding vector(1536),
   token_count INTEGER,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(document_id, chunk_index)
 );
 
 -- Create indexes for unified chunks
-CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_chunks_document_id 
+CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_chunks_document_id
 ON qms_chat_unified_chunks(document_id);
-
-CREATE INDEX IF NOT EXISTS idx_qms_chat_unified_chunks_veeva_document_id 
-ON qms_chat_unified_chunks(veeva_document_id);
 
 -- Table for storing Q&A interactions
 CREATE TABLE IF NOT EXISTS qms_chat_qa_interactions (
@@ -547,9 +480,6 @@ ON cfr_title21_web_resource_links(web_resource_id);
 CREATE INDEX IF NOT EXISTS idx_web_resource_links_regulation_id 
 ON cfr_title21_web_resource_links(regulation_id);
 
--- Sample data insertion (optional)
--- INSERT INTO Veeva_Doc_Chat_document_index (veeva_document_id, document_number, document_name, major_version, minor_version, document_type, status, summary) 
--- VALUES ('sample-id', 'DOC-001', 'Sample Document', 1, 0, 'Standard Operating Procedure', 'STEADYSTATE', 'This is a sample document summary.');
 
 -- ============================================================================
 -- GxP Educational Platform Tables
@@ -633,7 +563,7 @@ CREATE TABLE IF NOT EXISTS gxp_lessons (
   content_data JSONB, -- Flexible content storage (varies by content_type)
   estimated_minutes INTEGER, -- Estimated time to complete in minutes
   cfr_regulation_id INTEGER REFERENCES cfr_title21_regulations(id) ON DELETE SET NULL, -- Link to CFR regulation if applicable
-  document_id INTEGER REFERENCES Veeva_Doc_Chat_document_index(id) ON DELETE SET NULL, -- Link to indexed document if applicable
+  document_id INTEGER REFERENCES qms_chat_documents(id) ON DELETE SET NULL,
   workflow_template_id INTEGER REFERENCES qms_chat_workflow_templates(id) ON DELETE SET NULL, -- Link to workflow exercise if applicable
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

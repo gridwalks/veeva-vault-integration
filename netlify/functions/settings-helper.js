@@ -31,14 +31,6 @@ export async function getSystemSetting(settingKey, defaultValue = null) {
 }
 
 /**
- * Check if Veeva integration is enabled
- * @returns {Promise<boolean>} - True if Veeva integration is enabled
- */
-export async function isVeevaIntegrationEnabled() {
-  return await getSystemSetting('veeva_integration_enabled', true);
-}
-
-/**
  * Ensure settings table exists
  */
 async function ensureSettingsTable(pool) {
@@ -56,15 +48,8 @@ async function ensureSettingsTable(pool) {
     `);
 
     await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_qms_chat_system_settings_key 
+      CREATE INDEX IF NOT EXISTS idx_qms_chat_system_settings_key
       ON qms_chat_system_settings(setting_key)
-    `);
-
-    // Insert default settings if they don't exist
-    await pool.query(`
-      INSERT INTO qms_chat_system_settings (setting_key, setting_value, setting_type, description) 
-      VALUES ('veeva_integration_enabled', 'true', 'boolean', 'Enable or disable Veeva Vault integration')
-      ON CONFLICT (setting_key) DO NOTHING
     `);
   } catch (error) {
     console.error('Error ensuring settings table exists:', error);

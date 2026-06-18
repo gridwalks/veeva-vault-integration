@@ -36,12 +36,12 @@ export const handler = async (event) => {
     await initDatabase();
     const pool = getPool();
 
-    // Update the document with the new summary
+    // Update the uploaded document with the new summary
     const updateResult = await pool.query(`
-      UPDATE Veeva_Doc_Chat_document_index 
-      SET summary = $1, updated_at = CURRENT_TIMESTAMP
+      UPDATE qms_chat_documents
+      SET ai_summary = $1, updated_at = CURRENT_TIMESTAMP
       WHERE id = $2
-      RETURNING id, document_name, summary
+      RETURNING id, document_name, ai_summary as summary
     `, [newSummary, documentId]);
 
     if (updateResult.rows.length === 0) {

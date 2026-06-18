@@ -240,12 +240,7 @@ async function ensureSettingsTable(pool) {
     ON qms_chat_system_settings(setting_key)
   `);
 
-  // Insert default settings if they don't exist
-  await pool.query(`
-    INSERT INTO qms_chat_system_settings (setting_key, setting_value, setting_type, description) 
-    VALUES ('veeva_integration_enabled', 'true', 'boolean', 'Enable or disable Veeva Vault integration')
-    ON CONFLICT (setting_key) DO NOTHING
-  `);
+  // No default settings to seed at this time.
 }
 
 /**

@@ -295,7 +295,7 @@ async function getCourseDetails(pool, courseId, corsHeaders) {
             'cfr_regulation_identifier', cfr.regulation_id,
             'document_id', l.document_id,
             'document_name', d.document_name,
-            'document_number', d.document_number,
+            'document_number', null,
             'workflow_template_id', l.workflow_template_id,
             'workflow_template_name', w.name,
             'created_at', l.created_at,
@@ -305,7 +305,7 @@ async function getCourseDetails(pool, courseId, corsHeaders) {
       FROM gxp_modules m
       LEFT JOIN gxp_lessons l ON m.id = l.module_id
       LEFT JOIN cfr_title21_regulations cfr ON l.cfr_regulation_id = cfr.id
-      LEFT JOIN Veeva_Doc_Chat_document_index d ON l.document_id = d.id
+      LEFT JOIN qms_chat_documents d ON l.document_id = d.id
       LEFT JOIN qms_chat_workflow_templates w ON l.workflow_template_id = w.id
       WHERE m.course_id = $1
       GROUP BY m.id, m.module_order, m.title, m.description, m.created_at, m.updated_at
@@ -458,13 +458,13 @@ async function getLessonDetails(pool, lessonId, corsHeaders) {
         cfr.title as cfr_regulation_title,
         cfr.regulation_id as cfr_regulation_identifier,
         d.document_name,
-        d.document_number,
+        null as document_number,
         w.name as workflow_template_name
       FROM gxp_lessons l
       INNER JOIN gxp_modules m ON l.module_id = m.id
       INNER JOIN gxp_courses c ON m.course_id = c.id
       LEFT JOIN cfr_title21_regulations cfr ON l.cfr_regulation_id = cfr.id
-      LEFT JOIN Veeva_Doc_Chat_document_index d ON l.document_id = d.id
+      LEFT JOIN qms_chat_documents d ON l.document_id = d.id
       LEFT JOIN qms_chat_workflow_templates w ON l.workflow_template_id = w.id
       WHERE l.id = $1`,
       [lessonId]
@@ -540,7 +540,7 @@ async function updateLesson(pool, lessonId, body, corsHeaders) {
       // If document_id is a UUID string (veeva_document_id), look up the integer id
       if (document_id && typeof document_id === 'string' && document_id.includes('-')) {
         const docLookup = await pool.query(
-          'SELECT id FROM Veeva_Doc_Chat_document_index WHERE veeva_document_id = $1',
+          'SELECT id FROM qms_chat_documents WHERE id::text = $1',
           [document_id]
         );
         if (docLookup.rows.length > 0) {
@@ -727,7 +727,7 @@ async function createLesson(pool, moduleId, body, corsHeaders) {
     let resolvedDocumentId = document_id;
     if (document_id && typeof document_id === 'string' && document_id.includes('-')) {
       const docLookup = await pool.query(
-        'SELECT id FROM Veeva_Doc_Chat_document_index WHERE veeva_document_id = $1',
+        'SELECT id FROM qms_chat_documents WHERE id::text = $1',
         [document_id]
       );
       if (docLookup.rows.length > 0) {

@@ -17,11 +17,10 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
   
   // Collapsible sections state - default to all collapsed
   const [expandedGroups, setExpandedGroups] = React.useState({
-    veeva: false,  // Collapsed by default
-    upload: false,  // Collapsed by default
-    cfr_regulation: false,  // Collapsed by default
-    attachment: false,  // Collapsed by default
-    unknown: false  // Collapsed by default
+    upload: false,
+    cfr_regulation: false,
+    attachment: false,
+    unknown: false
   });
   const [isExternalResourcesExpanded, setIsExternalResourcesExpanded] = React.useState(false);  // Collapsed by default
 
@@ -37,7 +36,6 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
   // Group documents by source_type and sort by similarity
   const groupAndSortDocuments = (documents) => {
     const groups = {
-      veeva: [],
       upload: [],
       cfr_regulation: [],
       attachment: [],
@@ -82,7 +80,6 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
     const allExpanded = Object.values(expandedGroups).every(v => v);
     const newState = !allExpanded;
     setExpandedGroups({
-      veeva: newState,
       upload: newState,
       cfr_regulation: newState,
       attachment: newState,
@@ -92,7 +89,6 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
 
   const getGroupLabel = (sourceType) => {
     const labels = {
-      veeva: 'Veeva Documents',
       upload: 'Uploaded Documents',
       cfr_regulation: 'CFR Regulations',
       attachment: 'Attachments',
@@ -103,7 +99,6 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
 
   const getGroupIcon = (sourceType) => {
     const icons = {
-      veeva: '📋',
       upload: '📤',
       cfr_regulation: '📜',
       attachment: '📎',
@@ -137,7 +132,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
         
         // For uploaded documents, we need to download them using the download API
         const { downloadUploadedDocumentUrl } = await import('../api');
-        const documentId = document.veeva_document_id || document.id || document.document_id;
+        const documentId = document.id || document.document_id;
         
         if (!documentId) {
           throw new Error('Document ID is missing. Cannot load document.');
@@ -148,14 +143,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
         try {
           const response = await fetch(downloadUrl);
           if (!response.ok) {
-            // If it's an unknown document and the upload API fails, it might be a Veeva document
-            // that wasn't properly tagged. Try Veeva API as fallback for 403 or 404 errors
-            if (document.source_type === 'unknown' && (response.status === 404 || response.status === 403)) {
-              console.log(`Upload API returned ${response.status} for unknown document, trying Veeva API as fallback`);
-              // Fall through to Veeva download path below
-            } else {
-              throw new Error(`Failed to download uploaded document: ${response.status} ${response.statusText}`);
-            }
+            throw new Error(`Failed to download document: ${response.status} ${response.statusText}`);
           } else {
             const blob = await response.blob();
             const fileType = response.headers.get('content-type') || 'application/octet-stream';
@@ -217,17 +205,10 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
             }
           }
         } catch (error) {
-          // If it's an unknown document and upload API fails, try Veeva as fallback
-          // This handles network errors or other issues that might prevent us from determining document type
-          if (document.source_type === 'unknown' && (error.message.includes('404') || error.message.includes('403'))) {
-            console.log('Upload API failed, trying Veeva API as fallback for unknown document');
-            // Fall through to Veeva download path below
-          } else {
-            console.error('Error handling uploaded document:', error);
-            setDocumentContent(`Error loading uploaded document: ${error.message}`);
-            setIsLoading(false);
-            return;
-          }
+          console.error('Error handling uploaded document:', error);
+          setDocumentContent(`Error loading document: ${error.message}`);
+          setIsLoading(false);
+          return;
         }
       }
       
@@ -236,7 +217,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
         console.log('Displaying workflow-generated document with text content');
         
         // Extract workflow instance ID (format: workflow_123 or numeric ID)
-        const instanceId = document.veeva_document_id?.toString().replace('workflow_', '');
+        const instanceId = document.id?.toString().replace('workflow_', '');
         setWorkflowInstanceId(instanceId);
         
         // Initialize version history
@@ -351,9 +332,9 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
             let errorMessage = 'Access denied (403). ';
             try {
               const errorData = JSON.parse(errorText);
-              errorMessage += errorData.message || errorData.error || 'You may not have permission to access this document, or it may not be a Veeva document.';
+              errorMessage += errorData.message || errorData.error || 'You may not have permission to access this document.';
             } catch {
-              errorMessage += 'You may not have permission to access this document, or it may not be a Veeva document.';
+              errorMessage += 'You may not have permission to access this document.';
             }
             throw new Error(errorMessage);
           }
@@ -1087,7 +1068,7 @@ const SelectedDocumentViewer = React.forwardRef(({ selectedDocuments, onDocument
               {/* Referenced Documents Section */}
               {referencedDocuments.length > 0 && (() => {
                 const groupedDocs = groupAndSortDocuments(referencedDocuments);
-                const groupKeys = ['veeva', 'upload', 'cfr_regulation', 'attachment', 'unknown'];
+                const groupKeys = ['upload', 'cfr_regulation', 'attachment', 'unknown'];
                 const hasMultipleGroups = groupKeys.filter(key => groupedDocs[key].length > 0).length > 1;
                 const totalDocs = referencedDocuments.length;
 

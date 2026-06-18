@@ -102,7 +102,7 @@ async function handleTutoringRequest(pool, userId, body, corsHeaders) {
         // Get linked document if available
         if (lesson.document_id) {
           const docResult = await pool.query(
-            `SELECT document_name, summary, manual_summary FROM Veeva_Doc_Chat_document_index WHERE id = $1`,
+            `SELECT document_name, ai_summary as summary, null as manual_summary FROM qms_chat_documents WHERE id = $1`,
             [lesson.document_id]
           );
           if (docResult.rows.length > 0) {

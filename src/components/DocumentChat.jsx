@@ -538,27 +538,18 @@ The files will upload automatically and I'll be able to perform a detailed compa
         document_number: displayNumber,
         // Add uploaded document properties
         isUploaded: document.isUploaded || document.source_type === 'upload',
-        source_type: document.source_type || 'veeva'
+        source_type: document.source_type || 'upload'
       };
       onOpenDocumentInPane(mappedDocument);
     } else {
       // Fallback to document viewer if no callback provided
-      if (document.isUploaded || document.source_type === 'upload') {
-        // For uploaded documents, use the download API
-        import('../api').then(({ downloadUploadedDocumentUrl }) => {
-          const url = downloadUploadedDocumentUrl({ documentId: document.id || document.document_id });
-          setSelectedDocument({
-            url: url,
-            name: displayName
-          });
-        });
-      } else {
-        // For Veeva documents, use the regular download API
+      import('../api').then(({ downloadUploadedDocumentUrl }) => {
+        const url = downloadUploadedDocumentUrl({ documentId: document.id || document.document_id });
         setSelectedDocument({
-          url: `/api/download-file?docId=${document.id}&major=${document.version.split('.')[0]}&minor=${document.version.split('.')[1]}`,
+          url: url,
           name: displayName
         });
-      }
+      });
       setViewerOpen(true);
     }
   };
@@ -1126,7 +1117,7 @@ The files will upload automatically and I'll be able to perform a detailed compa
                   fontSize: '13px',
                   color: '#666'
                 }}>
-                  {selectedDocuments.length > 0 && `${selectedDocuments.length} Veeva document${selectedDocuments.length !== 1 ? 's' : ''}`}
+                  {selectedDocuments.length > 0 && `${selectedDocuments.length} document${selectedDocuments.length !== 1 ? 's' : ''}`}
                   {selectedDocuments.length > 0 && (attachedDocuments.length > 0 || uploadedBlobs.length > 0) && ', '}
                   {attachedDocuments.length > 0 && `${attachedDocuments.length} indexed upload${attachedDocuments.length !== 1 ? 's' : ''}`}
                   {attachedDocuments.length > 0 && uploadedBlobs.length > 0 && ', '}

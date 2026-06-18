@@ -1,12 +1,6 @@
 # Environment Variables Template
 # Copy this file to .env and fill in your actual values
 
-# Veeva Vault Configuration
-VAULT_DOMAIN=y-prime-quality.veevavault.com
-VAULT_API_VERSION=v25.2
-VAULT_USERNAME=<your_vault_username>
-VAULT_PASSWORD=<your_vault_password>
-
 # Supabase Configuration (AccelerQA Reg Intel database)
 # These are auto-injected by the Netlify <-> Supabase integration in production.
 # For local dev, copy values from Supabase → Settings → API / Database.

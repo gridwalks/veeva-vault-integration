@@ -1,6 +1,5 @@
 import { getPool, initDatabase } from "./db.js";
 import { ensureUploadedDocumentColumnSupport } from "./uploaded-document-columns.js";
-import { isVeevaIntegrationEnabled } from "./settings-helper.js";
 import OpenAI from "openai";
 import Groq from "groq-sdk";
 import { getStore } from "@netlify/blobs";
@@ -370,9 +369,7 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = [], re
   
   relevantChunks.forEach(chunk => {
     let docId = null;
-    if (chunk.source_type === 'veeva' && chunk.veeva_document_id) {
-      docId = normalizeId(chunk.veeva_document_id);
-    } else if (chunk.source_type === 'upload' && chunk.upload_document_id) {
+    if (chunk.source_type === 'upload' && chunk.upload_document_id) {
       docId = normalizeId(chunk.upload_document_id);
     } else if (chunk.source_type === 'cfr_regulation' && chunk.regulation_id) {
       docId = normalizeId(chunk.regulation_id);
@@ -391,9 +388,7 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = [], re
   // Calculate max and avg similarity for each document
   const getSimilarityScores = (doc) => {
     let docId = null;
-    if (doc.source_type === 'veeva' && doc.veeva_document_id) {
-      docId = normalizeId(doc.veeva_document_id);
-    } else if (doc.source_type === 'upload' && (doc.document_id || doc.id)) {
+    if (doc.source_type === 'upload' && (doc.document_id || doc.id)) {
       docId = normalizeId(doc.document_id || doc.id);
     } else if (doc.source_type === 'cfr_regulation') {
       // For CFR regulations, chunks use regulation_id (database ID), 
@@ -402,7 +397,7 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = [], re
     } else if (doc.source_type === 'web_resource' && doc.document_id) {
       docId = normalizeId(doc.document_id);
     } else {
-      const fallbackId = doc.veeva_document_id || doc.document_id || doc.id || doc.number || doc.name;
+      const fallbackId = doc.document_id || doc.id || doc.number || doc.name;
       docId = normalizeId(fallbackId);
     }
     
@@ -420,7 +415,6 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = [], re
 
   return [
     ...relevantDocuments.map((doc) => {
-      const isVeevaDoc = doc.source_type === "veeva";
       const isUploadedDoc = doc.source_type === "upload";
       const isCfrRegulation = doc.source_type === "cfr_regulation";
       const isWebResource = doc.source_type === "web_resource";
@@ -461,27 +455,10 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = [], re
         };
       }
 
-      if (isVeevaDoc) {
-        const major = doc.major_version ?? doc.majorVersion ?? "0";
-        const minor = doc.minor_version ?? doc.minorVersion ?? "0";
-        return {
-          id: doc.veeva_document_id,
-          name: doc.document_name,
-          number: doc.document_number,
-          version: `${major}.${minor}`,
-          type: doc.document_type,
-          status: doc.status,
-          source_type: "veeva",
-          maxSimilarity: similarityScores.maxSimilarity,
-          avgSimilarity: similarityScores.avgSimilarity,
-        };
-      }
-
       if (isCfrRegulation) {
         return {
           id: doc.document_id || doc.id,
           document_id: doc.document_id || doc.id,
-          veeva_document_id: doc.document_id || doc.id, // For compatibility with viewer
           name: doc.document_name || doc.title || "CFR Regulation",
           document_name: doc.document_name || doc.title || "CFR Regulation",
           number: doc.regulation_id || doc.document_id || "",
@@ -506,7 +483,6 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = [], re
         return {
           id: doc.document_id || doc.id,
           document_id: doc.document_id || doc.id,
-          veeva_document_id: doc.document_id || doc.id, // For compatibility with viewer
           name: doc.document_name || doc.title || "Web Resource",
           document_name: doc.document_name || doc.title || "Web Resource",
           number: doc.source_url || "",
@@ -525,7 +501,7 @@ function buildResponseDocuments(relevantDocuments, processedAttachments = [], re
       }
 
       return {
-        id: doc.veeva_document_id || doc.document_id || doc.id || doc.number || doc.name,
+        id: doc.document_id || doc.id || doc.number || doc.name,
         name: doc.document_name || doc.name,
         number: doc.document_number || doc.original_filename || doc.number || doc.document_name,
         version: doc.version || "unknown",
@@ -915,18 +891,7 @@ export const handler = async (event) => {
 
     // Initialize database
     await initDatabase();
-    
-    // Check if Veeva integration is enabled (with error handling)
-    let veevaEnabled = true; // Default to enabled if check fails
-    try {
-      veevaEnabled = await isVeevaIntegrationEnabled();
-      console.log('Veeva integration enabled:', veevaEnabled);
-    } catch (settingsError) {
-      console.error('Error checking Veeva integration setting, defaulting to enabled:', settingsError);
-      // Default to enabled if we can't check the setting
-      veevaEnabled = true;
-    }
-    
+
     const pool = getPool();
 
     const uploadedColumnSupport = await ensureUploadedDocumentColumnSupport(pool);
@@ -974,37 +939,22 @@ export const handler = async (event) => {
       isComparisonQuery
     });
 
-    // Separate Veeva document IDs from uploaded document IDs
-    let veevaDocumentIds = [];
+    // Separate uploaded document IDs from other IDs
     let uploadedDocumentIds = [];
-    
+
     if (documentIds && Array.isArray(documentIds)) {
       documentIds.forEach(id => {
         if (typeof id === 'string' && id.startsWith('uploaded_')) {
           // Extract the UUID after 'uploaded_' prefix
           uploadedDocumentIds.push(id.substring(9));
-        } else {
-          // Only add Veeva document IDs if integration is enabled
-          if (veevaEnabled) {
-            veevaDocumentIds.push(id);
-          } else {
-            console.log('Skipping Veeva document ID (integration disabled):', id);
-          }
         }
       });
-    }
-    
-    // If Veeva integration is disabled, clear any Veeva document IDs
-    if (!veevaEnabled) {
-      veevaDocumentIds = [];
     }
 
     console.log('Chat request details:', {
       message: message.substring(0, 100) + '...',
       originalDocumentIds: documentIds,
-      veevaDocumentIds: veevaDocumentIds.length > 0 ? veevaDocumentIds : 'none',
       uploadedDocumentIds: uploadedDocumentIds.length > 0 ? uploadedDocumentIds : 'none',
-      veevaCount: veevaDocumentIds.length,
       uploadedCount: uploadedDocumentIds.length,
       historyLength: conversationHistory.length,
       attachmentCount: Array.isArray(attachments) ? attachments.length : 0
@@ -1085,113 +1035,36 @@ export const handler = async (event) => {
         // Convert embedding array to PostgreSQL vector format
         const embeddingStr = '[' + queryEmbedding.join(',') + ']';
         
-        let veevaChunks = [];
+        // veevaChunks removed — no longer used
         let uploadedChunks = [];
-        
-        // Query Veeva document chunks if we have Veeva document IDs and integration is enabled
-        if (veevaDocumentIds.length > 0 && veevaEnabled) {
-          const veevaPlaceholders = veevaDocumentIds.map((_, index) => `$${index + 2}`).join(',');
-          // Increase chunk limit for comparison mode to get more comprehensive content
-          const chunkLimit = isComparisonQuery ? 10 : 5;
-          const veevaQuery = `
-            SELECT 
-              dc.chunk_text,
-              dc.veeva_document_id,
-              dc.chunk_index,
-              di.document_name,
-              di.document_number,
-              di.major_version,
-              di.minor_version,
-              di.document_type,
-              di.status,
-              1 - (dc.embedding <=> $1::vector) as similarity,
-              'veeva' as source_type
-            FROM Veeva_Doc_Chat_document_chunks dc
-            JOIN Veeva_Doc_Chat_document_index di ON dc.document_id = di.id
-            WHERE dc.veeva_document_id IN (${veevaPlaceholders})
-            ORDER BY dc.embedding <=> $1::vector
-            LIMIT ${chunkLimit}
+
+        if (uploadedDocumentIds.length === 0) {
+          // Search all uploaded documents when no specific docs are selected
+          const uploadedQuery = `
+            SELECT
+              c.chunk_text,
+              c.document_id as upload_document_id,
+              c.chunk_index,
+              d.document_name,
+              d.document_type,
+              d.ai_summary,
+              d.file_size,
+              d.original_filename,
+              ${safeFileNameSelectWithAlias},
+              1 - (c.embedding <=> $1::vector) as similarity,
+              'upload' as source_type
+            FROM qms_chat_document_chunks c
+            JOIN qms_chat_documents d ON c.document_id = d.id
+            WHERE c.user_id = $2
+            ORDER BY c.embedding <=> $1::vector
+            LIMIT ${isUploadedDocQuery ? 10 : 5}
           `;
-          const veevaResult = await pool.query(veevaQuery, [embeddingStr, ...veevaDocumentIds]);
-          veevaChunks = veevaResult.rows;
-          console.log(`Found ${veevaChunks.length} Veeva chunks (comparison mode: ${isComparisonQuery})`);
-        } else if (veevaDocumentIds.length === 0 && uploadedDocumentIds.length === 0) {
-          if (isUploadedDocQuery) {
-            // If asking about uploaded documents, only search uploaded docs
-            console.log('Searching only uploaded documents for uploaded doc query');
-            const uploadedQuery = `
-              SELECT 
-                c.chunk_text,
-                c.document_id as upload_document_id,
-                c.chunk_index,
-                d.document_name,
-                d.document_type,
-                d.ai_summary,
-                d.file_size,
-                d.original_filename,
-                ${safeFileNameSelectWithAlias},
-                1 - (c.embedding <=> $1::vector) as similarity,
-                'upload' as source_type
-              FROM qms_chat_document_chunks c
-              JOIN qms_chat_documents d ON c.document_id = d.id
-              WHERE c.user_id = $2
-              ORDER BY c.embedding <=> $1::vector
-              LIMIT 10
-            `;
-            const uploadedResult = await pool.query(uploadedQuery, [embeddingStr, effectiveUserId]);
-            uploadedChunks = uploadedResult.rows;
-            console.log(`Found ${uploadedChunks.length} uploaded chunks for uploaded doc query`);
-          } else if (veevaEnabled) {
-            // If no specific docs selected and not asking about uploaded docs, search all Veeva docs (only if enabled)
-            const veevaQuery = `
-              SELECT 
-                dc.chunk_text,
-                dc.veeva_document_id,
-                dc.chunk_index,
-                di.document_name,
-                di.document_number,
-                di.major_version,
-                di.minor_version,
-                di.document_type,
-                di.status,
-                1 - (dc.embedding <=> $1::vector) as similarity,
-                'veeva' as source_type
-              FROM Veeva_Doc_Chat_document_chunks dc
-              JOIN Veeva_Doc_Chat_document_index di ON dc.document_id = di.id
-              ORDER BY dc.embedding <=> $1::vector
-              LIMIT 5
-            `;
-            const veevaResult = await pool.query(veevaQuery, [embeddingStr]);
-            veevaChunks = veevaResult.rows;
-            console.log(`Found ${veevaChunks.length} Veeva chunks from all documents`);
-            
-            // Also search all uploaded documents when no specific docs are selected
-            const uploadedQuery = `
-              SELECT 
-                c.chunk_text,
-                c.document_id as upload_document_id,
-                c.chunk_index,
-                d.document_name,
-                d.document_type,
-                d.ai_summary,
-                d.file_size,
-                d.original_filename,
-                ${safeFileNameSelectWithAlias},
-                1 - (c.embedding <=> $1::vector) as similarity,
-                'upload' as source_type
-              FROM qms_chat_document_chunks c
-              JOIN qms_chat_documents d ON c.document_id = d.id
-              WHERE c.user_id = $2
-              ORDER BY c.embedding <=> $1::vector
-              LIMIT 5
-            `;
-            const uploadedResult = await pool.query(uploadedQuery, [embeddingStr, effectiveUserId]);
-            uploadedChunks = uploadedResult.rows;
-            logSafely('info', 'Found uploaded chunks', { 
+          const uploadedResult = await pool.query(uploadedQuery, [embeddingStr, effectiveUserId]);
+          uploadedChunks = uploadedResult.rows;
+          logSafely('info', 'Found uploaded chunks', {
             chunkCount: uploadedChunks.length,
             userId: effectiveUserId ? 'present' : 'missing'
           });
-          }
         }
         
         // Query CFR regulation chunks
@@ -1319,7 +1192,7 @@ export const handler = async (event) => {
         // Combine and sort by similarity
         // For comparison mode, limit chunks to prevent context overflow
         const maxChunks = isComparisonQuery ? 6 : 5;
-        relevantChunks = [...veevaChunks, ...uploadedChunks, ...cfrChunks, ...webResourceChunks]
+        relevantChunks = [...uploadedChunks, ...cfrChunks, ...webResourceChunks]
           .sort((a, b) => b.similarity - a.similarity)
           .slice(0, maxChunks);
         
@@ -1340,10 +1213,6 @@ export const handler = async (event) => {
       }
       
       // Get unique documents from the chunks
-      const uniqueVeevaDocIds = [...new Set(relevantChunks
-        .filter(c => c.source_type === 'veeva' && c.veeva_document_id)
-        .map(c => c.veeva_document_id))];
-      
       const uniqueUploadedDocIds = [...new Set(relevantChunks
         .filter(c => c.source_type === 'upload' && c.upload_document_id)
         .map(c => c.upload_document_id))];
@@ -1366,34 +1235,19 @@ export const handler = async (event) => {
       
       console.log('Semantic search results:', {
         totalChunks: relevantChunks.length,
-        uniqueVeevaDocIds: uniqueVeevaDocIds,
         uniqueUploadedDocIds: uniqueUploadedDocIds,
         uniqueCfrRegulationIds: uniqueCfrRegulationIds,
         practiceAssociatedRegulationIds: practiceAssociatedRegulationIds.length,
         detectedPractices: detectedPractices,
         uniqueWebResourceIds: uniqueWebResourceIds,
         chunkDetails: relevantChunks.map(c => ({
-          docId: c.veeva_document_id || c.upload_document_id || c.regulation_id || c.web_resource_id,
+          docId: c.upload_document_id || c.regulation_id || c.web_resource_id,
           docName: c.document_name || c.title,
           docNumber: c.document_number,
           similarity: c.similarity,
           source: c.source_type
         }))
       });
-      
-      // Fetch Veeva document metadata
-      if (uniqueVeevaDocIds.length > 0) {
-        const veevaDocPlaceholders = uniqueVeevaDocIds.map((_, index) => `$${index + 1}`).join(',');
-        const veevaDocQuery = `
-          SELECT veeva_document_id, document_number, document_name, 
-                 major_version, minor_version, document_type, status, summary, manual_summary,
-                 'veeva' as source_type
-          FROM Veeva_Doc_Chat_document_index 
-          WHERE veeva_document_id IN (${veevaDocPlaceholders})
-        `;
-        const veevaDocResult = await pool.query(veevaDocQuery, uniqueVeevaDocIds);
-        relevantDocuments.push(...veevaDocResult.rows);
-      }
       
       // Fetch uploaded document metadata
       if (uniqueUploadedDocIds.length > 0) {
@@ -1507,201 +1361,38 @@ export const handler = async (event) => {
       }))
     });
     
-    if (searchTerms.length > 0 && veevaDocumentIds.length === 0 && uploadedDocumentIds.length === 0) {
-        if (isUploadedDocQuery) {
-          // If asking about uploaded documents, only search uploaded docs
-          console.log('Keyword search: searching only uploaded documents for uploaded doc query');
-          const uploadedSearchConditions = searchTerms.map((term, index) => 
-            `(document_name ILIKE $${index + 1} OR ai_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1} OR original_filename ILIKE $${index + 1})`
-          ).join(' OR ');
-          
-          const uploadedSearchParams = searchTerms.map(term => `%${term}%`);
-          const uploadedQuery = `
-            SELECT id as document_id, document_name,
-                   document_type, ai_summary, file_size, original_filename, ${safeFileNameSelect},
-                   'upload' as source_type
-            FROM qms_chat_documents
-            WHERE (${uploadedSearchConditions}) AND user_id = $${uploadedSearchParams.length + 1}
-            ORDER BY
-              CASE
-                WHEN document_name ILIKE ANY($${uploadedSearchParams.length + 2}) THEN 1
-                WHEN ai_summary ILIKE ANY($${uploadedSearchParams.length + 3}) THEN 2
-                WHEN original_filename ILIKE ANY($${uploadedSearchParams.length + 4}) THEN 3
-                ELSE 4
-              END,
-              document_name
-            LIMIT 10
-          `;
-          
-          console.log('Uploaded documents keyword search query:', uploadedQuery);
-          const uploadedResult = await pool.query(uploadedQuery, [...uploadedSearchParams, userId, uploadedSearchParams, uploadedSearchParams, uploadedSearchParams]);
-          const uploadedKeywordDocuments = uploadedResult.rows;
-          
-          console.log(`Found ${uploadedKeywordDocuments.length} uploaded documents based on keyword search`);
-          console.log('Uploaded keyword search documents:', uploadedKeywordDocuments.map(doc => ({
-            id: doc.document_id,
-            name: doc.document_name,
-            source: doc.source_type
-          })));
-          
-          // Add uploaded documents to relevant documents
-          relevantDocuments.push(...uploadedKeywordDocuments);
-        } else {
-          // Regular search for both Veeva and uploaded documents
-          // Define searchParams here so it's available for both Veeva and uploaded document queries
-          const searchParams = searchTerms.map(term => `%${term}%`);
-          
-          // First, try exact document number matches (case-insensitive) - only if Veeva enabled
-          const exactMatches = [];
-          let keywordSearchDocuments = [];
-          
-          if (veevaEnabled) {
-            for (const term of searchTerms) {
-              if (/^[a-z0-9\-_]+$/i.test(term)) {
-                console.log(`Checking for exact document number match: ${term}`);
-                const exactQuery = `
-                  SELECT veeva_document_id, document_number, document_name, 
-                         major_version, minor_version, document_type, status, summary, manual_summary,
-                         'veeva' as source_type
-                  FROM Veeva_Doc_Chat_document_index 
-                  WHERE document_number ILIKE $1
-                  LIMIT 5
-                `;
-                const exactResult = await pool.query(exactQuery, [term]);
-                if (exactResult.rows.length > 0) {
-                  console.log(`Found exact match for ${term}:`, exactResult.rows.map(doc => doc.document_number));
-                  exactMatches.push(...exactResult.rows);
-                }
-              }
-            }
-            
-            // Create a search query that looks for terms in document names, summaries, manual summaries, types, and document numbers
-            const searchConditions = searchTerms.map((term, index) => 
-              `(document_name ILIKE $${index + 1} OR summary ILIKE $${index + 1} OR manual_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1} OR document_number ILIKE $${index + 1})`
-            ).join(' OR ');
-          const query = `
-            SELECT veeva_document_id, document_number, document_name, 
-                   major_version, minor_version, document_type, status, summary, manual_summary,
-                   'veeva' as source_type
-            FROM Veeva_Doc_Chat_document_index 
-            WHERE ${searchConditions}
-            ORDER BY 
-              CASE 
-                WHEN document_name ILIKE ANY($${searchParams.length + 1}) THEN 1
-                WHEN manual_summary ILIKE ANY($${searchParams.length + 2}) THEN 2
-                WHEN summary ILIKE ANY($${searchParams.length + 3}) THEN 3
-                ELSE 4
-              END,
-              document_name
-            LIMIT 10
-          `;
-          
-          console.log('Keyword search query:', query);
-          console.log('Search parameters:', searchParams);
-          console.log('Search conditions:', searchConditions);
-          
-          const result = await pool.query(query, [...searchParams, searchParams, searchParams, searchParams]);
-          keywordSearchDocuments = result.rows;
-        }
-        
-        // Also search uploaded documents
-        const uploadedSearchConditions = searchTerms.map((term, index) => 
-          `(document_name ILIKE $${index + 1} OR ai_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1} OR original_filename ILIKE $${index + 1})`
-        ).join(' OR ');
-        
-        const uploadedQuery = `
-          SELECT id as document_id, document_name,
-                 document_type, ai_summary, file_size, original_filename, ${safeFileNameSelect},
-                 'upload' as source_type
-          FROM qms_chat_documents
-          WHERE (${uploadedSearchConditions}) AND user_id = $${searchParams.length + 1}
-          ORDER BY
-            CASE
-              WHEN document_name ILIKE ANY($${searchParams.length + 2}) THEN 1
-              WHEN ai_summary ILIKE ANY($${searchParams.length + 3}) THEN 2
-              WHEN original_filename ILIKE ANY($${searchParams.length + 4}) THEN 3
-              ELSE 4
-            END,
-            document_name
-          LIMIT 10
-        `;
-        
-        console.log('Uploaded documents keyword search query:', uploadedQuery);
-        const uploadedResult = await pool.query(uploadedQuery, [...searchParams, userId, searchParams, searchParams, searchParams]);
-        const uploadedKeywordDocuments = uploadedResult.rows;
-        
-        // Combine exact matches with general search results, prioritizing exact matches
-        const allKeywordDocuments = [...exactMatches, ...keywordSearchDocuments, ...uploadedKeywordDocuments];
-        // Remove duplicates based on veeva_document_id or document_id
-        const uniqueKeywordDocuments = allKeywordDocuments.filter((doc, index, self) => 
-          index === self.findIndex(d => (d.veeva_document_id || d.document_id) === (doc.veeva_document_id || doc.document_id))
-        );
-        
-        console.log(`Found ${uniqueKeywordDocuments.length} relevant documents based on keyword search (${exactMatches.length} exact matches, ${keywordSearchDocuments.length} Veeva matches, ${uploadedKeywordDocuments.length} uploaded matches)`);
-        console.log('Keyword search documents:', uniqueKeywordDocuments.map(doc => ({
-          id: doc.veeva_document_id || doc.document_id,
-          number: doc.document_number || 'N/A',
-          name: doc.document_name,
-          source: doc.source_type,
-          isExactMatch: exactMatches.some(exact => (exact.veeva_document_id || exact.document_id) === (doc.veeva_document_id || doc.document_id))
-        })));
-        
-        // Merge with existing documents from semantic search, avoiding duplicates
-        const existingDocIds = new Set(relevantDocuments.map(doc => doc.veeva_document_id || doc.document_id));
-        const newDocuments = uniqueKeywordDocuments.filter(doc => !existingDocIds.has(doc.veeva_document_id || doc.document_id));
-        
-        // For comparison queries, limit keyword documents to prevent context overflow
-        const maxKeywordDocs = isComparisonQuery ? 2 : 10;
-        const limitedNewDocuments = newDocuments.slice(0, maxKeywordDocs);
-        relevantDocuments.push(...limitedNewDocuments);
-        
-        console.log(`Added ${limitedNewDocuments.length} new documents from keyword search (limited from ${newDocuments.length}, ${relevantDocuments.length} total)`);
-        console.log('Final relevant documents:', relevantDocuments.map(doc => ({
-          id: doc.veeva_document_id || doc.document_id,
-          number: doc.document_number,
-          name: doc.document_name,
-          source: doc.source_type || 'unknown'
-        })));
-        
-        // For documents found by keyword search but not semantic search, 
-        // we need to add their content to the context so the AI can respond about them
-        if (newDocuments.length > 0) {
-          console.log('Adding keyword-only documents to context for AI response...');
-          // These documents will be included in the documentContext via the relevantDocuments array
-          // The AI will use their summaries and metadata to respond
-        }
-        } // End of else block for regular search
-    } else if (documentIds && documentIds.length > 0 && veevaEnabled) {
-      // Get specific documents by IDs (only if Veeva integration is enabled)
-      const placeholders = documentIds.map((_, index) => `$${index + 1}`).join(',');
-      const query = `
-        SELECT veeva_document_id, document_number, document_name, 
-               major_version, minor_version, document_type, status, summary, manual_summary,
-               'veeva' as source_type
-        FROM Veeva_Doc_Chat_document_index 
-        WHERE veeva_document_id IN (${placeholders})
-        ORDER BY document_name
+    if (searchTerms.length > 0 && uploadedDocumentIds.length === 0) {
+      // Search uploaded documents by keyword
+      const searchParams = searchTerms.map(term => `%${term}%`);
+      const uploadedSearchConditions = searchTerms.map((term, index) =>
+        `(document_name ILIKE $${index + 1} OR ai_summary ILIKE $${index + 1} OR document_type ILIKE $${index + 1} OR original_filename ILIKE $${index + 1})`
+      ).join(' OR ');
+
+      const uploadedQuery = `
+        SELECT id as document_id, document_name,
+               document_type, ai_summary, file_size, original_filename, ${safeFileNameSelect},
+               'upload' as source_type
+        FROM qms_chat_documents
+        WHERE (${uploadedSearchConditions}) AND user_id = $${searchParams.length + 1}
+        ORDER BY
+          CASE
+            WHEN document_name ILIKE ANY($${searchParams.length + 2}) THEN 1
+            WHEN ai_summary ILIKE ANY($${searchParams.length + 3}) THEN 2
+            WHEN original_filename ILIKE ANY($${searchParams.length + 4}) THEN 3
+            ELSE 4
+          END,
+          document_name
+        LIMIT 10
       `;
-      
-      const result = await pool.query(query, documentIds);
-      relevantDocuments = result.rows;
-      
-      console.log(`Retrieved ${relevantDocuments.length} specific documents for chat`);
-    } else if (searchTerms.length === 0 && veevaEnabled) {
-      // If no search terms, get the most recent documents (only if Veeva integration is enabled)
-      const query = `
-        SELECT veeva_document_id, document_number, document_name, 
-               major_version, minor_version, document_type, status, summary, manual_summary,
-               'veeva' as source_type
-        FROM Veeva_Doc_Chat_document_index 
-        ORDER BY updated_at DESC
-        LIMIT 5
-      `;
-      
-      const result = await pool.query(query);
-      relevantDocuments = result.rows;
-      
-      console.log(`Retrieved ${relevantDocuments.length} recent documents for chat`);
+
+      const uploadedResult = await pool.query(uploadedQuery, [...searchParams, userId, searchParams, searchParams, searchParams]);
+      const uploadedKeywordDocuments = uploadedResult.rows;
+      console.log(`Found ${uploadedKeywordDocuments.length} uploaded documents based on keyword search`);
+
+      const existingDocIds = new Set(relevantDocuments.map(doc => doc.document_id));
+      const newDocuments = uploadedKeywordDocuments.filter(doc => !existingDocIds.has(doc.document_id));
+      const maxKeywordDocs = isComparisonQuery ? 2 : 10;
+      relevantDocuments.push(...newDocuments.slice(0, maxKeywordDocs));
     }
 
     // Search for relevant external resources
@@ -1844,7 +1535,7 @@ export const handler = async (event) => {
       const MAX_CHUNK_TEXT_LENGTH = isComparisonQuery ? 600 : 1500;
       
       const chunkContext = relevantChunks.map((chunk, index) => {
-        const docId = chunk.veeva_document_id || chunk.upload_document_id || chunk.regulation_id || chunk.web_resource_id;
+        const docId = chunk.upload_document_id || chunk.regulation_id || chunk.web_resource_id;
         const docMetadata = documentMetadataMap.get(docId);
         const manualSummary = docMetadata?.manual_summary;
         const isCfrChunk = chunk.source_type === 'cfr_regulation';
@@ -1883,9 +1574,9 @@ Similarity: ${(chunk.similarity * 100).toFixed(1)}%`;
       }).join('\n\n');
       
       // Also include document summaries for any documents that weren't found by semantic search
-      const documentsWithChunks = new Set(relevantChunks.map(c => c.veeva_document_id || c.upload_document_id || c.regulation_id));
+      const documentsWithChunks = new Set(relevantChunks.map(c => c.upload_document_id || c.regulation_id));
       const documentsWithoutChunks = relevantDocuments.filter(doc => {
-        const docId = doc.veeva_document_id || doc.document_id;
+        const docId = doc.document_id;
         return docId && !documentsWithChunks.has(docId);
       });
       
@@ -1931,8 +1622,6 @@ Status: ${doc.status || 'Unknown'}`;
       // Fallback to document summaries
       console.log('Building context from document summaries (keyword search fallback)');
       documentContext = relevantDocuments.map(doc => {
-        // Handle Veeva, uploaded documents, CFR regulations, and web resources
-        const isVeevaDoc = doc.source_type === 'veeva';
         const isUploadedDoc = doc.source_type === 'upload';
         const isCfrRegulation = doc.source_type === 'cfr_regulation';
         const isWebResource = doc.source_type === 'web_resource';
@@ -1981,33 +1670,6 @@ Domain: ${doc.domain || 'N/A'}`;
           
           context += '\n\n---';
           return context;
-        } else if (isVeevaDoc) {
-          context = `**${doc.document_name}** (${doc.document_number} v${doc.major_version}.${doc.minor_version})
-Type: ${doc.document_type || 'Unknown'}
-Status: ${doc.status || 'Unknown'}`;
-
-          // Add AI summary if available (truncated for comparison queries)
-          if (doc.summary) {
-            const maxSummaryLength = isComparisonQuery ? 300 : 800;
-            const summaryText = doc.summary.length > maxSummaryLength 
-              ? doc.summary.substring(0, maxSummaryLength) + '...' 
-              : doc.summary;
-            context += `\nAI Summary: ${summaryText}`;
-          }
-
-          // Add manual summary if available (truncated for comparison queries)
-          if (doc.manual_summary) {
-            const maxSummaryLength = isComparisonQuery ? 300 : 800;
-            const summaryText = doc.manual_summary.length > maxSummaryLength 
-              ? doc.manual_summary.substring(0, maxSummaryLength) + '...' 
-              : doc.manual_summary;
-            context += `\nManual Summary: ${summaryText}`;
-          }
-
-          // If no summaries available
-          if (!doc.summary && !doc.manual_summary) {
-            context += `\nSummary: No summary available`;
-          }
         } else if (isUploadedDoc) {
           const fileSizeKB = doc.file_size ? Math.round(doc.file_size / 1024) : 'Unknown';
           context = `**${doc.document_name}** (Uploaded Document)
@@ -2485,7 +2147,7 @@ ${externalResourcesContext}${securityGuardrails}`;
         `, [
           userId,
           Date.now().toString(), // Simple session identifier
-          relevantDocuments.map(doc => doc.veeva_document_id || doc.document_id),
+          relevantDocuments.map(doc => doc.document_id),
           message,
           response,
           JSON.stringify(comparisonMetadata)

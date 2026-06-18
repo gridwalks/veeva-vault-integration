@@ -2,16 +2,16 @@ import { getPool, initDatabase } from "./db.js";
 
 export const handler = async (event) => {
   console.log('=== CLEAR ALL CHUNKS ===');
-  
+
   try {
     await initDatabase();
     const pool = getPool();
-    
-    // Delete all chunks
-    const result = await pool.query('DELETE FROM Veeva_Doc_Chat_document_chunks');
-    
+
+    // Delete all uploaded document chunks
+    const result = await pool.query('DELETE FROM qms_chat_document_chunks');
+
     console.log(`Deleted ${result.rowCount} chunks`);
-    
+
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
@@ -29,7 +29,7 @@ export const handler = async (event) => {
       stack: error.stack,
       timestamp: new Date().toISOString()
     });
-    
+
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
@@ -40,4 +40,3 @@ export const handler = async (event) => {
     };
   }
 };
-

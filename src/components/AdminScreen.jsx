@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { useAuth0 } from '@auth0/auth0-react';
-import { indexDocuments, getIndexedDocuments, getSystemSettings, updateSystemSetting, deleteVeevaData } from "../api";
+import { indexDocuments, getIndexedDocuments } from "../api";
 import IndexedDocumentList from "./IndexedDocumentList.jsx";
 import BlobDocumentList from "./BlobDocumentList.jsx";
 import DocumentUpload from "./DocumentUpload.jsx";
@@ -10,25 +9,17 @@ import WorkflowManagement from "./WorkflowManagement.jsx";
 import IndexingLogs from "./IndexingLogs.jsx";
 import CfrTitle21 from "./CfrTitle21.jsx";
 import UserManagement from "./UserManagement.jsx";
-import VeevaDocumentList from "./VeevaDocumentList.jsx";
 import CourseAuthoring from "./CourseAuthoring.jsx";
 import EducationalAnalytics from "./EducationalAnalytics.jsx";
 import WebScraping from "./WebScraping.jsx";
 import PracticeManagement from "./PracticeManagement.jsx";
 
 export default function AdminScreen({ userId }) {
-  const { getAccessTokenSilently } = useAuth0();
   const [q, setQ] = useState("");
   const [indexedData, setIndexedData] = useState({ items: [], total: 0, pageOffset: 0, pageSize: 50 });
   const [activeTab, setActiveTab] = useState("indexed");
   const [isIndexing, setIsIndexing] = useState(false);
   const [indexResult, setIndexResult] = useState(null);
-  const [veevaIntegrationEnabled, setVeevaIntegrationEnabled] = useState(true);
-  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
-  const [settingsError, setSettingsError] = useState(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isDeletingVeevaData, setIsDeletingVeevaData] = useState(false);
-  const [deleteError, setDeleteError] = useState(null);
 
   async function loadIndexed(offset = 0) {
     console.log('Loading indexed documents...', { query: q, offset });
@@ -163,126 +154,51 @@ export default function AdminScreen({ userId }) {
   useEffect(() => {
     console.log('Admin screen mounted, loading initial data...');
     loadIndexed(0);
-    loadSystemSettings();
   }, []);
-
-  async function loadSystemSettings() {
-    setIsLoadingSettings(true);
-    setSettingsError(null);
-    try {
-      const accessToken = await getAccessTokenSilently();
-      const result = await getSystemSettings({ 
-        setting_key: 'veeva_integration_enabled',
-        accessToken 
-      });
-      if (result.setting) {
-        setVeevaIntegrationEnabled(result.setting.value);
-      }
-    } catch (err) {
-      console.error('Error loading system settings:', err);
-      setSettingsError(err.message);
-      // Default to enabled if we can't load settings
-      setVeevaIntegrationEnabled(true);
-    } finally {
-      setIsLoadingSettings(false);
-    }
-  }
-
-  async function handleToggleVeevaIntegration(enabled) {
-    setIsLoadingSettings(true);
-    setSettingsError(null);
-    try {
-      const accessToken = await getAccessTokenSilently();
-      await updateSystemSetting({
-        setting_key: 'veeva_integration_enabled',
-        setting_value: enabled,
-        accessToken
-      });
-      setVeevaIntegrationEnabled(enabled);
-      
-      // If disabling and user is on veeva-documents tab, switch to indexed tab
-      if (!enabled && activeTab === 'veeva-documents') {
-        setActiveTab('indexed');
-      }
-    } catch (err) {
-      console.error('Error updating system settings:', err);
-      setSettingsError(err.message);
-      // Revert the toggle on error
-      setVeevaIntegrationEnabled(!enabled);
-    } finally {
-      setIsLoadingSettings(false);
-    }
-  }
-
-  async function handleDeleteVeevaData() {
-    setIsDeletingVeevaData(true);
-    setDeleteError(null);
-    try {
-      const accessToken = await getAccessTokenSilently();
-      const result = await deleteVeevaData({ accessToken });
-      
-      console.log('Veeva data deleted successfully:', result);
-      
-      // Close confirmation dialog
-      setShowDeleteConfirm(false);
-      
-      // Refresh indexed documents to reflect the deletion
-      await loadIndexed(0);
-      
-      // Show success message (you could add a success state here)
-      alert(`Successfully deleted ${result.deletedDocuments} Veeva documents and ${result.deletedChunks} chunks from the database.`);
-    } catch (err) {
-      console.error('Error deleting Veeva data:', err);
-      setDeleteError(err.message);
-    } finally {
-      setIsDeletingVeevaData(false);
-    }
-  }
 
   const menuGroups = [
     {
       header: "Knowledge Management",
       items: [
-        { id: "indexed", label: "Indexed Documents", requiresVeeva: false },
-        ...(veevaIntegrationEnabled ? [{ id: "veeva-documents", label: "Available Documents in Veeva", requiresVeeva: true }] : []),
-        { id: "upload", label: "Upload Documents", requiresVeeva: false },
-        { id: "blob", label: "Blob Documents", requiresVeeva: false },
-        { id: "external", label: "External Resources", requiresVeeva: false },
-        { id: "cfr", label: "CFR Title 21", requiresVeeva: false },
-        { id: "practice-management", label: "Practice Associations", requiresVeeva: false },
-        { id: "web-scraping", label: "Web Scraping", requiresVeeva: false },
-        { id: "qa", label: "Q&A Management", requiresVeeva: false }
+        { id: "indexed", label: "Indexed Documents" },
+        { id: "upload", label: "Upload Documents" },
+        { id: "blob", label: "Blob Documents" },
+        { id: "external", label: "External Resources" },
+        { id: "cfr", label: "CFR Title 21" },
+        { id: "practice-management", label: "Practice Associations" },
+        { id: "web-scraping", label: "Web Scraping" },
+        { id: "qa", label: "Q&A Management" }
       ]
     },
     {
       header: "Workflow Management",
       items: [
-        { id: "workflow", label: "Workflow Management", requiresVeeva: false }
+        { id: "workflow", label: "Workflow Management" }
       ]
     },
     {
       header: "Education Management",
       items: [
-        { id: "course-authoring", label: "Course Authoring", requiresVeeva: false },
-        { id: "educational-analytics", label: "Educational Analytics", requiresVeeva: false }
+        { id: "course-authoring", label: "Course Authoring" },
+        { id: "educational-analytics", label: "Educational Analytics" }
       ]
     },
     {
       header: "User Management",
       items: [
-        { id: "users", label: "User Management", requiresVeeva: false }
+        { id: "users", label: "User Management" }
       ]
     },
     {
       header: "System Settings",
       items: [
-        { id: "settings", label: "System Settings", requiresVeeva: false }
+        { id: "settings", label: "System Settings" }
       ]
     },
     {
       header: "Logs",
       items: [
-        { id: "logs", label: "Indexing Logs", requiresVeeva: false }
+        { id: "logs", label: "Indexing Logs" }
       ]
     }
   ];
@@ -408,34 +324,32 @@ export default function AdminScreen({ userId }) {
           <button
             type="button"
             onClick={() => handleIndexDocuments(false)}
-            disabled={isIndexing || !veevaIntegrationEnabled}
+            disabled={isIndexing}
             style={{
               padding:'6px 12px',
-              backgroundColor: (isIndexing || !veevaIntegrationEnabled) ? '#ccc' : '#28a745',
+              backgroundColor: isIndexing ? '#ccc' : '#28a745',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
-              cursor: (isIndexing || !veevaIntegrationEnabled) ? 'not-allowed' : 'pointer',
+              cursor: isIndexing ? 'not-allowed' : 'pointer',
               fontSize:'12px'
             }}
-            title={!veevaIntegrationEnabled ? 'Veeva integration is disabled' : ''}
           >
             {isIndexing ? 'Indexing...' : 'Index Documents'}
           </button>
           <button
             type="button"
             onClick={() => handleIndexDocuments(true)}
-            disabled={isIndexing || !veevaIntegrationEnabled}
+            disabled={isIndexing}
             style={{
               padding:'6px 12px',
-              backgroundColor: (isIndexing || !veevaIntegrationEnabled) ? '#ccc' : '#ff6b35',
+              backgroundColor: isIndexing ? '#ccc' : '#ff6b35',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
-              cursor: (isIndexing || !veevaIntegrationEnabled) ? 'not-allowed' : 'pointer',
+              cursor: isIndexing ? 'not-allowed' : 'pointer',
               fontSize:'12px'
             }}
-            title={!veevaIntegrationEnabled ? 'Veeva integration is disabled' : ''}
           >
             {isIndexing ? 'Regenerating...' : 'Regenerate Summaries'}
           </button>
@@ -538,8 +452,6 @@ export default function AdminScreen({ userId }) {
             </button>
           </div>
         </>
-      ) : activeTab === "veeva-documents" ? (
-        <VeevaDocumentList />
       ) : activeTab === "upload" ? (
         <DocumentUpload
           userId={userId}
@@ -590,285 +502,7 @@ export default function AdminScreen({ userId }) {
           }}>
             System Settings
           </h2>
-
-          {settingsError && (
-            <div style={{
-              backgroundColor: '#f8d7da',
-              color: '#721c24',
-              padding: '12px',
-              borderRadius: '6px',
-              marginBottom: '16px',
-              border: '1px solid #f5c6cb',
-              fontSize: '14px'
-            }}>
-              Error: {settingsError}
-            </div>
-          )}
-
-          <div style={{
-            backgroundColor: '#f8f9fa',
-            border: '1px solid #e9ecef',
-            borderRadius: '6px',
-            padding: '20px',
-            marginBottom: '16px'
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '12px'
-            }}>
-              <div>
-                <h3 style={{
-                  margin: '0 0 4px 0',
-                  color: '#374151',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
-                  Veeva Vault Integration
-                </h3>
-                <p style={{
-                  margin: 0,
-                  color: '#6b7280',
-                  fontSize: '14px',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
-                  Enable or disable integration with Veeva Vault. When disabled, Veeva-related features will be hidden.
-                </p>
-              </div>
-              <label style={{
-                position: 'relative',
-                display: 'inline-block',
-                width: '60px',
-                height: '34px',
-                cursor: isLoadingSettings ? 'not-allowed' : 'pointer'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={veevaIntegrationEnabled}
-                  onChange={(e) => handleToggleVeevaIntegration(e.target.checked)}
-                  disabled={isLoadingSettings}
-                  style={{ opacity: 0, width: 0, height: 0 }}
-                />
-                <span style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: veevaIntegrationEnabled ? '#28a745' : '#ccc',
-                  borderRadius: '34px',
-                  transition: 'background-color 0.3s',
-                  opacity: isLoadingSettings ? 0.6 : 1
-                }}>
-                  <span style={{
-                    position: 'absolute',
-                    content: '""',
-                    height: '26px',
-                    width: '26px',
-                    left: veevaIntegrationEnabled ? '34px' : '4px',
-                    bottom: '4px',
-                    backgroundColor: 'white',
-                    borderRadius: '50%',
-                    transition: 'left 0.3s',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                  }} />
-                </span>
-              </label>
-            </div>
-            <div style={{
-              marginTop: '12px',
-              padding: '12px',
-              backgroundColor: '#ffffff',
-              borderRadius: '4px',
-              border: '1px solid #dee2e6'
-            }}>
-              <p style={{
-                margin: 0,
-                fontSize: '13px',
-                color: '#495057',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
-                <strong>Current Status:</strong> {veevaIntegrationEnabled ? (
-                  <span style={{ color: '#28a745', fontWeight: '600' }}>Enabled</span>
-                ) : (
-                  <span style={{ color: '#dc3545', fontWeight: '600' }}>Disabled</span>
-                )}
-              </p>
-              {isLoadingSettings && (
-                <p style={{
-                  margin: '8px 0 0 0',
-                  fontSize: '12px',
-                  color: '#6c757d',
-                  fontStyle: 'italic'
-                }}>
-                  Updating setting...
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Delete Veeva Data Section */}
-          <div style={{
-            backgroundColor: '#fff3cd',
-            border: '1px solid #ffc107',
-            borderRadius: '6px',
-            padding: '20px',
-            marginTop: '20px'
-          }}>
-            <div style={{
-              marginBottom: '12px'
-            }}>
-              <h3 style={{
-                margin: '0 0 4px 0',
-                color: '#856404',
-                fontSize: '16px',
-                fontWeight: '600',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
-                Delete All Veeva Data
-              </h3>
-              <p style={{
-                margin: 0,
-                color: '#856404',
-                fontSize: '14px',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
-                Permanently remove all Veeva documents and chunks from the database. This action cannot be undone.
-              </p>
-            </div>
-            
-            {deleteError && (
-              <div style={{
-                backgroundColor: '#f8d7da',
-                color: '#721c24',
-                padding: '12px',
-                borderRadius: '4px',
-                marginBottom: '12px',
-                border: '1px solid #f5c6cb',
-                fontSize: '14px'
-              }}>
-                Error: {deleteError}
-              </div>
-            )}
-
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              disabled={isDeletingVeevaData}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: isDeletingVeevaData ? '#ccc' : '#dc3545',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: isDeletingVeevaData ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                transition: 'background-color 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                if (!isDeletingVeevaData) {
-                  e.target.style.backgroundColor = '#c82333';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isDeletingVeevaData) {
-                  e.target.style.backgroundColor = '#dc3545';
-                }
-              }}
-            >
-              {isDeletingVeevaData ? 'Deleting...' : 'Delete All Veeva Data'}
-            </button>
-          </div>
-
-          {/* Confirmation Dialog */}
-          {showDeleteConfirm && (
-            <div style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000
-            }}>
-              <div style={{
-                backgroundColor: 'white',
-                borderRadius: '8px',
-                padding: '24px',
-                maxWidth: '500px',
-                width: '90%',
-                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-              }}>
-                <h3 style={{
-                  margin: '0 0 16px 0',
-                  color: '#dc3545',
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
-                  Confirm Deletion
-                </h3>
-                <p style={{
-                  margin: '0 0 24px 0',
-                  color: '#495057',
-                  fontSize: '14px',
-                  lineHeight: '1.5',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
-                  Are you sure you want to permanently delete all Veeva documents and chunks from the database? This action cannot be undone.
-                </p>
-                <div style={{
-                  display: 'flex',
-                  gap: '12px',
-                  justifyContent: 'flex-end'
-                }}>
-                  <button
-                    onClick={() => {
-                      setShowDeleteConfirm(false);
-                      setDeleteError(null);
-                    }}
-                    disabled={isDeletingVeevaData}
-                    style={{
-                      padding: '8px 16px',
-                      backgroundColor: '#6c757d',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: isDeletingVeevaData ? 'not-allowed' : 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleDeleteVeevaData}
-                    disabled={isDeletingVeevaData}
-                    style={{
-                      padding: '8px 16px',
-                      backgroundColor: isDeletingVeevaData ? '#ccc' : '#dc3545',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: isDeletingVeevaData ? 'not-allowed' : 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                    }}
-                  >
-                    {isDeletingVeevaData ? 'Deleting...' : 'Yes, Delete All Data'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          <p style={{ color: '#6b7280', fontSize: '14px' }}>No configurable settings at this time.</p>
         </div>
       ) : null}
       </div>

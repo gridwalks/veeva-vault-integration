@@ -965,36 +965,21 @@ The documents will be automatically included in the comparison analysis.
         document_number: displayNumber,
         // Add uploaded document properties
         isUploaded: document.isUploaded || document.source_type === 'upload',
-        source_type: document.source_type || 'veeva'
+        source_type: document.source_type || 'upload'
       };
       console.log('Mapped document for pane:', mappedDocument);
       onOpenDocumentInPane(mappedDocument);
     } else {
       // Fallback to direct download if no callback provided
-      if (document.isUploaded || document.source_type === 'upload') {
-        // For uploaded documents, use the download API
-        const url = downloadUploadedDocumentUrl({ documentId: document.id || document.document_id });
-        const a = window.document.createElement('a');
-        a.href = url;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.download = getDocumentSafeName(document) || document.original_filename || document.document_name || 'document';
-        window.document.body.appendChild(a);
-        a.click();
-        a.remove();
-      } else {
-        // For Veeva documents, use the regular download API
-        const [major, minor] = document.version.split('.');
-        const url = `/api/download-file?docId=${document.id}&major=${major}&minor=${minor}`;
-        const a = window.document.createElement('a');
-        a.href = url;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.download = displayName;
-        window.document.body.appendChild(a);
-        a.click();
-        a.remove();
-      }
+      const url = downloadUploadedDocumentUrl({ documentId: document.id || document.document_id });
+      const a = window.document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.download = getDocumentSafeName(document) || document.original_filename || document.document_name || 'document';
+      window.document.body.appendChild(a);
+      a.click();
+      a.remove();
     }
   };
 
@@ -1961,7 +1946,7 @@ The documents will be automatically included in the comparison analysis.
                     fontSize: '11px',
                     color: '#666'
                   }}>
-                    {selectedDocuments.length > 0 && `${selectedDocuments.length} Veeva document${selectedDocuments.length !== 1 ? 's' : ''}`}
+                    {selectedDocuments.length > 0 && `${selectedDocuments.length} document${selectedDocuments.length !== 1 ? 's' : ''}`}
                     {selectedDocuments.length > 0 && (attachedDocuments.length > 0 || uploadedBlobs.length > 0) && ', '}
                     {attachedDocuments.length > 0 && `${attachedDocuments.length} indexed upload${attachedDocuments.length !== 1 ? 's' : ''}`}
                     {attachedDocuments.length > 0 && uploadedBlobs.length > 0 && ', '}

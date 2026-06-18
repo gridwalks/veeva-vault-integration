@@ -1,4 +1,4 @@
-import { downloadUrl, updateManualSummary, downloadUploadedDocumentUrl, deleteDocument, regenerateDocumentSummary, acceptRegeneratedSummary } from "../api";
+import { updateManualSummary, downloadUploadedDocumentUrl, deleteDocument, regenerateDocumentSummary, acceptRegeneratedSummary } from "../api";
 import { useState } from "react";
 import DocumentViewer from "./DocumentViewer.jsx";
 import ReactMarkdown from "react-markdown";
@@ -21,14 +21,7 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected, o
 
   const handleViewDocument = (doc) => {
     let url;
-    if (doc.source_type === 'upload') {
-      // For uploaded documents, use the download API to get a proper URL
-      // blob_url is a key, not a direct URL, so we need to fetch via the API
-      url = downloadUploadedDocumentUrl({ documentId: doc.id });
-    } else {
-      // For Veeva documents, use the download API
-      url = downloadUrl({ id: doc.veeva_document_id, major: doc.major_version, minor: doc.minor_version });
-    }
+    url = downloadUploadedDocumentUrl({ documentId: doc.id });
     
     setSelectedDocument({
       url: url,
@@ -172,21 +165,9 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected, o
         hasBlobUrl: !!doc.blob_url
       });
       
-      // Determine source type - if source_type is undefined, infer from available fields
-      let sourceType = doc.source_type;
-      if (!sourceType) {
-        if (doc.veeva_document_id) {
-          sourceType = 'veeva';
-        } else if (doc.blob_url) {
-          sourceType = 'upload';
-        } else {
-          throw new Error('Cannot determine document source type - no veeva_document_id or blob_url found');
-        }
-      }
-      
       const result = await regenerateDocumentSummary({
         documentId: doc.id,
-        sourceType: sourceType
+        sourceType: 'upload'
       });
       
       console.log('Summary regeneration completed:', result);
@@ -348,7 +329,6 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected, o
                 >
                   View
                 </button>
-                {doc.source_type === 'upload' ? (
                   <a
                     href={downloadUploadedDocumentUrl({ documentId: doc.id })}
                     style={{
@@ -364,23 +344,6 @@ export default function IndexedDocumentList({ items = [], onDocumentsSelected, o
                   >
                     Download
                   </a>
-                ) : (
-                  <a
-                    href={downloadUrl({ id: doc.veeva_document_id, major: doc.major_version, minor: doc.minor_version })}
-                    style={{
-                      padding: '6px 10px',
-                      backgroundColor: '#28a745',
-                      color: 'white',
-                      textDecoration: 'none',
-                      borderRadius: '4px',
-                      fontSize: '11px'
-                    }}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Download
-                  </a>
-                )}
                 <button
                   onClick={() => handleDeleteDocument(doc)}
                   disabled={deletingDoc === doc.id}

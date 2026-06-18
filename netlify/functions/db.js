@@ -51,45 +51,6 @@ export async function initDatabase() {
     console.log('Initializing database schema...');
     const startTime = Date.now();
     
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS Veeva_Doc_Chat_document_index (
-        id SERIAL PRIMARY KEY,
-        veeva_document_id VARCHAR(255) UNIQUE NOT NULL,
-        document_number VARCHAR(255) NOT NULL,
-        document_name TEXT NOT NULL,
-        major_version INTEGER NOT NULL,
-        minor_version INTEGER NOT NULL,
-        document_type VARCHAR(255),
-        status VARCHAR(100),
-        summary TEXT,
-        manual_summary TEXT,
-        indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Create index for faster lookups
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_document_index_veeva_id 
-      ON Veeva_Doc_Chat_document_index(veeva_document_id)
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_document_index_number 
-      ON Veeva_Doc_Chat_document_index(document_number)
-    `);
-
-    // Add manual_summary column if it doesn't exist (for existing installations)
-    try {
-      await client.query(`
-        ALTER TABLE Veeva_Doc_Chat_document_index 
-        ADD COLUMN IF NOT EXISTS manual_summary TEXT
-      `);
-      console.log('Manual summary column added or already exists');
-    } catch (alterError) {
-      console.log('Manual summary column may already exist:', alterError.message);
-    }
-
     // Enable pgvector extension for vector similarity search
     try {
       await client.query(`CREATE EXTENSION IF NOT EXISTS vector`);
@@ -98,34 +59,6 @@ export async function initDatabase() {
       console.warn('Could not enable pgvector extension:', vectorError.message);
       console.warn('Vector search features will not be available. Please enable pgvector manually.');
     }
-
-    // Create document_chunks table for RAG
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS Veeva_Doc_Chat_document_chunks (
-        id SERIAL PRIMARY KEY,
-        document_id INTEGER NOT NULL REFERENCES Veeva_Doc_Chat_document_index(id) ON DELETE CASCADE,
-        veeva_document_id VARCHAR(255) NOT NULL,
-        chunk_index INTEGER NOT NULL,
-        chunk_text TEXT NOT NULL,
-        embedding vector(1536),
-        token_count INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(document_id, chunk_index)
-      )
-    `);
-
-    // Create indexes for chunks
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_chunks_document_id 
-      ON Veeva_Doc_Chat_document_chunks(document_id)
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_Veeva_Doc_Chat_chunks_veeva_document_id 
-      ON Veeva_Doc_Chat_document_chunks(veeva_document_id)
-    `);
-
-    console.log('Document chunks table created or already exists');
 
     // Create Q&A interactions table
     await client.query(`
@@ -569,7 +502,7 @@ export async function initDatabase() {
         content_data JSONB,
         estimated_minutes INTEGER,
         cfr_regulation_id INTEGER REFERENCES cfr_title21_regulations(id) ON DELETE SET NULL,
-        document_id INTEGER REFERENCES Veeva_Doc_Chat_document_index(id) ON DELETE SET NULL,
+        document_id INTEGER REFERENCES qms_chat_documents(id) ON DELETE SET NULL,
         workflow_template_id INTEGER REFERENCES qms_chat_workflow_templates(id) ON DELETE SET NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

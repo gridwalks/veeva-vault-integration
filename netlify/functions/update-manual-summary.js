@@ -39,12 +39,12 @@ export const handler = async (event) => {
       summaryPreview: manualSummary.substring(0, 100) + '...'
     });
 
-    // Update the manual summary for the document
+    // Update the manual summary for the uploaded document
     const query = `
-      UPDATE Veeva_Doc_Chat_document_index 
-      SET manual_summary = $1, updated_at = CURRENT_TIMESTAMP
+      UPDATE qms_chat_documents
+      SET ai_summary = $1, updated_at = CURRENT_TIMESTAMP
       WHERE id = $2
-      RETURNING id, veeva_document_id, document_name, manual_summary, updated_at
+      RETURNING id, document_name, ai_summary, updated_at
     `;
 
     const result = await pool.query(query, [manualSummary, documentId]);
@@ -64,7 +64,6 @@ export const handler = async (event) => {
     console.log('Manual summary updated successfully:', {
       documentId: updatedDocument.id,
       documentName: updatedDocument.document_name,
-      summaryLength: updatedDocument.manual_summary.length,
       updatedAt: updatedDocument.updated_at
     });
 
@@ -77,9 +76,8 @@ export const handler = async (event) => {
         success: true,
         document: {
           id: updatedDocument.id,
-          veeva_document_id: updatedDocument.veeva_document_id,
           document_name: updatedDocument.document_name,
-          manual_summary: updatedDocument.manual_summary,
+          manual_summary: updatedDocument.ai_summary,
           updated_at: updatedDocument.updated_at
         },
         metadata: {

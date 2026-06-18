@@ -452,16 +452,6 @@ export async function analyzePerformance({ course_id, lesson_id } = {}, accessTo
 // ============================================================================
 // Document listing functions
 // ============================================================================
-export async function listApproved({ name = "", limit = 50, offset = 0 } = {}) {
-  const data = await apiRequest({
-    url: '/api/list-approved',
-    params: { name, limit, offset },
-    successMessage: 'Fetching approved documents...',
-    errorMessage: 'Failed to load documents'
-  });
-  return data;
-}
-
 export async function indexDocuments({ name = "", limit = 100, force = false, batchSize = 5, batchOffset = 0 } = {}) {
   const params = { name, limit };
   if (force) params.force = 'true';
@@ -569,12 +559,6 @@ export async function cleanupIndexingLogs({ retentionDays = 30, dryRun = false }
     successMessage: 'Cleaning up indexing logs...',
     errorMessage: 'Failed to cleanup indexing logs'
   });
-}
-
-export function downloadUrl({ id, major, minor }) {
-  const p = new URLSearchParams({ docId: id });
-  if (major && minor) { p.set("major", major); p.set("minor", minor); }
-  return `/api/download-file?${p}`;
 }
 
 export function downloadUploadedDocumentUrl({ documentId }) {
@@ -1087,18 +1071,6 @@ export async function updateSystemSetting({ setting_key, setting_value, accessTo
     headers,
     successMessage: 'Updating system setting...',
     errorMessage: 'Failed to update system setting'
-  });
-}
-
-export async function deleteVeevaData({ accessToken }) {
-  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-  
-  return apiRequest({
-    url: '/api/delete-veeva-data',
-    method: 'DELETE',
-    headers,
-    successMessage: 'Deleting Veeva data...',
-    errorMessage: 'Failed to delete Veeva data'
   });
 }
 

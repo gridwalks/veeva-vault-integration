@@ -53,21 +53,10 @@ export const handler = async (event) => {
     await initDatabase();
     const pool = getPool();
     
-    // Get document count from both tables
-    let veevaDocCount = 0;
+    // Get document count
     let uploadedDocCount = 0;
-    let veevaChunkCount = 0;
     let uploadedChunkCount = 0;
-    
-    try {
-      const veevaDocCountResult = await pool.query(
-        'SELECT COUNT(*) as count FROM Veeva_Doc_Chat_document_index'
-      );
-      veevaDocCount = parseInt(veevaDocCountResult.rows[0].count);
-    } catch (e) {
-      console.log('Veeva documents table not accessible:', e.message);
-    }
-    
+
     try {
       const uploadedDocCountResult = await pool.query(
         'SELECT COUNT(*) as count FROM qms_chat_documents'
@@ -76,19 +65,9 @@ export const handler = async (event) => {
     } catch (e) {
       console.log('Uploaded documents table not accessible:', e.message);
     }
-    
-    const docCount = veevaDocCount + uploadedDocCount;
-    
-    // Get chunk count from both tables
-    try {
-      const veevaChunkCountResult = await pool.query(
-        'SELECT COUNT(*) as count FROM Veeva_Doc_Chat_document_chunks'
-      );
-      veevaChunkCount = parseInt(veevaChunkCountResult.rows[0].count);
-    } catch (e) {
-      console.log('Veeva chunks table not accessible:', e.message);
-    }
-    
+
+    const docCount = uploadedDocCount;
+
     try {
       const uploadedChunkCountResult = await pool.query(
         'SELECT COUNT(*) as count FROM qms_chat_document_chunks'
@@ -97,34 +76,15 @@ export const handler = async (event) => {
     } catch (e) {
       console.log('Uploaded chunks table not accessible:', e.message);
     }
-    
-    const chunkCount = veevaChunkCount + uploadedChunkCount;
-    
-    // Get documents with chunk counts and embedding validation from both tables
-    let veevaDocChunkStats = { rows: [] };
+
+    const chunkCount = uploadedChunkCount;
+
+    // Get documents with chunk counts and embedding validation
     let uploadedDocChunkStats = { rows: [] };
-    
-    try {
-      veevaDocChunkStats = await pool.query(`
-        SELECT 
-          di.id,
-          di.veeva_document_id,
-          di.document_name,
-          COUNT(dc.id) as chunk_count,
-          COUNT(CASE WHEN dc.embedding IS NOT NULL THEN 1 END) as chunks_with_embeddings,
-          COUNT(CASE WHEN dc.embedding IS NOT NULL THEN 1 END) as chunks_with_valid_embeddings,
-          'veeva' as source_type
-        FROM Veeva_Doc_Chat_document_index di
-        LEFT JOIN Veeva_Doc_Chat_document_chunks dc ON di.id = dc.document_id
-        GROUP BY di.id, di.veeva_document_id, di.document_name
-      `);
-    } catch (e) {
-      console.log('Veeva documents query failed:', e.message);
-    }
-    
+
     try {
       uploadedDocChunkStats = await pool.query(`
-        SELECT 
+        SELECT
           d.id,
           d.original_filename as veeva_document_id,
           d.document_name,
@@ -139,36 +99,19 @@ export const handler = async (event) => {
     } catch (e) {
       console.log('Uploaded documents query failed:', e.message);
     }
-    
-    // Combine both result sets
-    const docChunkStats = {
-      rows: [...veevaDocChunkStats.rows, ...uploadedDocChunkStats.rows]
-    };
+
+    const docChunkStats = { rows: uploadedDocChunkStats.rows };
     
     const docsWithChunks = docChunkStats.rows.filter(row => row.chunk_count > 0).length;
     const docsWithoutChunks = docChunkStats.rows.filter(row => row.chunk_count === 0).length;
     const docsWithValidEmbeddings = docChunkStats.rows.filter(row => row.chunks_with_valid_embeddings > 0).length;
     
-    // Check for chunks with invalid embeddings from both tables
-    let veevaInvalidEmbeddingStats = { rows: [{ chunks_without_embeddings: 0, chunks_with_invalid_embeddings: 0, empty_chunks: 0, short_chunks: 0 }] };
+    // Check for chunks with invalid embeddings
     let uploadedInvalidEmbeddingStats = { rows: [{ chunks_without_embeddings: 0, chunks_with_invalid_embeddings: 0, empty_chunks: 0, short_chunks: 0 }] };
-    
-    try {
-      veevaInvalidEmbeddingStats = await pool.query(`
-        SELECT 
-          COUNT(CASE WHEN embedding IS NULL THEN 1 END) as chunks_without_embeddings,
-          COUNT(CASE WHEN embedding IS NOT NULL THEN 1 END) as chunks_with_invalid_embeddings,
-          COUNT(CASE WHEN chunk_text IS NULL OR chunk_text = '' THEN 1 END) as empty_chunks,
-          COUNT(CASE WHEN LENGTH(chunk_text) < 10 THEN 1 END) as short_chunks
-        FROM Veeva_Doc_Chat_document_chunks
-      `);
-    } catch (e) {
-      console.log('Veeva chunks table not accessible:', e.message);
-    }
-    
+
     try {
       uploadedInvalidEmbeddingStats = await pool.query(`
-        SELECT 
+        SELECT
           COUNT(CASE WHEN embedding IS NULL THEN 1 END) as chunks_without_embeddings,
           COUNT(CASE WHEN embedding IS NOT NULL THEN 1 END) as chunks_with_invalid_embeddings,
           COUNT(CASE WHEN chunk_text IS NULL OR chunk_text = '' THEN 1 END) as empty_chunks,
@@ -178,16 +121,13 @@ export const handler = async (event) => {
     } catch (e) {
       console.log('Uploaded chunks table not accessible:', e.message);
     }
-    
-    // Combine the stats
+
     const invalidStats = {
-      chunks_without_embeddings: parseInt(veevaInvalidEmbeddingStats.rows[0].chunks_without_embeddings) + parseInt(uploadedInvalidEmbeddingStats.rows[0].chunks_without_embeddings),
-      chunks_with_invalid_embeddings: parseInt(veevaInvalidEmbeddingStats.rows[0].chunks_with_invalid_embeddings) + parseInt(uploadedInvalidEmbeddingStats.rows[0].chunks_with_invalid_embeddings),
-      empty_chunks: parseInt(veevaInvalidEmbeddingStats.rows[0].empty_chunks) + parseInt(uploadedInvalidEmbeddingStats.rows[0].empty_chunks),
-      short_chunks: parseInt(veevaInvalidEmbeddingStats.rows[0].short_chunks) + parseInt(uploadedInvalidEmbeddingStats.rows[0].short_chunks)
+      chunks_without_embeddings: parseInt(uploadedInvalidEmbeddingStats.rows[0].chunks_without_embeddings),
+      chunks_with_invalid_embeddings: parseInt(uploadedInvalidEmbeddingStats.rows[0].chunks_with_invalid_embeddings),
+      empty_chunks: parseInt(uploadedInvalidEmbeddingStats.rows[0].empty_chunks),
+      short_chunks: parseInt(uploadedInvalidEmbeddingStats.rows[0].short_chunks)
     };
-    
-    // Remove the old line since we already have invalidStats defined above
     
     console.log('Chunk statistics:', {
       totalDocuments: docCount,
@@ -206,54 +146,27 @@ export const handler = async (event) => {
     let vectorSearchTest = null;
     try {
       if (chunkCount > 0) {
-        // Try to get a sample embedding from either table
-        let sampleChunk = null;
-        try {
-          sampleChunk = await pool.query(`
-            SELECT embedding FROM Veeva_Doc_Chat_document_chunks 
-            WHERE embedding IS NOT NULL
-            LIMIT 1
-          `);
-        } catch (e) {
-          // If Veeva table doesn't exist, try uploaded chunks table
-          sampleChunk = await pool.query(`
-            SELECT embedding FROM qms_chat_document_chunks 
-            WHERE embedding IS NOT NULL
-            LIMIT 1
-          `);
-        }
-        
+        // Try to get a sample embedding from uploaded chunks table
+        const sampleChunk = await pool.query(`
+          SELECT embedding FROM qms_chat_document_chunks
+          WHERE embedding IS NOT NULL
+          LIMIT 1
+        `);
+
         if (sampleChunk.rows.length > 0) {
           const testEmbedding = sampleChunk.rows[0].embedding;
-          
-          // Test both tables for vector search
-          let vectorTest = null;
-          try {
-            vectorTest = await pool.query(`
-              SELECT 
-                dc.chunk_text,
-                di.document_name,
-                1 - (dc.embedding <=> $1::vector) as similarity
-              FROM Veeva_Doc_Chat_document_chunks dc
-              JOIN Veeva_Doc_Chat_document_index di ON dc.document_id = di.id
-              WHERE dc.embedding IS NOT NULL
-              ORDER BY dc.embedding <=> $1::vector
-              LIMIT 3
-            `, [testEmbedding]);
-          } catch (e) {
-            // If Veeva table doesn't exist, try uploaded chunks
-            vectorTest = await pool.query(`
-              SELECT 
-                c.chunk_text,
-                d.document_name,
-                1 - (c.embedding <=> $1::vector) as similarity
-              FROM qms_chat_document_chunks c
-              JOIN qms_chat_documents d ON c.document_id = d.id
-              WHERE c.embedding IS NOT NULL
-              ORDER BY c.embedding <=> $1::vector
-              LIMIT 3
-            `, [testEmbedding]);
-          }
+
+          const vectorTest = await pool.query(`
+            SELECT
+              c.chunk_text,
+              d.document_name,
+              1 - (c.embedding <=> $1::vector) as similarity
+            FROM qms_chat_document_chunks c
+            JOIN qms_chat_documents d ON c.document_id = d.id
+            WHERE c.embedding IS NOT NULL
+            ORDER BY c.embedding <=> $1::vector
+            LIMIT 3
+          `, [testEmbedding]);
           
           vectorSearchTest = {
             success: true,

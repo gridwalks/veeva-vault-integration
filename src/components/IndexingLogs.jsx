@@ -103,7 +103,6 @@ export default function IndexingLogs() {
 
   const getSourceTypeColor = (sourceType) => {
     switch (sourceType) {
-      case 'veeva': return 'text-indigo-600 bg-indigo-100';
       case 'upload': return 'text-emerald-600 bg-emerald-100';
       case 'external': return 'text-amber-600 bg-amber-100';
       default: return 'text-gray-600 bg-gray-100';
@@ -229,7 +228,6 @@ export default function IndexingLogs() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">All</option>
-                <option value="veeva">Veeva</option>
                 <option value="upload">Upload</option>
                 <option value="external">External</option>
               </select>
