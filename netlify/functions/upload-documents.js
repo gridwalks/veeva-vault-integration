@@ -533,6 +533,8 @@ export const handler = async (event) => {
   const pool = getPool();
 
   // Test DB connectivity before doing anything else
+  const dbUrl = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL || '';
+  const dbUrlPreview = dbUrl ? dbUrl.replace(/:([^:@]+)@/, ':***@').substring(0, 80) : 'NOT SET';
   try {
     await pool.query('SELECT 1');
   } catch (connError) {
@@ -540,7 +542,13 @@ export const handler = async (event) => {
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: JSON.stringify({ success: false, error: 'Database connection failed', details: connError.message })
+      body: JSON.stringify({
+        success: false,
+        error: 'Database connection failed',
+        details: connError.message,
+        connectionStringPreview: dbUrlPreview,
+        hint: dbUrl.startsWith('http') ? 'SUPABASE_DATABASE_URL looks like a REST URL, not a PostgreSQL connection string' : 'Check Netlify env vars'
+      })
     };
   }
 
